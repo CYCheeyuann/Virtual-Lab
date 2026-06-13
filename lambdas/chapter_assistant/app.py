@@ -4,6 +4,7 @@ import boto3
 from flask import Flask, request, Response, stream_with_context
 
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 
 bedrock = boto3.client("bedrock-runtime", region_name="ap-southeast-1")
 MODEL_ID = "global.anthropic.claude-sonnet-4-6-20260217-v1:0"
@@ -13,18 +14,19 @@ def cors_headers():
     return {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST,OPTIONS",
+        "Access-Control-Allow-Methods": "POST,OPTIONS,GET",
     }
 
 
-@app.route("/", methods=["OPTIONS"])
-def options():
-    return Response("", status=200, headers=cors_headers())
+@app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
+@app.route("/<path:path>", methods=["GET", "POST", "OPTIONS"])
+def handler(path):
+    if request.method == "OPTIONS":
+        return Response("", status=200, headers=cors_headers())
+    if request.method == "GET":
+        return Response("Chapter Assistant ready", status=200, headers=cors_headers())
 
-
-@app.route("/", methods=["POST"])
-def generate():
-    body = request.get_json(force=True)
+    body = request.get_json(force=True, silent=True) or {}
     subject = body.get("subject", "Biology")
 
     prompt = (
@@ -34,25 +36,28 @@ def generate():
         "and important topics students should focus on."
     )
 
-    messages = [{"role": "user", "content": [{"text": prompt}]}]
+    messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
 
     def stream():
-        response = bedrock.invoke_model_with_response_stream(
-            modelId=MODEL_ID,
-            body=json.dumps({
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 4096,
-                "messages": messages,
-            }),
-        )
-        for event in response["body"]:
-            chunk = event.get("chunk")
-            if chunk:
-                data = json.loads(chunk["bytes"])
-                if data.get("type") == "content_block_delta":
-                    text = data["delta"].get("text", "")
-                    if text:
-                        yield text
+        try:
+            response = bedrock.invoke_model_with_response_stream(
+                modelId=MODEL_ID,
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 4096,
+                    "messages": messages,
+                }),
+            )
+            for event in response["body"]:
+                chunk = event.get("chunk")
+                if chunk:
+                    data = json.loads(chunk["bytes"])
+                    if data.get("type") == "content_block_delta":
+                        text = data["delta"].get("text", "")
+                        if text:
+                            yield text
+        except Exception as e:
+            yield f"\n\n⚠️ Error: {str(e)}"
 
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"

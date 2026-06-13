@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📝 Science Quiz</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <div class="brand">🔬 Virtual Science Lab</div>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link" href="chapter.html">Chapter Assistant</a>
+        <a class="nav-link" href="experiment.html">Experiment Guide</a>
+        <a class="nav-link active" href="quiz.html">Science Quiz</a>
+        <a class="nav-link" href="tutor.html">Science Tutor</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="page-header">
+      <h1>📝 Science Quiz</h1>
+      <p>Generate a multiple-choice quiz. Answers are blurred until you choose to reveal them.</p>
+    </div>
+
+    <section class="card">
+      <h2>Setup</h2>
+
+      <label for="subject">Subject</label>
+      <select id="subject" class="input">
+        <option value="Biology">Biology</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Physics">Physics</option>
+      </select>
+
+      <label for="topic">Quiz Topic</label>
+      <input id="topic" type="text" class="input"
+        placeholder="e.g. Photosynthesis, The Periodic Table, Gravity and Motion…" />
+
+      <label for="difficulty">Difficulty</label>
+      <select id="difficulty" class="input">
+        <option value="Beginner">Beginner</option>
+        <option value="Standard" selected>Standard</option>
+        <option value="Expert">Expert</option>
+        <option value="Master">Master</option>
+      </select>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="runBtn" class="btn btn-primary">▶ Generate Quiz</button>
+        <button id="revealBtn" class="btn btn-ghost">👁️ Reveal Answers</button>
+        <button id="resetBtn" class="btn btn-ghost">🔄 Reset</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>📚 Quiz</h2>
+      <div class="output-panel text-panel answer-hidden" id="out-quiz">
+        <div class="placeholder">Your quiz will appear here…</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="common.js"></script>
+  <script>
+    document.getElementById('runBtn').addEventListener('click', () => {
+      const subject    = document.getElementById('subject').value;
+      const quiz_topic = document.getElementById('topic').value.trim();
+      const difficulty = document.getElementById('difficulty').value;
+      const out = document.getElementById('out-quiz');
+      if (!quiz_topic) {
+        out.innerHTML = '<div class="error-msg">⚠️ Please enter a quiz topic first.</div>';
+        return;
+      }
+      out.classList.add('answer-hidden');
+      streamToPanel(window.STREAM_URLS.science_quiz, { subject, quiz_topic, difficulty }, 'out-quiz');
+    });
+
+    document.getElementById('revealBtn').addEventListener('click', () => {
+      document.getElementById('out-quiz').classList.toggle('answer-hidden');
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('topic').value = '';
+      document.getElementById('subject').value = 'Biology';
+      document.getElementById('difficulty').value = 'Standard';
+      const o = document.getElementById('out-quiz');
+      o.classList.add('answer-hidden');
+      o.innerHTML = '<div class="placeholder">Your quiz will appear here…</div>';
+    });
+  </script>
+</body>
+</html>

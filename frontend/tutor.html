@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🤖 Science Tutor</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <div class="brand">🔬 Virtual Science Lab</div>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link" href="chapter.html">Chapter Assistant</a>
+        <a class="nav-link" href="experiment.html">Experiment Guide</a>
+        <a class="nav-link" href="quiz.html">Science Quiz</a>
+        <a class="nav-link active" href="tutor.html">Science Tutor</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="page-header">
+      <h1>🤖 Science Tutor</h1>
+      <p>Streaming chat with conversation memory. Upload a document and ask the tutor to analyse it.</p>
+    </div>
+
+    <section class="card">
+      <h2>Settings</h2>
+      <label for="subject">Subject</label>
+      <select id="subject" class="input">
+        <option value="Biology">Biology</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Physics">Physics</option>
+      </select>
+
+      <label>Optional document (one-time, attached to next message)</label>
+      <div class="dropzone" id="dz">
+        <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html" hidden />
+        <p>📄 Drag &amp; drop or click to upload</p>
+        <small>JPG · PNG · WEBP · PDF · DOCX · PPTX · CSV · JSON · HTML</small>
+        <div class="file-info" id="file-info"></div>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="resetBtn" class="btn btn-ghost">🔄 Clear conversation</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>💬 Conversation</h2>
+      <div class="chat-panel" id="chat-panel">
+        <div class="chat-bubble bot">
+          🔬 Hi future scientist! I'm your Science Tutor. Ask me anything or upload a document and I'll explain it.
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input id="chatInput" type="text" class="input" placeholder="🔬 Type your science question…" />
+        <button id="sendBtn" class="btn btn-primary">Send</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="common.js"></script>
+  <script>
+    let history = [];
+    let pendingFile = { data: null, mime: null };
+    setupDropzone('dz', 'file', 'file-info', f => pendingFile = f);
+
+    function renderInline(text) {
+      return escapeHtml(text)
+        .replace(/^### (.+)$/gm, '<strong>$1</strong>')
+        .replace(/^## (.+)$/gm,  '<strong>$1</strong>')
+        .replace(/^# (.+)$/gm,   '<strong>$1</strong>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    }
+
+    async function send() {
+      const input = document.getElementById('chatInput');
+      const message = input.value.trim();
+      if (!message) return;
+
+      const subject = document.getElementById('subject').value;
+      const panel   = document.getElementById('chat-panel');
+
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble user';
+      userBubble.textContent = message;
+      panel.appendChild(userBubble);
+      input.value = '';
+      panel.scrollTop = panel.scrollHeight;
+
+      const botBubble = document.createElement('div');
+      botBubble.className = 'chat-bubble bot';
+      botBubble.innerHTML = '<span class="spinner"></span>';
+      panel.appendChild(botBubble);
+
+      const url = window.STREAM_URLS.science_tutor;
+      if (!url || url.startsWith('__URL_')) {
+        botBubble.innerHTML = '<span class="error-msg">⚠️ Streaming URL not configured.</span>';
+        return;
+      }
+
+      const body = { subject, message, history: history.slice() };
+      if (pendingFile.data) {
+        body.file_data = pendingFile.data;
+        body.file_mime = pendingFile.mime;
+        pendingFile = { data: null, mime: null };
+        document.getElementById('file-info').textContent = '';
+      }
+
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        botBubble.innerHTML = '<span class="streaming-cursor"></span>';
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder('utf-8');
+        let full = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          full += dec.decode(value, { stream: true });
+          botBubble.innerHTML = renderInline(full) + '<span class="streaming-cursor"></span>';
+          panel.scrollTop = panel.scrollHeight;
+        }
+        botBubble.innerHTML = renderInline(full);
+        history.push({ role: 'user', content: message });
+        history.push({ role: 'assistant', content: full });
+      } catch (err) {
+        botBubble.innerHTML = `<span class="error-msg">⚠️ ${err.message}</span>`;
+      }
+    }
+
+    document.getElementById('sendBtn').addEventListener('click', send);
+    document.getElementById('chatInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') send();
+    });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      history = [];
+      pendingFile = { data: null, mime: null };
+      document.getElementById('file-info').textContent = '';
+      document.getElementById('chat-panel').innerHTML =
+        '<div class="chat-bubble bot">Conversation cleared. Ask me anything!</div>';
+    });
+  </script>
+</body>
+</html>

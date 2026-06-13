@@ -5,6 +5,7 @@ import boto3
 from flask import Flask, request, Response, stream_with_context
 
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 
 bedrock = boto3.client("bedrock-runtime", region_name="ap-southeast-1")
 MODEL_ID = "global.anthropic.claude-sonnet-4-6-20260217-v1:0"
@@ -14,33 +15,54 @@ def cors_headers():
     return {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST,OPTIONS",
+        "Access-Control-Allow-Methods": "POST,OPTIONS,GET",
     }
 
 
-@app.route("/", methods=["OPTIONS"])
-def options():
-    return Response("", status=200, headers=cors_headers())
+def doc_format_from_mime(file_mime: str) -> str:
+    m = (file_mime or "").lower()
+    if "pdf" in m: return "pdf"
+    if "csv" in m: return "csv"
+    if "html" in m: return "html"
+    if "json" in m: return "txt"
+    if "docx" in m or "wordprocessingml" in m: return "docx"
+    if "xlsx" in m or "spreadsheetml" in m: return "xlsx"
+    if "pptx" in m or "presentationml" in m: return "pptx"
+    return "txt"
 
 
-@app.route("/", methods=["POST"])
-def generate():
-    body = request.get_json(force=True)
-    subject = body.get("subject", "Biology")
-    topic = body.get("topic", "")
+def image_format_from_mime(file_mime: str) -> str:
+    m = (file_mime or "").lower()
+    if "png"  in m: return "png"
+    if "webp" in m: return "webp"
+    if "gif"  in m: return "gif"
+    return "jpeg"
+
+
+@app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
+@app.route("/<path:path>", methods=["GET", "POST", "OPTIONS"])
+def handler(path):
+    if request.method == "OPTIONS":
+        return Response("", status=200, headers=cors_headers())
+    if request.method == "GET":
+        return Response("Experiment Guide ready", status=200, headers=cors_headers())
+
+    body = request.get_json(force=True, silent=True) or {}
+    subject    = body.get("subject", "Biology")
+    topic      = body.get("topic", "")
     difficulty = body.get("difficulty", "Standard")
-    file_data = body.get("file_data", None)
-    file_mime = body.get("file_mime", None)
+    file_data  = body.get("file_data")
+    file_mime  = body.get("file_mime")
 
     prompt = f"""You are an expert science educator and lab instructor.
 
 **PART 1: Document Analysis and Validation (if file uploaded)**
 
-If a document is provided, first validate its relevance:
+If a document is provided, first validate its relevance.
 
 ⚠️ **VALIDATION CHECK**
 - Examine if the document content is related to science, experiments, laboratory work, scientific concepts, or educational science topics
-- If the document is NOT science-related (e.g. business documents, personal letters, non-scientific content), respond with:
+- If the document is NOT science-related, respond with:
 
 ❌ **ERROR: Invalid Document**
 The uploaded document does not appear to be related to science or experiments. Please upload a document containing:
@@ -66,89 +88,81 @@ If the document IS science-related, proceed with analysis:
 
 **PART 2: Experiment Guide Generation**
 
-Generate a complete, detailed, and engaging experiment guide based on:
+Generate a complete, detailed, engaging experiment guide based on:
 Subject: {subject}
 Difficulty: {difficulty}
 Topic: {topic}
 
 Structure your response with the following emoji-headed sections:
 
-🎯 Objective — State the purpose and learning goal of the experiment.
+🎯 Objective — purpose and learning goal of the experiment.
 
-🧰 Materials — List everything needed with quantities and specifications.
+🧰 Materials — everything needed with quantities and specifications.
 
-🔬 Procedure — Provide clear numbered step-by-step instructions.
+🔬 Procedure — clear numbered step-by-step instructions.
 
-📊 Expected Results — Describe what the student should observe and measure.
+⚠️ Safety Briefing — list each hazard and the corresponding precaution.
 
-🧠 Scientific Explanation — Explain the underlying science concepts in an engaging, accurate way appropriate for the difficulty level.
+📊 Expected Results — what the student should observe and measure.
 
-🌍 Real-Life Applications — Share 3-4 real-world examples where this science is used.
+🧠 Scientific Explanation — explain the underlying concepts at the difficulty level.
 
-📝 Summary — Provide a concise 2-3 sentence recap of the entire experiment, highlighting the key learning points and main scientific concept explored.
+🌍 Real-Life Applications — 3-4 real-world examples.
 
-If a validated document was provided, incorporate insights from it into the experiment guide where relevant.
+📝 Summary — concise 2-3 sentence recap of the experiment.
 
-Make it educational, accurate, and exciting. Use clear language appropriate for the selected difficulty level."""
+If a validated document was provided, incorporate insights from it where relevant.
+
+Make it educational, accurate, and exciting."""
 
     content_blocks = []
-
-    # Handle file upload - multimodal content
     if file_data and file_mime:
-        if file_mime.startswith("image/"):
-            content_blocks.append({
-                "image": {
-                    "format": file_mime.split("/")[1].replace("jpeg", "jpeg"),
+        try:
+            raw = base64.b64decode(file_data)
+            if file_mime.startswith("image/"):
+                content_blocks.append({
+                    "type": "image",
                     "source": {
-                        "bytes": base64.b64decode(file_data)
-                    }
-                }
-            })
-        else:
-            # Document block for non-image files
-            fmt = "pdf"
-            if "pdf" in file_mime:
-                fmt = "pdf"
-            elif "csv" in file_mime:
-                fmt = "csv"
-            elif "html" in file_mime:
-                fmt = "html"
-            elif "docx" in file_mime or "wordprocessingml" in file_mime:
-                fmt = "docx"
-            elif "xlsx" in file_mime or "spreadsheetml" in file_mime:
-                fmt = "xlsx"
-            elif "pptx" in file_mime or "presentationml" in file_mime:
-                fmt = "pptx"
-            content_blocks.append({
-                "document": {
-                    "format": fmt,
-                    "name": "uploaded_document",
+                        "type": "base64",
+                        "media_type": file_mime,
+                        "data": file_data,
+                    },
+                })
+            else:
+                content_blocks.append({
+                    "type": "document",
                     "source": {
-                        "bytes": base64.b64decode(file_data)
-                    }
-                }
-            })
+                        "type": "base64",
+                        "media_type": file_mime,
+                        "data": file_data,
+                    },
+                })
+        except Exception:
+            pass
 
-    content_blocks.append({"text": prompt})
+    content_blocks.append({"type": "text", "text": prompt})
     messages = [{"role": "user", "content": content_blocks}]
 
     def stream():
-        response = bedrock.invoke_model_with_response_stream(
-            modelId=MODEL_ID,
-            body=json.dumps({
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 4096,
-                "messages": messages,
-            }),
-        )
-        for event in response["body"]:
-            chunk = event.get("chunk")
-            if chunk:
-                data = json.loads(chunk["bytes"])
-                if data.get("type") == "content_block_delta":
-                    text = data["delta"].get("text", "")
-                    if text:
-                        yield text
+        try:
+            response = bedrock.invoke_model_with_response_stream(
+                modelId=MODEL_ID,
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 4096,
+                    "messages": messages,
+                }),
+            )
+            for event in response["body"]:
+                chunk = event.get("chunk")
+                if chunk:
+                    data = json.loads(chunk["bytes"])
+                    if data.get("type") == "content_block_delta":
+                        text = data["delta"].get("text", "")
+                        if text:
+                            yield text
+        except Exception as e:
+            yield f"\n\n⚠️ Error: {str(e)}"
 
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"

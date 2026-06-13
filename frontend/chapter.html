@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📖 Chapter Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <div class="brand">🔬 Virtual Science Lab</div>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link active" href="chapter.html">Chapter Assistant</a>
+        <a class="nav-link" href="experiment.html">Experiment Guide</a>
+        <a class="nav-link" href="quiz.html">Science Quiz</a>
+        <a class="nav-link" href="tutor.html">Science Tutor</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="page-header">
+      <h1>📖 Chapter Assistant</h1>
+      <p>Pick a subject and get a structured overview of its main chapters and key concepts.</p>
+    </div>
+
+    <section class="card">
+      <h2>Subject</h2>
+      <label for="subject">Select Science Subject</label>
+      <select id="subject" class="input">
+        <option value="Biology">Biology</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Physics">Physics</option>
+      </select>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="runBtn" class="btn btn-primary">▶ Generate Overview</button>
+        <button id="resetBtn" class="btn btn-ghost">🔄 Reset</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>📑 Chapter Overview</h2>
+      <div class="output-panel text-panel" id="out-chapter">
+        <div class="placeholder">Chapter overview will appear here…</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="common.js"></script>
+  <script>
+    document.getElementById('runBtn').addEventListener('click', () => {
+      const subject = document.getElementById('subject').value;
+      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject }, 'out-chapter');
+    });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('subject').value = 'Biology';
+      clearPanel('out-chapter', 'Chapter overview will appear here…');
+    });
+  </script>
+</body>
+</html>

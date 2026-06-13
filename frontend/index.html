@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🔬 Virtual Science Lab Assistant</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="hero">
+      <h1>🔬 Virtual Science Lab Assistant</h1>
+      <p class="tagline">Your AI-powered companion for Biology, Chemistry &amp; Physics</p>
+      <div class="hero-actions">
+        <button id="runAllBtn" class="btn btn-primary">▶ Run All</button>
+        <button id="resetBtn" class="btn btn-secondary">🔄 Reset</button>
+      </div>
+    </header>
+
+    <main class="grid">
+
+      <!-- Widget 1: Subject -->
+      <section class="card">
+        <h2>📚 Subject</h2>
+        <p class="hint">Select Science Subject</p>
+        <select id="subject" class="input">
+          <option value="Biology">Biology</option>
+          <option value="Chemistry">Chemistry</option>
+          <option value="Physics">Physics</option>
+        </select>
+      </section>
+
+      <!-- Widget 2: Chapter Assistant (AI output) -->
+      <section class="card">
+        <h2>📖 Chapter Assistant</h2>
+        <p class="hint">AI-generated chapter overview based on your selected subject</p>
+        <button class="btn btn-run" data-run="chapter">Generate</button>
+        <div class="output-panel text-panel" id="out-chapter">
+          <div class="placeholder">Chapter overview will appear here…</div>
+        </div>
+      </section>
+
+      <!-- Widget 3: Experiment Topic -->
+      <section class="card">
+        <h2>🧪 Experiment Topic</h2>
+        <input id="experimentTopic" type="text" class="input"
+          placeholder="e.g. Osmosis, Acid-Base Reactions, Newton's Laws of Motion..." />
+      </section>
+
+      <!-- Widget 4: Experiment Document -->
+      <section class="card">
+        <h2>📎 Experiment Document</h2>
+        <p class="hint">Upload a document related to your experiment (optional). The AI will analyze and summarize its content.</p>
+        <div class="dropzone" id="dz-experiment">
+          <input type="file" id="file-experiment" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html" hidden />
+          <p>📄 Drag &amp; drop or click to upload<br><small>JPG · PNG · WEBP · PDF · DOCX · PPTX · CSV · JSON · HTML</small></p>
+          <div class="file-info" id="file-info-experiment"></div>
+        </div>
+      </section>
+
+      <!-- Widget 5: Difficulty Level (input for experiment) -->
+      <section class="card">
+        <h2>🎚️ Experiment Difficulty</h2>
+        <select id="experimentDifficulty" class="input">
+          <option value="Beginner">Beginner</option>
+          <option value="Standard" selected>Standard</option>
+          <option value="Expert">Expert</option>
+          <option value="Master">Master</option>
+        </select>
+      </section>
+
+      <!-- Widget 5 cont: Experiment Guide (AI output) -->
+      <section class="card card-wide">
+        <h2>🔬 Experiment Guide</h2>
+        <p class="hint">Complete experiment guide with safety briefing</p>
+        <button class="btn btn-run" data-run="experiment">Generate</button>
+        <div class="output-panel text-panel" id="out-experiment">
+          <div class="placeholder">Your experiment guide will appear here…</div>
+        </div>
+      </section>
+
+      <!-- Widget 8: Quiz Difficulty -->
+      <section class="card">
+        <h2>🎯 Quiz Difficulty</h2>
+        <p class="hint">Select quiz difficulty…</p>
+        <select id="quizDifficulty" class="input">
+          <option value="Beginner">Beginner</option>
+          <option value="Standard" selected>Standard</option>
+          <option value="Expert">Expert</option>
+          <option value="Master">Master</option>
+        </select>
+      </section>
+
+      <!-- Widget 9: Quiz Topic -->
+      <section class="card">
+        <h2>❓ Quiz Topic</h2>
+        <input id="quizTopic" type="text" class="input"
+          placeholder="e.g. Photosynthesis, The Periodic Table, Gravity and Motion, Cell Division..." />
+      </section>
+
+      <!-- Widget 10: Science Quiz (AI output) -->
+      <section class="card card-wide">
+        <h2>📝 Science Quiz</h2>
+        <p class="hint">AI-generated multiple choice quiz with answers</p>
+        <button class="btn btn-run" data-run="quiz">Generate Quiz</button>
+        <button class="btn btn-secondary" id="revealAnswersBtn">👁️ Reveal Answers</button>
+        <div class="output-panel text-panel" id="out-quiz">
+          <div class="placeholder">Your quiz will appear here…</div>
+        </div>
+      </section>
+
+      <!-- Widget 6: Upload Document for Analysis -->
+      <section class="card">
+        <h2>📁 Upload Document for Analysis</h2>
+        <p class="hint">Upload any science-related document (notes, textbook pages, lab reports, research papers) and the Science Tutor will analyze and explain it for you.</p>
+        <div class="dropzone" id="dz-tutor">
+          <input type="file" id="file-tutor" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html" hidden />
+          <p>📄 Drag &amp; drop or click to upload<br><small>JPG · PNG · WEBP · PDF · DOCX · PPTX · CSV · JSON · HTML</small></p>
+          <div class="file-info" id="file-info-tutor"></div>
+        </div>
+      </section>
+
+      <!-- Widget 7: Science Tutor (Chatbot) -->
+      <section class="card card-wide">
+        <h2>🤖 Science Tutor</h2>
+        <p class="hint">🔬 Hey there, future scientist! Ask anything about your subject. I remember our conversation.</p>
+        <div class="chat-panel" id="chat-panel">
+          <div class="chat-bubble bot">
+            Ask your science tutor anything or discuss the uploaded document...
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <input id="chatInput" type="text" class="input"
+            placeholder="🔬 Type your science question…" />
+          <button id="chatSendBtn" class="btn btn-primary">Send</button>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <p>Powered by AWS Bedrock · Claude Sonnet 4.6 · Streaming Lambda</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

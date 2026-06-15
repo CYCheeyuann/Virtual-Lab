@@ -39,8 +39,8 @@
       </select>
 
       <div class="btn-row" style="margin-top:18px">
-        <button id="runBtn" class="btn btn-primary">▶ Generate Overview</button>
-        <button id="resetBtn" class="btn btn-ghost">🔄 Reset</button>
+        <button id="runBtn" class="btn btn-primary"></button>
+        <button id="resetBtn" class="btn btn-ghost"></button>
       </div>
     </section>
 
@@ -49,20 +49,36 @@
       <div class="output-panel text-panel" id="out-chapter">
         <div class="placeholder">Chapter overview will appear here…</div>
       </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
+      </div>
     </section>
   </main>
 
   <script src="config.js"></script>
+  <script src="progress.js"></script>
   <script src="common.js"></script>
   <script>
+    // Inject SVG icon buttons
+    document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Overview</span>`;
+    document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
+    document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
+
     document.getElementById('runBtn').addEventListener('click', () => {
       const btn = document.getElementById('runBtn');
       const subject = document.getElementById('subject').value;
-      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject }, 'out-chapter', btn);
+      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject }, 'out-chapter', btn, {
+        successToast: 'Chapter overview generated',
+        onComplete: () => recordActivity(subject)
+      });
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
       document.getElementById('subject').value = 'Biology';
+      setSubjectTheme('Biology');
       clearPanel('out-chapter', 'Chapter overview will appear here…');
+    });
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      exportToPDF('out-chapter', 'Chapter Overview');
     });
   </script>
 </body>

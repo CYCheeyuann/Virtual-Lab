@@ -60,8 +60,8 @@
       </div>
 
       <div class="btn-row" style="margin-top:18px">
-        <button id="runBtn" class="btn btn-primary">▶ Generate Experiment</button>
-        <button id="resetBtn" class="btn btn-ghost">🔄 Reset</button>
+        <button id="runBtn" class="btn btn-primary"></button>
+        <button id="resetBtn" class="btn btn-ghost"></button>
       </div>
     </section>
 
@@ -70,12 +70,21 @@
       <div class="output-panel text-panel" id="out-experiment">
         <div class="placeholder">Your experiment guide will appear here…</div>
       </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
+      </div>
     </section>
   </main>
 
   <script src="config.js"></script>
+  <script src="progress.js"></script>
   <script src="common.js"></script>
   <script>
+    // Inject SVG icon buttons
+    document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Experiment</span>`;
+    document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
+    document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
+
     let uploadedFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
 
@@ -87,6 +96,7 @@
       const out = document.getElementById('out-experiment');
       if (!topic) {
         out.innerHTML = '<div class="error-msg">⚠️ Please enter an experiment topic first.</div>';
+        showToast('Please enter an experiment topic', 'warning');
         return;
       }
       const body = { subject, topic, difficulty };
@@ -95,16 +105,24 @@
         body.file_mime = uploadedFile.mime;
         body.file_name = uploadedFile.name;
       }
-      streamToPanel(window.STREAM_URLS.experiment_guide, body, 'out-experiment', btn);
+      streamToPanel(window.STREAM_URLS.experiment_guide, body, 'out-experiment', btn, {
+        successToast: 'Experiment guide generated',
+        onComplete: () => recordActivity(subject)
+      });
     });
 
     document.getElementById('resetBtn').addEventListener('click', () => {
       document.getElementById('topic').value = '';
       document.getElementById('subject').value = 'Biology';
+      setSubjectTheme('Biology');
       document.getElementById('difficulty').value = 'Standard';
       document.getElementById('file-info').textContent = '';
       uploadedFile = { data: null, mime: null, name: null };
       clearPanel('out-experiment', 'Your experiment guide will appear here…');
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      exportToPDF('out-experiment', 'Experiment Guide');
     });
   </script>
 </body>

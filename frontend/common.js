@@ -1,10 +1,200 @@
 /* ─── Shared helpers for all pages ───────────────────────────────────── */
 
+/* ============================================================
+ *  SVG ICON LIBRARY
+ *  Inline SVGs returned as strings, used everywhere instead
+ *  of plain emoji/text on buttons.
+ * ============================================================ */
+const ICONS = {
+  // Lightning bolt — Generate
+  bolt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 4 14 12 14 11 22 20 10 12 10 13 2" fill="currentColor" stroke="none"/></svg>`,
+  // Circular arrow — Reset
+  refresh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`,
+  // Paper plane — Send
+  plane: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" stroke="none" opacity="0.85"/></svg>`,
+  // Eye — Show
+  eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  // Eye-off — Hide
+  eyeOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.79 19.79 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a19.86 19.86 0 0 1-3.17 4.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
+  // Download — Export PDF
+  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  // Trash can — Clear
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>`,
+  // Sun / Moon for theme toggle
+  sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>`,
+  moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor" opacity="0.15"/></svg>`,
+};
+
+/* Convenience helper for buttons */
+function iconHtml(name, extraClass = '') {
+  const cls = `btn-icon ${extraClass}`.trim();
+  return `<span class="${cls}">${ICONS[name] || ''}</span>`;
+}
+
+/* ============================================================
+ *  ESCAPING
+ * ============================================================ */
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;')
+  return String(s ?? '')
+          .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
+}
+
+/* ============================================================
+ *  SUBJECT THEME
+ * ============================================================ */
+function setSubjectTheme(subject) {
+  if (!['Biology', 'Chemistry', 'Physics'].includes(subject)) subject = 'Biology';
+  document.documentElement.setAttribute('data-subject', subject);
+  try { localStorage.setItem('selectedSubject', subject); } catch (e) {}
+  updateFloatingIcons(subject);
+}
+
+function getSavedSubject() {
+  try { return localStorage.getItem('selectedSubject') || 'Biology'; }
+  catch (e) { return 'Biology'; }
+}
+
+const SUBJECT_ICONS = {
+  Biology:   ['🧬', '🌿', '🍃', '🦠', '🧪', '🌱'],
+  Chemistry: ['⚗️', '🧪', '🔬', '🧫', '⚛️', '💊'],
+  Physics:   ['🔭', '⚛️', '🌌', '🪐', '🛰️', '⚡'],
+};
+
+function updateFloatingIcons(subject) {
+  // Clear previous icons
+  document.querySelectorAll('.floating-icon').forEach(el => el.remove());
+  const set = SUBJECT_ICONS[subject] || SUBJECT_ICONS.Biology;
+  const positions = [
+    { top: '12%',  left: '6%'   },
+    { top: '22%',  left: '88%'  },
+    { top: '46%',  left: '4%'   },
+    { top: '58%',  left: '92%'  },
+    { top: '78%',  left: '10%'  },
+    { top: '85%',  left: '82%'  },
+  ];
+  positions.forEach((pos, i) => {
+    const el = document.createElement('div');
+    el.className = 'floating-icon';
+    el.textContent = set[i % set.length];
+    el.style.top = pos.top;
+    el.style.left = pos.left;
+    el.style.animationDelay = `${i * 1.7}s`;
+    document.body.appendChild(el);
+  });
+}
+
+/* Bind a #subject <select> to the theme system */
+function bindSubjectSelect() {
+  const sel = document.getElementById('subject');
+  if (!sel) return;
+  // restore from localStorage
+  const saved = getSavedSubject();
+  if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+  setSubjectTheme(sel.value);
+  sel.addEventListener('change', () => setSubjectTheme(sel.value));
+}
+
+/* ============================================================
+ *  DARK / LIGHT THEME
+ * ============================================================ */
+function initTheme() {
+  let pref = null;
+  try { pref = localStorage.getItem('theme'); } catch (e) {}
+  if (!pref) {
+    pref = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ? 'dark' : 'light';
+  }
+  applyTheme(pref);
+
+  // Listen for system changes when user has not explicitly set one
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (mq.addEventListener) {
+      mq.addEventListener('change', e => {
+        let saved = null;
+        try { saved = localStorage.getItem('theme'); } catch (_) {}
+        if (!saved) applyTheme(e.matches ? 'dark' : 'light');
+      });
+    }
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.innerHTML = theme === 'dark' ? ICONS.sun : ICONS.moon;
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try { localStorage.setItem('theme', next); } catch (e) {}
+  showToast(next === 'dark' ? '🌙 Dark mode on' : '☀️ Light mode on', 'success');
+}
+
+/* ============================================================
+ *  TOAST NOTIFICATIONS
+ * ============================================================ */
+function ensureToastContainer() {
+  let c = document.getElementById('toast-container');
+  if (!c) {
+    c = document.createElement('div');
+    c.id = 'toast-container';
+    c.className = 'toast-container';
+    document.body.appendChild(c);
+  }
+  return c;
+}
+function showToast(message, type = 'info', duration = 4000) {
+  const c = ensureToastContainer();
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icon = type === 'success' ? '✅'
+             : type === 'error'   ? '❌'
+             : type === 'warning' ? '⚠️' : 'ℹ️';
+  t.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <div class="toast-msg">${escapeHtml(message)}</div>
+    <button class="toast-close" aria-label="Close">×</button>`;
+  c.appendChild(t);
+  const close = () => {
+    t.classList.add('toast-out');
+    setTimeout(() => t.remove(), 280);
+  };
+  t.querySelector('.toast-close').addEventListener('click', close);
+  if (duration > 0) setTimeout(close, duration);
+}
+
+/* ============================================================
+ *  STREAMING + LOADING SKELETON + BUTTON LOADING
+ * ============================================================ */
+function skeletonHTML() {
+  return `
+    <div class="skeleton">
+      <div class="skeleton-line title"></div>
+      <div class="skeleton-line long"></div>
+      <div class="skeleton-line medium"></div>
+      <div class="skeleton-line long"></div>
+      <div class="skeleton-line short"></div>
+      <div class="skeleton-line medium"></div>
+    </div>`;
+}
+
+function setButtonLoading(btn, isLoading, loadingLabel = 'Generating…') {
+  if (!btn) return;
+  if (isLoading) {
+    btn.dataset.origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="btn-spinner"></span><span>${escapeHtml(loadingLabel)}</span>`;
+  } else {
+    if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml;
+    delete btn.dataset.origHtml;
+    btn.disabled = false;
+  }
 }
 
 /* Render one streaming line as a markdown <span class="md-line"> */
@@ -43,19 +233,21 @@ function appendMarkdownLine(panel, raw, panelId) {
 }
 
 /* Stream POST to a Lambda Function URL, render into panel, disable button while running */
-async function streamToPanel(url, body, panelId, btn) {
+async function streamToPanel(url, body, panelId, btn, options = {}) {
   const panel = document.getElementById(panelId);
-  panel.innerHTML = '<div><span class="spinner"></span>Generating…</div>';
+  panel.innerHTML = skeletonHTML();
 
-  if (btn) btn.disabled = true;
+  setButtonLoading(btn, true, options.loadingLabel || 'Generating…');
 
   if (!url || url.startsWith('__URL_')) {
     panel.innerHTML =
       '<div class="error-msg">⚠️ Streaming URL not configured. Deploy via GitHub Actions first.</div>';
-    if (btn) btn.disabled = false;
+    setButtonLoading(btn, false);
+    showToast('Streaming URL not configured', 'error');
     return;
   }
 
+  let fullText = '';
   try {
     const resp = await fetch(url, {
       method: 'POST',
@@ -75,7 +267,9 @@ async function streamToPanel(url, body, panelId, btn) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      buffer += chunk;
       const lines = buffer.split('\n');
       buffer = lines.pop();
       for (const line of lines) appendMarkdownLine(panel, line, panelId);
@@ -84,16 +278,27 @@ async function streamToPanel(url, body, panelId, btn) {
       panel.appendChild(cursor);
       panel.scrollTop = panel.scrollHeight;
     }
-    if (buffer) appendMarkdownLine(panel, buffer, panelId);
+    if (buffer) {
+      appendMarkdownLine(panel, buffer, panelId);
+      fullText += '';
+    }
     if (cursor.parentNode) cursor.remove();
+
+    if (typeof options.onComplete === 'function') {
+      try { options.onComplete(fullText, panel); } catch (e) { console.warn(e); }
+    }
+    if (options.successToast) showToast(options.successToast, 'success');
   } catch (err) {
     panel.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(err.message)}</div>`;
+    showToast(`Failed: ${err.message}`, 'error');
   } finally {
-    if (btn) btn.disabled = false;
+    setButtonLoading(btn, false);
   }
 }
 
-/* Drag-and-drop / click upload */
+/* ============================================================
+ *  DROPZONE
+ * ============================================================ */
 function setupDropzone(zoneId, inputId, infoId, onLoad) {
   const zone  = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
@@ -113,9 +318,9 @@ function setupDropzone(zoneId, inputId, infoId, onLoad) {
   });
 
   function handleFile(file) {
-    // Client-side 10 MB limit
     if (file.size > 10 * 1024 * 1024) {
       info.textContent = '⚠️ File too large (max 10 MB)';
+      showToast('File too large (max 10 MB)', 'warning');
       return;
     }
     const reader = new FileReader();
@@ -134,3 +339,116 @@ function clearPanel(id, msg) {
   const p = document.getElementById(id);
   if (p) p.innerHTML = `<div class="placeholder">${msg || 'Output will appear here…'}</div>`;
 }
+
+/* ============================================================
+ *  PDF EXPORT (window.print + dedicated print stylesheet)
+ * ============================================================ */
+function exportToPDF(panelId, title) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  if (!panel.textContent.trim() || panel.querySelector('.placeholder')) {
+    showToast('Nothing to export yet', 'warning');
+    return;
+  }
+  const exportBtns = document.querySelectorAll('.btn-export');
+  const origHtmls = [];
+  exportBtns.forEach((b, i) => { origHtmls[i] = b.innerHTML; b.disabled = true;
+    b.innerHTML = '<span class="btn-spinner"></span><span>Exporting…</span>'; });
+
+  const oldTitle = document.title;
+  if (title) document.title = title;
+  setTimeout(() => {
+    window.print();
+    document.title = oldTitle;
+    exportBtns.forEach((b, i) => { b.innerHTML = origHtmls[i]; b.disabled = false; });
+  }, 120);
+}
+
+/* ============================================================
+ *  KEYBOARD SHORTCUTS
+ * ============================================================ */
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + Enter — submit / generate / send
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      const target = document.querySelector('#sendBtn, #runBtn');
+      if (target && !target.disabled) {
+        e.preventDefault();
+        target.click();
+      }
+      return;
+    }
+    // Ctrl + Shift + D — toggle dark mode
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+      e.preventDefault();
+      toggleTheme();
+      return;
+    }
+    // Escape — clear inputs / reset
+    if (e.key === 'Escape') {
+      const reset = document.getElementById('resetBtn');
+      const active = document.activeElement;
+      // If user focused an input, just clear it; otherwise trigger reset
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        if (active.value) {
+          active.value = '';
+          e.preventDefault();
+          return;
+        }
+      }
+      if (reset && !reset.disabled) {
+        e.preventDefault();
+        reset.click();
+      }
+    }
+  });
+}
+
+/* ============================================================
+ *  NAVBAR THEME TOGGLE INJECTION
+ * ============================================================ */
+function injectThemeToggle() {
+  const navLinks = document.querySelector('.nav-links');
+  if (!navLinks || document.getElementById('themeToggle')) return;
+  const btn = document.createElement('button');
+  btn.id = 'themeToggle';
+  btn.className = 'theme-toggle';
+  btn.title = 'Toggle dark mode (Ctrl+Shift+D)';
+  btn.setAttribute('aria-label', 'Toggle dark mode');
+  btn.addEventListener('click', toggleTheme);
+  navLinks.appendChild(btn);
+  // Set initial icon
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  btn.innerHTML = cur === 'dark' ? ICONS.sun : ICONS.moon;
+}
+
+/* ============================================================
+ *  KEYBOARD SHORTCUT HINT
+ * ============================================================ */
+function injectShortcutHint() {
+  if (document.querySelector('.shortcut-hint')) return;
+  const main = document.querySelector('main.page');
+  if (!main) return;
+  const hint = document.createElement('div');
+  hint.className = 'shortcut-hint';
+  hint.innerHTML = `⌨️ Shortcuts:
+    <kbd>Ctrl</kbd>+<kbd>Enter</kbd> generate ·
+    <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> dark mode ·
+    <kbd>Esc</kbd> clear`;
+  main.appendChild(hint);
+}
+
+/* ============================================================
+ *  GLOBAL BOOTSTRAP
+ * ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  bindSubjectSelect();             // safe no-op when there is no #subject
+  // If no subject select on this page, still apply saved subject
+  if (!document.getElementById('subject')) {
+    setSubjectTheme(getSavedSubject());
+  }
+  injectThemeToggle();
+  injectShortcutHint();
+  initKeyboardShortcuts();
+});

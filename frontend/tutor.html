@@ -47,7 +47,8 @@
       </div>
 
       <div class="btn-row" style="margin-top:18px">
-        <button id="resetBtn" class="btn btn-ghost">🔄 Clear conversation</button>
+        <button id="resetBtn" class="btn btn-ghost"></button>
+        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
       </div>
     </section>
 
@@ -60,14 +61,20 @@
       </div>
       <div class="chat-input-row">
         <input id="chatInput" type="text" class="input" placeholder="🔬 Type your science question…" />
-        <button id="sendBtn" class="btn btn-primary">Send</button>
+        <button id="sendBtn" class="btn btn-primary btn-send"></button>
       </div>
     </section>
   </main>
 
   <script src="config.js"></script>
+  <script src="progress.js"></script>
   <script src="common.js"></script>
   <script>
+    // Inject SVG icon buttons
+    document.getElementById('sendBtn').innerHTML  = `${iconHtml('plane', 'btn-icon-plane')}<span>Send</span>`;
+    document.getElementById('resetBtn').innerHTML = `${iconHtml('trash', 'btn-icon-trash')}<span>Clear conversation</span>`;
+    document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
+
     let history = [];
     let pendingFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => pendingFile = f);
@@ -89,7 +96,7 @@
       const message = input.value.trim();
       if (!message) return;
 
-      sendBtn.disabled = true;
+      setButtonLoading(sendBtn, true, 'Sending…');
       const subject = document.getElementById('subject').value;
       const panel   = document.getElementById('chat-panel');
 
@@ -102,13 +109,14 @@
 
       const botBubble = document.createElement('div');
       botBubble.className = 'chat-bubble bot';
-      botBubble.innerHTML = '<span class="spinner"></span>';
+      botBubble.innerHTML = '<span class="spinner"></span>Thinking…';
       panel.appendChild(botBubble);
 
       const url = window.STREAM_URLS.science_tutor;
       if (!url || url.startsWith('__URL_')) {
         botBubble.innerHTML = '<span class="error-msg">⚠️ Streaming URL not configured.</span>';
-        sendBtn.disabled = false;
+        showToast('Streaming URL not configured', 'error');
+        setButtonLoading(sendBtn, false);
         return;
       }
 
@@ -143,16 +151,21 @@
         botBubble.innerHTML = renderInline(full);
         history.push({ role: 'user', content: message });
         history.push({ role: 'assistant', content: full });
+        recordActivity(subject);
       } catch (err) {
         botBubble.innerHTML = `<span class="error-msg">⚠️ ${err.message}</span>`;
+        showToast(`Failed: ${err.message}`, 'error');
       } finally {
-        document.getElementById('sendBtn').disabled = false;
+        setButtonLoading(sendBtn, false);
       }
     }
 
     document.getElementById('sendBtn').addEventListener('click', send);
     document.getElementById('chatInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') send();
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
       history = [];
@@ -160,6 +173,10 @@
       document.getElementById('file-info').textContent = '';
       document.getElementById('chat-panel').innerHTML =
         '<div class="chat-bubble bot">Conversation cleared. Ask me anything!</div>';
+      showToast('Conversation cleared', 'success', 2200);
+    });
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      exportToPDF('chat-panel', 'Tutor Conversation');
     });
   </script>
 </body>

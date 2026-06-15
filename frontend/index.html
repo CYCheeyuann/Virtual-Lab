@@ -29,6 +29,8 @@
       <p>Pick a tool to start. Each tool runs on its own page with its own AI.</p>
     </div>
 
+    <section class="progress-dashboard" id="progressDashboard"></section>
+
     <div class="tile-grid">
       <a class="tile" href="chapter.html">
         <div class="tile-icon">📖</div>
@@ -60,5 +62,13 @@
     </div>
   </main>
 
+  <script src="config.js"></script>
+  <script src="progress.js"></script>
+  <script src="common.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      renderProgressDashboard('progressDashboard');
+    });
+  </script>
 </body>
 </html>

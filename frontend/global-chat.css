@@ -52,11 +52,12 @@
   max-width: calc(100vw - 36px);
   height: 540px;
   max-height: calc(100vh - 130px);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--c-bg-glass-2);
   backdrop-filter: blur(14px);
-  border: 1px solid var(--c-card-border);
-  border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--c-border);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px var(--c-shadow-strong);
   z-index: 9001;
   display: flex;
   flex-direction: column;
@@ -66,7 +67,6 @@
   pointer-events: none;
   transition: transform 0.22s ease, opacity 0.22s ease;
 }
-[data-theme="dark"] .gc-panel { background: rgba(31, 36, 41, 0.94); }
 .gc-panel.open {
   transform: translateY(0) scale(1);
   opacity: 1;
@@ -135,10 +135,10 @@
   border-bottom-right-radius: 4px;
 }
 .gc-msg.assistant {
-  background: var(--c-input-bg);
+  background: var(--c-bg-glass);
   color: var(--c-text);
   align-self: flex-start;
-  border: 1px solid var(--c-card-border);
+  border: 1px solid var(--c-border);
   border-bottom-left-radius: 4px;
 }
 .gc-msg.injected {
@@ -178,8 +178,8 @@
   display: flex;
   gap: 6px;
   padding: 10px;
-  border-top: 1px solid var(--c-card-border);
-  background: var(--c-card-bg);
+  border-top: 1px solid var(--c-border);
+  background: var(--c-bg-glass);
 }
 .gc-input {
   flex: 1;

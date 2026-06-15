@@ -5,7 +5,12 @@ An AI-powered learning companion for Biology, Chemistry, and Physics — sliced 
 ## Stack
 
 - **AWS Lambda** (Python 3.12, Flask, Lambda Web Adapter, response streaming)
-- **Amazon Bedrock** — Claude Sonnet 4.6 (`global.anthropic.claude-sonnet-4-6-20260217-v1:0`)
+- **Amazon Bedrock**
+  - Text: Claude Haiku 4.5 via the **global** inference profile
+    (`global.anthropic.claude-haiku-4-5-20250609-v1:0`), called from
+    `ap-southeast-1`.
+  - Image: **Amazon Nova Canvas** (`amazon.nova-canvas-v1:0`), called from
+    `ap-northeast-1` (Nova Canvas is not available in Singapore).
 - **Amazon S3** — static website hosting (multi-page)
 - **GitHub Actions** — CI/CD via AWS SAM
 
@@ -27,10 +32,13 @@ Browser (S3 multi-page site)
     │
     │  fetch + ReadableStream
     ▼
-Lambda Function URLs (4 Flask apps, RESPONSE_STREAM)
+Lambda Function URLs (7 Flask apps; 6 RESPONSE_STREAM, 1 BUFFERED)
     │
-    ▼
-Amazon Bedrock (Claude Sonnet 4.6 global inference profile)
+    ├──► Amazon Bedrock — Claude Haiku 4.5 (global inference profile, ap-southeast-1)
+    │       ↳ chapter, experiment, quiz, tutor, safety, what-if, image-prompt expansion
+    │
+    └──► Amazon Bedrock — Nova Canvas (ap-northeast-1)
+            ↳ image generator (rendered from Claude-expanded prompt)
 ```
 
 ## Security hardening applied
@@ -71,9 +79,10 @@ Amazon Bedrock (Claude Sonnet 4.6 global inference profile)
 
 ## Pre-deployment checklist
 
-1. **Enable Bedrock model access** in `ap-southeast-1`:
-   - AWS Console → Bedrock → Model Access
-   - Request `global.anthropic.claude-sonnet-4-6-20260217-v1:0`
+1. **Enable Bedrock model access** — request access in **both** regions:
+   - `ap-southeast-1` (Singapore): Claude Haiku 4.5 (request via the
+     `global.anthropic.claude-haiku-4-5-20250609-v1:0` global profile).
+   - `ap-northeast-1` (Tokyo): `amazon.nova-canvas-v1:0`.
 
 2. **Create an S3 bucket** for SAM deployment artifacts (any name, in `ap-southeast-1`).
 

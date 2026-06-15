@@ -34,14 +34,21 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
+              # Claude Haiku 4.5 — invoked through the GLOBAL inference profile
+              # from any region (we call it from ap-southeast-1).
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
                 Resource:
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/anthropic.claude-haiku-4-5-20250609-v1:0"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/global.anthropic.claude-haiku-4-5-20250609-v1:0"
                   - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20250609-v1:0"
-                  - "arn:aws:bedrock:*::foundation-model/amazon.titan-image-generator-v2:0"
+              # Amazon Nova Canvas — image generation in ap-northeast-1 only.
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.nova-canvas-v1:0"
 
   # ─── Chapter Assistant Lambda ───────────────────────────────────────────────
   ChapterAssistantFunction:
@@ -161,7 +168,7 @@ Resources:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
 
-  # ─── Image Generator Lambda (Non-Streaming, Titan + Claude) ────────────────
+  # ─── Image Generator Lambda (Non-Streaming, Nova Canvas + Claude) ──────────
   ImageGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -177,6 +184,12 @@ Resources:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
           PORT: "8080"
           ALLOWED_ORIGIN: !Ref AllowedOrigin
+          # Claude (text) runs in Singapore via global inference profile.
+          BEDROCK_REGION: ap-southeast-1
+          MODEL_ID: global.anthropic.claude-haiku-4-5-20250609-v1:0
+          # Nova Canvas (image) is only in ap-northeast-1 / us-east-1.
+          IMAGE_REGION: ap-northeast-1
+          IMAGE_MODEL_ID: amazon.nova-canvas-v1:0
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: BUFFERED

@@ -1,8 +1,10 @@
-"""Science Image Generator — two-step pipeline.
+"""Science Image Generator — two-step, two-region pipeline.
 
-Step 1: Claude (synchronous) generates a markdown scientific explanation
-        plus an optimised English image prompt.
-Step 2: Titan Image Generator v2 turns that prompt into a base64 PNG.
+Step 1: Claude Haiku 4.5 (global inference profile, called from ap-southeast-1)
+        expands the user's concept into a detailed English image prompt and a
+        markdown scientific explanation.
+Step 2: Amazon Nova Canvas (ap-northeast-1) renders that prompt as a 1024×1024
+        PNG returned as base64.
 
 Returns a single JSON document — text and image cannot share a stream.
 """
@@ -30,9 +32,14 @@ app = Flask(__name__)
 app.url_map.strict_slashes = False
 
 # ── Config ───────────────────────────────────────────────────────────────────
-REGION         = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
-TEXT_MODEL_ID  = os.environ.get("MODEL_ID",      "anthropic.claude-haiku-4-5-20250609-v1:0")
-IMAGE_MODEL_ID = os.environ.get("IMAGE_MODEL_ID","amazon.titan-image-generator-v2:0")
+# Claude (text) — global inference profile, invoked from Singapore.
+TEXT_REGION    = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
+TEXT_MODEL_ID  = os.environ.get("MODEL_ID",
+                                "global.anthropic.claude-haiku-4-5-20250609-v1:0")
+
+# Nova Canvas (image) — only available in ap-northeast-1 / us-east-1.
+IMAGE_REGION   = os.environ.get("IMAGE_REGION",   "ap-northeast-1")
+IMAGE_MODEL_ID = os.environ.get("IMAGE_MODEL_ID", "amazon.nova-canvas-v1:0")
 
 VALID_STYLES = {
     "Scientific Diagram", "Textbook Illustration", "3D Render",
@@ -40,12 +47,24 @@ VALID_STYLES = {
 }
 VALID_DETAILS = {"Simple", "Detailed", "Advanced"}
 
-_client = None
-def _get_client():
-    global _client
-    if _client is None:
-        _client = boto3.client("bedrock-runtime", region_name=REGION)
-    return _client
+_text_client = None
+_image_client = None
+
+
+def _get_text_client():
+    """bedrock-runtime client pinned to TEXT_REGION (Singapore)."""
+    global _text_client
+    if _text_client is None:
+        _text_client = boto3.client("bedrock-runtime", region_name=TEXT_REGION)
+    return _text_client
+
+
+def _get_image_client():
+    """bedrock-runtime client pinned to IMAGE_REGION (Tokyo)."""
+    global _image_client
+    if _image_client is None:
+        _image_client = boto3.client("bedrock-runtime", region_name=IMAGE_REGION)
+    return _image_client
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -71,10 +90,12 @@ def handler(path):
     if not concept:
         return _json_response({"error": "concept is required"}, status=400)
 
-    logger.info("Image gen subject=%s concept=%s style=%s detail=%s",
-                subject, concept, style, detail)
+    logger.info(
+        "Image gen subject=%s concept=%s style=%s detail=%s text_region=%s image_region=%s",
+        subject, concept, style, detail, TEXT_REGION, IMAGE_REGION,
+    )
 
-    # Step 1 — Claude
+    # Step 1 — Claude expands the concept into a detailed English prompt.
     try:
         explanation, image_prompt = _claude_step(subject, concept, style, detail)
     except ClientError as e:
@@ -86,17 +107,19 @@ def handler(path):
             status=500,
         )
 
-    # Step 2 — Titan Image
+    # Step 2 — Nova Canvas renders the expanded prompt.
     try:
-        image_b64 = _titan_step(image_prompt)
+        image_b64 = _nova_step(image_prompt)
     except ClientError as e:
-        return _bedrock_error("Titan image generation failed", e, fallback_text=explanation,
-                              prompt_used=image_prompt)
+        return _bedrock_error(
+            "Nova Canvas image generation failed", e,
+            fallback_text=explanation, prompt_used=image_prompt,
+        )
     except Exception as e:           # noqa: BLE001
-        logger.exception("Titan step failed")
+        logger.exception("Nova Canvas step failed")
         return _json_response(
             {
-                "error": f"Titan image generation failed: {type(e).__name__}: {e}",
+                "error": f"Nova Canvas image generation failed: {type(e).__name__}: {e}",
                 "explanation": explanation,
                 "prompt_used": image_prompt,
             },
@@ -104,20 +127,20 @@ def handler(path):
         )
 
     return _json_response({
-        "explanation": explanation,
+        "explanation":  explanation,
         "image_base64": image_b64,
-        "prompt_used": image_prompt,
+        "prompt_used":  image_prompt,
     })
 
 
-# ── Step 1: Claude (synchronous) ─────────────────────────────────────────────
+# ── Step 1: Claude (synchronous, ap-southeast-1) ────────────────────────────
 _CLAUDE_SYSTEM = (
     "You are a science visualisation expert. For each request, output a single "
     "JSON object with EXACTLY these two string keys:\n"
     '  "explanation"  — markdown-formatted scientific explanation (150–250 words) '
     "with short headings (## / ###) and bullet points. Be accurate and engaging.\n"
     '  "image_prompt" — detailed English prompt for an image-generation model '
-    "(< 450 characters). Describe subject, composition, perspective, lighting, "
+    "(< 900 characters). Describe subject, composition, perspective, lighting, "
     "labelled features, and visual style. No camera brand names. No text overlays "
     "unless the style demands them.\n"
     "Output ONLY the JSON object — no prose, no markdown fences."
@@ -125,7 +148,7 @@ _CLAUDE_SYSTEM = (
 
 
 def _claude_step(subject, concept, style, detail):
-    client = _get_client()
+    client = _get_text_client()
     user = (
         f"Subject: {subject}\n"
         f"Concept: {concept}\n"
@@ -196,25 +219,32 @@ def _fallback_prompt(concept, style, detail):
     )
 
 
-# ── Step 2: Titan Image v2 ───────────────────────────────────────────────────
-def _titan_step(prompt):
-    client = _get_client()
+# ── Step 2: Nova Canvas (ap-northeast-1) ─────────────────────────────────────
+# Nova Canvas accepts up to 1024 chars for `text` in TEXT_IMAGE mode.
+_NOVA_PROMPT_LIMIT = 1024
+
+
+def _nova_step(prompt):
+    client = _get_image_client()
     body = {
         "taskType": "TEXT_IMAGE",
-        "textToImageParams": {"text": prompt[:1024]},
+        "textToImageParams": {"text": prompt[:_NOVA_PROMPT_LIMIT]},
         "imageGenerationConfig": {
             "numberOfImages": 1,
-            "height": 1024,
-            "width": 1024,
-            "cfgScale": 8.0,
-            "seed": 42,
+            "height":  1024,
+            "width":   1024,
+            "cfgScale": 6.5,   # Nova Canvas recommended range: 1.1–10
+            "seed":     0,
+            "quality":  "standard",
         },
     }
     resp    = client.invoke_model(modelId=IMAGE_MODEL_ID, body=json.dumps(body))
     payload = json.loads(resp["body"].read())
     images  = payload.get("images") or []
     if not images:
-        raise RuntimeError(f"Titan returned no images: {payload!r}")
+        # Nova Canvas returns `error` on safety/validation failures.
+        err = payload.get("error") or payload
+        raise RuntimeError(f"Nova Canvas returned no images: {err!r}")
     return images[0]
 
 

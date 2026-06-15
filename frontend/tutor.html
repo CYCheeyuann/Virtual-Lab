@@ -68,7 +68,7 @@
   <script src="common.js"></script>
   <script>
     let history = [];
-    let pendingFile = { data: null, mime: null };
+    let pendingFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => pendingFile = f);
 
     function renderInline(text) {
@@ -107,6 +107,7 @@
       const url = window.STREAM_URLS.science_tutor;
       if (!url || url.startsWith('__URL_')) {
         botBubble.innerHTML = '<span class="error-msg">⚠️ Streaming URL not configured.</span>';
+        sendBtn.disabled = false;
         return;
       }
 
@@ -114,7 +115,8 @@
       if (pendingFile.data) {
         body.file_data = pendingFile.data;
         body.file_mime = pendingFile.mime;
-        pendingFile = { data: null, mime: null };
+        body.file_name = pendingFile.name;
+        pendingFile = { data: null, mime: null, name: null };
         document.getElementById('file-info').textContent = '';
       }
 
@@ -153,7 +155,7 @@
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
       history = [];
-      pendingFile = { data: null, mime: null };
+      pendingFile = { data: null, mime: null, name: null };
       document.getElementById('file-info').textContent = '';
       document.getElementById('chat-panel').innerHTML =
         '<div class="chat-bubble bot">Conversation cleared. Ask me anything!</div>';

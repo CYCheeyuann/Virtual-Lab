@@ -75,7 +75,7 @@
   <script src="config.js"></script>
   <script src="common.js"></script>
   <script>
-    let uploadedFile = { data: null, mime: null };
+    let uploadedFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
 
     document.getElementById('runBtn').addEventListener('click', () => {
@@ -89,7 +89,11 @@
         return;
       }
       const body = { subject, topic, difficulty };
-      if (uploadedFile.data) { body.file_data = uploadedFile.data; body.file_mime = uploadedFile.mime; }
+      if (uploadedFile.data) {
+        body.file_data = uploadedFile.data;
+        body.file_mime = uploadedFile.mime;
+        body.file_name = uploadedFile.name;
+      }
       streamToPanel(window.STREAM_URLS.experiment_guide, body, 'out-experiment', btn);
     });
 
@@ -98,7 +102,7 @@
       document.getElementById('subject').value = 'Biology';
       document.getElementById('difficulty').value = 'Standard';
       document.getElementById('file-info').textContent = '';
-      uploadedFile = { data: null, mime: null };
+      uploadedFile = { data: null, mime: null, name: null };
       clearPanel('out-experiment', 'Your experiment guide will appear here…');
     });
   </script>

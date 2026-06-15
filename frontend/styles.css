@@ -203,7 +203,8 @@ label {
   word-wrap: break-word;
 }
 .text-panel {
-  height: 340px;
+  min-height: 280px;
+  max-height: 60vh;
   overflow-y: auto;
 }
 .text-panel::-webkit-scrollbar { width: 6px; }

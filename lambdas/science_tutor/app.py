@@ -41,7 +41,7 @@ def handler(path):
     history   = trim_history(body.get("history", []))
     file_data = body.get("file_data")
     file_mime = body.get("file_mime")
-    file_name = sanitize_topic(body.get("file_name", ""), max_len=120) or "uploaded_file"
+    file_name = sanitize_topic(body.get("file_name", ""), max_len=255) or "uploaded_file"
 
     logger.info("Tutor request", extra={"subject": subject, "history_len": len(history)})
 
@@ -83,8 +83,8 @@ def handler(path):
         else:
             user_content.append({
                 "type": "document",
-                "title": file_name,
                 "source": {"type": "base64", "media_type": file_mime, "data": file_data},
+                "title": file_name,
             })
 
     user_content.append({"type": "text", "text": message or "Hello"})

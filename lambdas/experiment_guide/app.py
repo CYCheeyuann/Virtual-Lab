@@ -41,7 +41,7 @@ def handler(path):
     difficulty = sanitize_difficulty(body.get("difficulty", ""))
     file_data  = body.get("file_data")
     file_mime  = body.get("file_mime")
-    file_name  = sanitize_topic(body.get("file_name", ""), max_len=120) or "uploaded_file"
+    file_name  = sanitize_topic(body.get("file_name", ""), max_len=255) or "uploaded_file"
 
     logger.info("Experiment request", extra={"subject": subject, "topic": topic})
 
@@ -115,8 +115,8 @@ Make it educational, accurate, and exciting."""
         else:
             content_blocks.append({
                 "type": "document",
-                "title": file_name,
                 "source": {"type": "base64", "media_type": file_mime, "data": file_data},
+                "title": file_name,
             })
 
     content_blocks.append({"type": "text", "text": prompt})

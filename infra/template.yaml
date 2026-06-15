@@ -39,8 +39,8 @@ Resources:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
                 Resource:
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/global.anthropic.claude-sonnet-4-6-20260217-v1:0"
-                  - "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6-20260217-v1:0"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/anthropic.claude-haiku-4-5-20250609-v1:0"
+                  - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20250609-v1:0"
 
   # ─── Chapter Assistant Lambda ───────────────────────────────────────────────
   ChapterAssistantFunction:

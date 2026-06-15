@@ -41,6 +41,7 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/anthropic.claude-haiku-4-5-20250609-v1:0"
                   - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20250609-v1:0"
+                  - "arn:aws:bedrock:*::foundation-model/amazon.titan-image-generator-v2:0"
 
   # ─── Chapter Assistant Lambda ───────────────────────────────────────────────
   ChapterAssistantFunction:
@@ -120,6 +121,66 @@ Resources:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
 
+  # ─── Safety Assistant Lambda (Streaming) ───────────────────────────────────
+  SafetyAssistantFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambdas/safety_assistant/
+      Handler: run.sh
+      MemorySize: 256
+      Role: !GetAtt AppBedrockRole.Arn
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: response_stream
+          PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
+
+  # ─── What Happens If Lambda (Streaming) ────────────────────────────────────
+  WhatHappensIfFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambdas/what_happens_if/
+      Handler: run.sh
+      MemorySize: 256
+      Role: !GetAtt AppBedrockRole.Arn
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: response_stream
+          PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
+
+  # ─── Image Generator Lambda (Non-Streaming, Titan + Claude) ────────────────
+  ImageGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambdas/image_generator/
+      Handler: run.sh
+      MemorySize: 1024
+      Timeout: 300
+      Role: !GetAtt AppBedrockRole.Arn
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+
   # ─── S3 Frontend Bucket ────────────────────────────────────────────────────
   FrontendBucket:
     Type: AWS::S3::Bucket
@@ -154,6 +215,12 @@ Outputs:
     Value: !GetAtt ScienceQuizFunctionUrl.FunctionUrl
   ScienceTutorUrl:
     Value: !GetAtt ScienceTutorFunctionUrl.FunctionUrl
+  SafetyAssistantUrl:
+    Value: !GetAtt SafetyAssistantFunctionUrl.FunctionUrl
+  WhatHappensIfUrl:
+    Value: !GetAtt WhatHappensIfFunctionUrl.FunctionUrl
+  ImageGeneratorUrl:
+    Value: !GetAtt ImageGeneratorFunctionUrl.FunctionUrl
   WebsiteUrl:
     Value: !GetAtt FrontendBucket.WebsiteURL
   BucketName:

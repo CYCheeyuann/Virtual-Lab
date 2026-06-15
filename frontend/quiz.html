@@ -7,6 +7,7 @@
   <meta name="description" content="AI-generated science quizzes with four difficulty levels. Interactive scoring with instant feedback." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="global-chat.css" />
 </head>
 <body>
 
@@ -19,6 +20,7 @@
         <a class="nav-link" href="experiment.html">Experiment Guide</a>
         <a class="nav-link active" href="quiz.html">Science Quiz</a>
         <a class="nav-link" href="tutor.html">Science Tutor</a>
+        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
       </div>
     </div>
   </nav>
@@ -66,6 +68,7 @@
       </div>
       <div class="btn-row" style="margin-top:12px">
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
+        <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
   </main>
@@ -73,6 +76,7 @@
   <script src="config.js"></script>
   <script src="progress.js"></script>
   <script src="common.js"></script>
+  <script src="global-chat.js"></script>
   <script>
     // Inject SVG icon buttons
     const runBtn    = document.getElementById('runBtn');
@@ -83,6 +87,7 @@
     runBtn.innerHTML    = `${iconHtml('bolt')}<span>Generate Quiz</span>`;
     resetBtn.innerHTML  = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
     exportBtn.innerHTML = `${iconHtml('download')}<span>Export PDF</span>`;
+    document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI</span>`;
     setRevealBtn(false);
 
     function setRevealBtn(revealed) {
@@ -440,6 +445,32 @@
 
     exportBtn.addEventListener('click', () => {
       exportToPDF('out-quiz', 'Science Quiz');
+    });
+
+    document.getElementById('sendToAiBtn').addEventListener('click', () => {
+      if (!quizState) {
+        showToast('Generate and answer a quiz first', 'warning');
+        return;
+      }
+      const total = quizState.questions.length;
+      const correct = quizState.answers.filter(a => a && a.correct).length;
+      const incorrect = [];
+      quizState.questions.forEach((q, i) => {
+        const a = quizState.answers[i];
+        if (a && !a.correct) {
+          incorrect.push(`Q${i+1}: "${q.text}" — picked ${a.picked}, correct: ${q.correct}`);
+        }
+      });
+      const summary =
+        `Quiz Results — ${quizState.subject} / ${quizState.topic} (${quizState.difficulty})\n` +
+        `Score: ${correct}/${total}\n\n` +
+        (incorrect.length
+          ? `Questions to review:\n` + incorrect.map(s => '• ' + s).join('\n')
+          : `All correct! 🎉`);
+      window.GlobalChat && window.GlobalChat.injectContent(
+        summary, 'quiz',
+        `📝 Quiz: ${quizState.topic} (${correct}/${total})`
+      );
     });
   </script>
 </body>

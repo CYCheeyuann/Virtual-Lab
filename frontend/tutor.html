@@ -7,6 +7,7 @@
   <meta name="description" content="Streaming AI chatbot science tutor with full conversation memory and document analysis support." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="global-chat.css" />
 </head>
 <body>
 
@@ -19,6 +20,7 @@
         <a class="nav-link" href="experiment.html">Experiment Guide</a>
         <a class="nav-link" href="quiz.html">Science Quiz</a>
         <a class="nav-link active" href="tutor.html">Science Tutor</a>
+        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
       </div>
     </div>
   </nav>
@@ -49,6 +51,7 @@
       <div class="btn-row" style="margin-top:18px">
         <button id="resetBtn" class="btn btn-ghost"></button>
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
+        <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
 
@@ -69,11 +72,13 @@
   <script src="config.js"></script>
   <script src="progress.js"></script>
   <script src="common.js"></script>
+  <script src="global-chat.js"></script>
   <script>
     // Inject SVG icon buttons
     document.getElementById('sendBtn').innerHTML  = `${iconHtml('plane', 'btn-icon-plane')}<span>Send</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('trash', 'btn-icon-trash')}<span>Clear conversation</span>`;
     document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
+    document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send conversation to Lab Assistant</span>`;
 
     let history = [];
     let pendingFile = { data: null, mime: null, name: null };
@@ -177,6 +182,21 @@
     });
     document.getElementById('exportBtn').addEventListener('click', () => {
       exportToPDF('chat-panel', 'Tutor Conversation');
+    });
+    document.getElementById('sendToAiBtn').addEventListener('click', () => {
+      if (!history.length) {
+        showToast('Have a conversation first', 'warning');
+        return;
+      }
+      const subject = document.getElementById('subject').value;
+      // Compile a summary of the tutor conversation
+      const transcript = history.map(m => {
+        const who = m.role === 'user' ? 'You' : 'Tutor';
+        return `${who}: ${m.content}`;
+      }).join('\n\n');
+      window.GlobalChat && window.GlobalChat.injectContent(
+        transcript, 'tutor', `🤖 Tutor: ${subject} (${history.length} turns)`
+      );
     });
   </script>
 </body>

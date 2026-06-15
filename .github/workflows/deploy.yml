@@ -29,7 +29,8 @@ jobs:
 
       - name: Copy shared module into each Lambda for packaging
         run: |
-          for fn in chapter_assistant experiment_guide science_quiz science_tutor; do
+          for fn in chapter_assistant experiment_guide science_quiz science_tutor \
+                    safety_assistant what_happens_if image_generator; do
             cp lambdas/shared/*.py "lambdas/${fn}/"
           done
 
@@ -66,6 +67,15 @@ jobs:
 
           URL=$(get_output ScienceTutorUrl)
           sed -i "s|__URL_SCIENCE_TUTOR__|$URL|g" frontend/config.js
+
+          URL=$(get_output SafetyAssistantUrl)
+          sed -i "s|__URL_SAFETY_ASSISTANT__|$URL|g" frontend/config.js
+
+          URL=$(get_output WhatHappensIfUrl)
+          sed -i "s|__URL_WHAT_HAPPENS_IF__|$URL|g" frontend/config.js
+
+          URL=$(get_output ImageGeneratorUrl)
+          sed -i "s|__URL_IMAGE_GENERATOR__|$URL|g" frontend/config.js
 
       - name: Deploy frontend to S3
         run: |

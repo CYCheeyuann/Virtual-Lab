@@ -7,6 +7,7 @@
   <meta name="description" content="AI-generated complete lab guide with safety briefing. Supports document upload for context analysis." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="global-chat.css" />
 </head>
 <body>
 
@@ -19,6 +20,7 @@
         <a class="nav-link active" href="experiment.html">Experiment Guide</a>
         <a class="nav-link" href="quiz.html">Science Quiz</a>
         <a class="nav-link" href="tutor.html">Science Tutor</a>
+        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
       </div>
     </div>
   </nav>
@@ -72,6 +74,7 @@
       </div>
       <div class="btn-row" style="margin-top:12px">
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
+        <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
   </main>
@@ -79,11 +82,13 @@
   <script src="config.js"></script>
   <script src="progress.js"></script>
   <script src="common.js"></script>
+  <script src="global-chat.js"></script>
   <script>
     // Inject SVG icon buttons
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Experiment</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
     document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
+    document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI</span>`;
 
     let uploadedFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
@@ -123,6 +128,15 @@
 
     document.getElementById('exportBtn').addEventListener('click', () => {
       exportToPDF('out-experiment', 'Experiment Guide');
+    });
+    document.getElementById('sendToAiBtn').addEventListener('click', () => {
+      const text = document.getElementById('out-experiment').innerText.trim();
+      if (!text || text.startsWith('Your experiment guide')) {
+        showToast('Generate something first', 'warning');
+        return;
+      }
+      const topic = document.getElementById('topic').value.trim() || 'experiment';
+      window.GlobalChat && window.GlobalChat.injectContent(text, 'experiment', '🧪 Experiment: ' + topic);
     });
   </script>
 </body>

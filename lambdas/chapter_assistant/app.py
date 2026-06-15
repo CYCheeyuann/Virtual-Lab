@@ -1,33 +1,44 @@
-import json
+"""Chapter Assistant — generates subject chapter overview via Bedrock streaming."""
+
+import logging
 import os
-import boto3
+import sys
+
+# In Lambda, shared modules are copied alongside app.py by CI
+# For local dev, add parent shared/ to path
+_shared = os.path.join(os.path.dirname(__file__), "..", "shared")
+if os.path.isdir(_shared):
+    sys.path.insert(0, _shared)
+
 from flask import Flask, request, Response, stream_with_context
+from cors import cors_headers, preflight_response, ALLOWED_ORIGIN
+from validators import validate_api_key, sanitize_subject
+from bedrock_stream import stream_bedrock
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
-
-bedrock = boto3.client("bedrock-runtime", region_name="ap-southeast-1")
-MODEL_ID = "global.anthropic.claude-sonnet-4-6-20260217-v1:0"
-
-
-def cors_headers():
-    return {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST,OPTIONS,GET",
-    }
 
 
 @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
 @app.route("/<path:path>", methods=["GET", "POST", "OPTIONS"])
 def handler(path):
     if request.method == "OPTIONS":
-        return Response("", status=200, headers=cors_headers())
+        return preflight_response()
     if request.method == "GET":
         return Response("Chapter Assistant ready", status=200, headers=cors_headers())
 
+    # Auth check
+    if not validate_api_key(request):
+        return Response('{"error":"Unauthorized"}', status=401,
+                        content_type="application/json", headers=cors_headers())
+
     body = request.get_json(force=True, silent=True) or {}
-    subject = body.get("subject", "Biology")
+    subject = sanitize_subject(body.get("subject", ""))
+
+    logger.info("Chapter request", extra={"subject": subject})
 
     prompt = (
         f"I want to learn more about the chapters in {subject}. "
@@ -38,30 +49,9 @@ def handler(path):
 
     messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
 
-    def stream():
-        try:
-            response = bedrock.invoke_model_with_response_stream(
-                modelId=MODEL_ID,
-                body=json.dumps({
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 4096,
-                    "messages": messages,
-                }),
-            )
-            for event in response["body"]:
-                chunk = event.get("chunk")
-                if chunk:
-                    data = json.loads(chunk["bytes"])
-                    if data.get("type") == "content_block_delta":
-                        text = data["delta"].get("text", "")
-                        if text:
-                            yield text
-        except Exception as e:
-            yield f"\n\n⚠️ Error: {str(e)}"
-
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
-    return Response(stream_with_context(stream()), headers=headers)
+    return Response(stream_with_context(stream_bedrock(messages)), headers=headers)
 
 
 if __name__ == "__main__":

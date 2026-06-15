@@ -1,9 +1,10 @@
-/* ─── Shared helpers used by every page ──────────────────────────────── */
+/* ─── Shared helpers for all pages ───────────────────────────────────── */
 
 function escapeHtml(s) {
   return s.replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
 }
 
 /* Render one streaming line as a markdown <span class="md-line"> */
@@ -41,14 +42,17 @@ function appendMarkdownLine(panel, raw, panelId) {
   panel.appendChild(span);
 }
 
-/* Stream POST a JSON body to a Lambda Function URL into a panel */
-async function streamToPanel(url, body, panelId) {
+/* Stream POST to a Lambda Function URL, render into panel, disable button while running */
+async function streamToPanel(url, body, panelId, btn) {
   const panel = document.getElementById(panelId);
-  panel.innerHTML = '<div><span class="spinner"></span>Thinking…</div>';
+  panel.innerHTML = '<div><span class="spinner"></span>Generating…</div>';
+
+  if (btn) btn.disabled = true;
 
   if (!url || url.startsWith('__URL_')) {
     panel.innerHTML =
-      '<div class="error-msg">⚠️ Streaming URL not configured. The CI pipeline injects these on deploy.</div>';
+      '<div class="error-msg">⚠️ Streaming URL not configured. Deploy via GitHub Actions first.</div>';
+    if (btn) btn.disabled = false;
     return;
   }
 
@@ -58,7 +62,7 @@ async function streamToPanel(url, body, panelId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} — ${resp.statusText}`);
 
     panel.innerHTML = '';
     const cursor  = document.createElement('span');
@@ -83,11 +87,13 @@ async function streamToPanel(url, body, panelId) {
     if (buffer) appendMarkdownLine(panel, buffer, panelId);
     if (cursor.parentNode) cursor.remove();
   } catch (err) {
-    panel.innerHTML = `<div class="error-msg">⚠️ ${err.message}</div>`;
+    panel.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(err.message)}</div>`;
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
-/* Drag-and-drop / click upload, base64 stripping included */
+/* Drag-and-drop / click upload */
 function setupDropzone(zoneId, inputId, infoId, onLoad) {
   const zone  = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
@@ -107,20 +113,24 @@ function setupDropzone(zoneId, inputId, infoId, onLoad) {
   });
 
   function handleFile(file) {
+    // Client-side 10 MB limit
+    if (file.size > 10 * 1024 * 1024) {
+      info.textContent = '⚠️ File too large (max 10 MB)';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
       const comma  = result.indexOf(',');
       const base64 = result.slice(comma + 1);
-      info.textContent = `📎 ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+      info.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
       onLoad({ data: base64, mime: file.type, name: file.name });
     };
     reader.readAsDataURL(file);
   }
 }
 
-/* Reset helpers exposed to all pages */
-function clearPanel(id, msg = 'Output will appear here…') {
+function clearPanel(id, msg) {
   const p = document.getElementById(id);
-  if (p) p.innerHTML = `<div class="placeholder">${msg}</div>`;
+  if (p) p.innerHTML = `<div class="placeholder">${msg || 'Output will appear here…'}</div>`;
 }

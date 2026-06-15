@@ -1,11 +1,17 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Virtual Science Lab Assistant - Streaming Lambda + S3 Static Site
+Description: Virtual Science Lab Assistant — Streaming Lambda + Bedrock + S3
+
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: CORS allowed origin (set to S3 website URL after first deploy)
 
 Globals:
   Function:
-    Timeout: 60
-    MemorySize: 256
+    Timeout: 180
+    MemorySize: 512
     Runtime: python3.12
 
 Resources:
@@ -13,7 +19,7 @@ Resources:
   AppBedrockRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: VirtualScienceLabBedrockRole
+      RoleName: !Sub "${AWS::StackName}-BedrockRole"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -42,6 +48,7 @@ Resources:
     Properties:
       CodeUri: ../lambdas/chapter_assistant/
       Handler: run.sh
+      MemorySize: 256
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
@@ -50,6 +57,7 @@ Resources:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
           AWS_LWA_INVOKE_MODE: response_stream
           PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
@@ -68,6 +76,7 @@ Resources:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
           AWS_LWA_INVOKE_MODE: response_stream
           PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
@@ -78,6 +87,7 @@ Resources:
     Properties:
       CodeUri: ../lambdas/science_quiz/
       Handler: run.sh
+      MemorySize: 256
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
@@ -86,6 +96,7 @@ Resources:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
           AWS_LWA_INVOKE_MODE: response_stream
           PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
@@ -104,6 +115,7 @@ Resources:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
           AWS_LWA_INVOKE_MODE: response_stream
           PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM

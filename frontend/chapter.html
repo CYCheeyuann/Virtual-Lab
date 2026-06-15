@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>📖 Chapter Assistant</title>
+  <meta name="description" content="Generate a structured chapter overview for Biology, Chemistry, or Physics using AI." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -54,8 +55,9 @@
   <script src="common.js"></script>
   <script>
     document.getElementById('runBtn').addEventListener('click', () => {
+      const btn = document.getElementById('runBtn');
       const subject = document.getElementById('subject').value;
-      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject }, 'out-chapter');
+      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject }, 'out-chapter', btn);
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
       document.getElementById('subject').value = 'Biology';

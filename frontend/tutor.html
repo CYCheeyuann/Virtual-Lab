@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🤖 Science Tutor</title>
+  <meta name="description" content="Streaming AI chatbot science tutor with full conversation memory and document analysis support." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -83,9 +84,11 @@
 
     async function send() {
       const input = document.getElementById('chatInput');
+      const sendBtn = document.getElementById('sendBtn');
       const message = input.value.trim();
       if (!message) return;
 
+      sendBtn.disabled = true;
       const subject = document.getElementById('subject').value;
       const panel   = document.getElementById('chat-panel');
 
@@ -139,6 +142,8 @@
         history.push({ role: 'assistant', content: full });
       } catch (err) {
         botBubble.innerHTML = `<span class="error-msg">⚠️ ${err.message}</span>`;
+      } finally {
+        document.getElementById('sendBtn').disabled = false;
       }
     }
 

@@ -27,6 +27,12 @@ jobs:
       - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
 
+      - name: Copy shared module into each Lambda for packaging
+        run: |
+          for fn in chapter_assistant experiment_guide science_quiz science_tutor; do
+            cp lambdas/shared/*.py "lambdas/${fn}/"
+          done
+
       - name: SAM Build
         run: sam build --template infra/template.yaml
 
@@ -40,7 +46,7 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset
 
-      - name: Inject Lambda URLs into frontend
+      - name: Inject Lambda URLs into frontend config
         run: |
           get_output() {
             aws cloudformation describe-stacks \

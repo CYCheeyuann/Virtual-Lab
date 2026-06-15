@@ -1,37 +1,47 @@
-import json
+"""Science Quiz — generates multiple-choice quizzes via Bedrock streaming."""
+
+import logging
 import os
-import boto3
+import sys
+
+_shared = os.path.join(os.path.dirname(__file__), "..", "shared")
+if os.path.isdir(_shared):
+    sys.path.insert(0, _shared)
+
 from flask import Flask, request, Response, stream_with_context
+from cors import cors_headers, preflight_response
+from validators import (
+    validate_api_key, sanitize_subject, sanitize_difficulty, sanitize_topic,
+)
+from bedrock_stream import stream_bedrock
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
-
-bedrock = boto3.client("bedrock-runtime", region_name="ap-southeast-1")
-MODEL_ID = "global.anthropic.claude-sonnet-4-6-20260217-v1:0"
-
-
-def cors_headers():
-    return {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST,OPTIONS,GET",
-    }
 
 
 @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
 @app.route("/<path:path>", methods=["GET", "POST", "OPTIONS"])
 def handler(path):
     if request.method == "OPTIONS":
-        return Response("", status=200, headers=cors_headers())
+        return preflight_response()
     if request.method == "GET":
         return Response("Science Quiz ready", status=200, headers=cors_headers())
 
-    body = request.get_json(force=True, silent=True) or {}
-    subject    = body.get("subject", "Biology")
-    quiz_topic = body.get("quiz_topic", "")
-    difficulty = body.get("difficulty", "Standard")
+    if not validate_api_key(request):
+        return Response('{"error":"Unauthorized"}', status=401,
+                        content_type="application/json", headers=cors_headers())
 
-    prompt = f"""You are an expert science educator and quiz designer specializing in {subject}. Create an engaging multiple-choice quiz on:
+    body = request.get_json(force=True, silent=True) or {}
+    subject    = sanitize_subject(body.get("subject", ""))
+    quiz_topic = sanitize_topic(body.get("quiz_topic", ""))
+    difficulty = sanitize_difficulty(body.get("difficulty", ""))
+
+    logger.info("Quiz request", extra={"subject": subject, "topic": quiz_topic})
+
+    prompt = f"""You are an expert science educator and quiz designer specializing in {subject}. Create an engaging multiple-choice quiz:
 
 Subject Area: {subject}
 Topic: {quiz_topic}
@@ -39,67 +49,44 @@ Difficulty: {difficulty}
 
 **QUIZ STRUCTURE BASED ON DIFFICULTY:**
 
-🟢 **Beginner** — Foundational concepts, basic recall, simple terminology, clear answer choices. Suitable for middle school or early high school.
+🟢 **Beginner** — Foundational concepts, basic recall, simple terminology. Suitable for middle school or early high school.
 
-🔵 **Standard** — Mix of recall and application questions. Moderate complexity. Suitable for high school or intro college.
+🔵 **Standard** — Mix of recall and application. Moderate complexity. Suitable for high school or intro college.
 
-🟡 **Expert** — Advanced application and analysis. Complex scenarios. May include calculations or multi-step problems. Suitable for advanced college or early graduate.
+🟡 **Expert** — Advanced analysis. Complex scenarios. May include calculations. Suitable for advanced college.
 
-🔴 **Master** — Graduate/professional complexity, cutting-edge concepts, technical terminology, critical thinking. Suitable for graduate students, researchers, professionals.
+🔴 **Master** — Graduate/professional complexity. Cutting-edge concepts. Suitable for researchers.
 
 ---
 
-**FORMAT:** Generate exactly 5 questions. For each question use this exact structure:
+Generate exactly 5 questions. For each use:
 
-📘 **Question N:** Write the question here.
+📘 **Question N:** [question]
 
 A) First option
 B) Second option
 C) Third option
 D) Fourth option
 
-✅ **Correct Answer:** letter - Full text of correct answer
+✅ **Correct Answer:** letter - Full text
 
-💡 **Explanation:** Explain why this answer is correct and briefly clarify why the other options are wrong.
+💡 **Explanation:** Why correct and why others are wrong.
 
 ---
 
-Make questions progressively more challenging. Ensure all questions are directly relevant to {subject} and {quiz_topic}.
+Make questions progressively harder. End with:
 
-At the end include:
+🧠 **Fun Fact** — A lesser-known fact related to {quiz_topic}.
 
-🧠 **Fun Fact** — A fascinating, lesser-known fact related to {quiz_topic}.
+🎯 **Difficulty Summary** — What makes this appropriate for {difficulty} level.
 
-🎯 **Difficulty Summary** — What makes this quiz appropriate for {difficulty} level learners studying {subject}.
-
-Be scientifically accurate and educational. Avoid trick questions."""
+Be accurate, educational, engaging. No trick questions."""
 
     messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
 
-    def stream():
-        try:
-            response = bedrock.invoke_model_with_response_stream(
-                modelId=MODEL_ID,
-                body=json.dumps({
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 4096,
-                    "messages": messages,
-                }),
-            )
-            for event in response["body"]:
-                chunk = event.get("chunk")
-                if chunk:
-                    data = json.loads(chunk["bytes"])
-                    if data.get("type") == "content_block_delta":
-                        text = data["delta"].get("text", "")
-                        if text:
-                            yield text
-        except Exception as e:
-            yield f"\n\n⚠️ Error: {str(e)}"
-
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
-    return Response(stream_with_context(stream()), headers=headers)
+    return Response(stream_with_context(stream_bedrock(messages)), headers=headers)
 
 
 if __name__ == "__main__":

@@ -1,2 +1,3 @@
 #!/bin/bash
-python app.py
+set -e
+exec python app.py

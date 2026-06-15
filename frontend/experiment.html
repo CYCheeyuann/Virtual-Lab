@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🧪 Experiment Guide</title>
+  <meta name="description" content="AI-generated complete lab guide with safety briefing. Supports document upload for context analysis." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -78,6 +79,7 @@
     setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
 
     document.getElementById('runBtn').addEventListener('click', () => {
+      const btn = document.getElementById('runBtn');
       const subject    = document.getElementById('subject').value;
       const topic      = document.getElementById('topic').value.trim();
       const difficulty = document.getElementById('difficulty').value;
@@ -88,7 +90,7 @@
       }
       const body = { subject, topic, difficulty };
       if (uploadedFile.data) { body.file_data = uploadedFile.data; body.file_mime = uploadedFile.mime; }
-      streamToPanel(window.STREAM_URLS.experiment_guide, body, 'out-experiment');
+      streamToPanel(window.STREAM_URLS.experiment_guide, body, 'out-experiment', btn);
     });
 
     document.getElementById('resetBtn').addEventListener('click', () => {

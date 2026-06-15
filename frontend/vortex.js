@@ -130,10 +130,19 @@
 
     /* Public API */
     setHue(baseHue, rangeHue) {
+      const oldBase  = this.opts.baseHue;
+      const oldRange = this.opts.rangeHue;
       this.opts.baseHue  = baseHue;
       if (typeof rangeHue === 'number') this.opts.rangeHue = rangeHue;
-      // Particles re-seed naturally as they expire — produces a smooth fade
-      // from old palette to new over ~3–5 seconds.
+      // Re-tint living particles by remapping their hue from the OLD
+      // [oldBase, oldBase+oldRange] band onto the new [baseHue, baseHue+rangeHue]
+      // band. This makes subject switches visible immediately instead of
+      // waiting ~5s for natural particle turnover.
+      const props = this.particleProps;
+      for (let i = 8; i < props.length; i += this.PROP_COUNT) {
+        const t = oldRange > 0 ? (props[i] - oldBase) / oldRange : 0;
+        props[i] = baseHue + t * this.opts.rangeHue;
+      }
     }
     pause()   { this.paused = true;  if (this.rafId) cancelAnimationFrame(this.rafId); }
     resume()  { if (!this.paused) return; this.paused = false; this.rafId = requestAnimationFrame(this._loop); }
@@ -169,10 +178,14 @@
       const o = this.opts;
       const x  = Math.random() * this._cssW;
       const y  = this.center[1] + (Math.random() * 2 - 1) * o.rangeY;
+      // Seed a small initial velocity so the very first rendered line is
+      // non-degenerate. Without this the first frame draws zero-length
+      // strokes which some browsers skip entirely.
+      const angle = Math.random() * Math.PI * 2;
       this.particleProps[i  ] = x;
       this.particleProps[i+1] = y;
-      this.particleProps[i+2] = 0;
-      this.particleProps[i+3] = 0;
+      this.particleProps[i+2] = Math.cos(angle) * 0.5;
+      this.particleProps[i+3] = Math.sin(angle) * 0.5;
       this.particleProps[i+4] = 0;
       this.particleProps[i+5] = o.baseTTL    + Math.random() * o.rangeTTL;
       this.particleProps[i+6] = o.baseSpeed  + Math.random() * o.rangeSpeed;
@@ -297,6 +310,9 @@
       rangeHue:      cfg.rangeHue,
       backgroundColor: 'transparent',
     });
+
+    // eslint-disable-next-line no-console
+    console.log('[vortex] active —', particleCount, 'particles, hue', cfg.baseHue);
 
     // Re-tune hue when the user picks a different subject.
     if (window.MutationObserver) {

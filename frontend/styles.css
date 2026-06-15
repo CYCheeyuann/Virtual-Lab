@@ -118,18 +118,27 @@ a:hover { text-decoration: underline; }
 }
 
 /* ─── Vortex particle background ─────────────────────────────────────── */
+/* z-index: 0 (NOT -1) — with z-index:-1 the body's gradient repaints on
+   top of the canvas via root-background propagation and you'd never see
+   the particles. At z-index:0 the canvas sits above the body bg, while
+   page content (z-index:1) and navbar (z-index:100) still cover it.   */
 #vortex-canvas {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
-  opacity: 0.45;
+  background: transparent;
+  opacity: 0.55;
+  mix-blend-mode: screen;
   transition: opacity 0.6s ease;
 }
-[data-theme="dark"] #vortex-canvas { opacity: 0.7; }
-@media (max-width: 600px) { #vortex-canvas { opacity: 0.35; } }
+[data-theme="dark"] #vortex-canvas {
+  opacity: 0.85;
+  mix-blend-mode: lighten;
+}
+@media (max-width: 600px) { #vortex-canvas { opacity: 0.4; } }
 @media print              { #vortex-canvas { display: none !important; } }
 @keyframes float {
   0%, 100% { transform: translateY(0)    rotate(0deg); }

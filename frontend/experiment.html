@@ -118,9 +118,8 @@
     });
 
     document.getElementById('resetBtn').addEventListener('click', () => {
+      // Note: subject is intentionally NOT reset — the user picked it on purpose.
       document.getElementById('topic').value = '';
-      document.getElementById('subject').value = 'Biology';
-      setSubjectTheme('Biology');
       document.getElementById('difficulty').value = 'Standard';
       document.getElementById('file-info').textContent = '';
       uploadedFile = { data: null, mime: null, name: null };

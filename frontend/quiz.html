@@ -432,9 +432,8 @@
     });
 
     resetBtn.addEventListener('click', () => {
+      // Note: subject is intentionally NOT reset — the user picked it on purpose.
       document.getElementById('topic').value = '';
-      document.getElementById('subject').value = 'Biology';
-      setSubjectTheme('Biology');
       document.getElementById('difficulty').value = 'Standard';
       quizState = null;
       const o = document.getElementById('out-quiz');

@@ -98,42 +98,12 @@ function bindSubjectSelect() {
 }
 
 /* ============================================================
- *  DARK / LIGHT THEME
+ *  THEME — dark mode is the only mode.
  * ============================================================ */
 function initTheme() {
-  let pref = null;
-  try { pref = localStorage.getItem('theme'); } catch (e) {}
-  if (!pref) {
-    pref = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
-      ? 'dark' : 'light';
-  }
-  applyTheme(pref);
-
-  // Listen for system changes when user has not explicitly set one
-  if (window.matchMedia) {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    if (mq.addEventListener) {
-      mq.addEventListener('change', e => {
-        let saved = null;
-        try { saved = localStorage.getItem('theme'); } catch (_) {}
-        if (!saved) applyTheme(e.matches ? 'dark' : 'light');
-      });
-    }
-  }
-}
-
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  const btn = document.getElementById('themeToggle');
-  if (btn) btn.innerHTML = theme === 'dark' ? ICONS.sun : ICONS.moon;
-}
-
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'light';
-  const next = current === 'dark' ? 'light' : 'dark';
-  applyTheme(next);
-  try { localStorage.setItem('theme', next); } catch (e) {}
-  showToast(next === 'dark' ? '🌙 Dark mode on' : '☀️ Light mode on', 'success');
+  // Force dark theme always; previous light-mode toggle has been removed.
+  document.documentElement.setAttribute('data-theme', 'dark');
+  try { localStorage.removeItem('theme'); } catch (e) {}
 }
 
 /* ============================================================
@@ -378,12 +348,6 @@ function initKeyboardShortcuts() {
       }
       return;
     }
-    // Ctrl + Shift + D — toggle dark mode
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
-      e.preventDefault();
-      toggleTheme();
-      return;
-    }
     // Escape — clear inputs / reset
     if (e.key === 'Escape') {
       const reset = document.getElementById('resetBtn');
@@ -405,21 +369,13 @@ function initKeyboardShortcuts() {
 }
 
 /* ============================================================
- *  NAVBAR THEME TOGGLE INJECTION
+ *  NAVBAR THEME TOGGLE — removed (dark mode only).
+ *  Keeping a stub so callers don't break if the function is referenced
+ *  elsewhere; cleans up any pre-existing button from cached HTML.
  * ============================================================ */
 function injectThemeToggle() {
-  const navLinks = document.querySelector('.nav-links');
-  if (!navLinks || document.getElementById('themeToggle')) return;
-  const btn = document.createElement('button');
-  btn.id = 'themeToggle';
-  btn.className = 'theme-toggle';
-  btn.title = 'Toggle dark mode (Ctrl+Shift+D)';
-  btn.setAttribute('aria-label', 'Toggle dark mode');
-  btn.addEventListener('click', toggleTheme);
-  navLinks.appendChild(btn);
-  // Set initial icon
-  const cur = document.documentElement.getAttribute('data-theme') || 'light';
-  btn.innerHTML = cur === 'dark' ? ICONS.sun : ICONS.moon;
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.remove();
 }
 
 /* ============================================================
@@ -433,7 +389,6 @@ function injectShortcutHint() {
   hint.className = 'shortcut-hint';
   hint.innerHTML = `⌨️ Shortcuts:
     <kbd>Ctrl</kbd>+<kbd>Enter</kbd> generate ·
-    <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> dark mode ·
     <kbd>Esc</kbd> clear`;
   main.appendChild(hint);
 }

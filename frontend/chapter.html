@@ -79,8 +79,7 @@
       });
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
-      document.getElementById('subject').value = 'Biology';
-      setSubjectTheme('Biology');
+      // Note: subject is intentionally NOT reset — the user picked it on purpose.
       clearPanel('out-chapter', 'Chapter overview will appear here…');
     });
     document.getElementById('exportBtn').addEventListener('click', () => {

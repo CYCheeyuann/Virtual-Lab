@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>📝 Science Quiz</title>
-  <meta name="description" content="AI-generated science quizzes with four difficulty levels. Interactive scoring with instant feedback." />
+  <title>📝 Quiz Generator</title>
+  <meta name="description" content="AI-powered quiz generator with outline refinement, strict JSON questions, and interactive grading." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
@@ -18,7 +18,7 @@
         <a class="nav-link" href="index.html">Home</a>
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
         <a class="nav-link" href="experiment.html">Experiment Guide</a>
-        <a class="nav-link active" href="quiz.html">Science Quiz</a>
+        <a class="nav-link active" href="quiz.html">Quiz Generator</a>
         <a class="nav-link" href="lab-tools.html">Lab Tools</a>
       </div>
     </div>
@@ -26,12 +26,13 @@
 
   <main class="page">
     <div class="page-header">
-      <h1>📝 Science Quiz</h1>
-      <p>Generate a multiple-choice quiz. Click an option to lock in your answer and get instant feedback.</p>
+      <h1>📝 Quiz Generator</h1>
+      <p>Generate an AI quiz tailored to your topic and difficulty. Review the outline, refine it, then take the test.</p>
     </div>
 
-    <section class="card">
-      <h2>Setup</h2>
+    <!-- ═══ PHASE 1: Setup ═══ -->
+    <section class="card" id="phase-setup">
+      <h2>1 · Setup</h2>
 
       <label for="subject">Subject</label>
       <select id="subject" class="input">
@@ -40,34 +41,70 @@
         <option value="Physics">Physics</option>
       </select>
 
-      <label for="topic">Quiz Topic</label>
+      <label for="topic">Chapter / Topic</label>
       <input id="topic" type="text" class="input"
-        placeholder="e.g. Photosynthesis, The Periodic Table, Gravity and Motion…" />
+        placeholder="e.g. Electrochemistry, Genetic Inheritance, Circular Motion…" />
 
       <label for="difficulty">Difficulty</label>
       <select id="difficulty" class="input">
-        <option value="Beginner">Beginner</option>
-        <option value="Standard" selected>Standard</option>
-        <option value="Expert">Expert</option>
-        <option value="Master">Master</option>
+        <option value="Form 4">Form 4</option>
+        <option value="SPM" selected>SPM</option>
+        <option value="STPM">STPM</option>
+        <option value="University">University</option>
       </select>
 
+      <label for="numQ">Number of questions</label>
+      <select id="numQ" class="input">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+      </select>
+
+      <label>Reference Document (optional)</label>
+      <div class="dropzone" id="dz">
+        <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+        <p>📄 Drag &amp; drop or click to upload</p>
+        <small>PDF · DOCX · TXT · Images · JSON</small>
+        <div class="file-info" id="file-info"></div>
+      </div>
+
       <div class="btn-row" style="margin-top:18px">
-        <button id="runBtn" class="btn btn-primary"></button>
-        <button id="revealBtn" class="btn btn-ghost"></button>
-        <button id="resetBtn" class="btn btn-ghost"></button>
+        <button id="outlineBtn" class="btn btn-primary"></button>
       </div>
     </section>
 
-    <section class="card">
-      <h2>📚 Quiz</h2>
-      <div id="quizScoreboardHost"></div>
-      <div class="output-panel text-panel answer-hidden" id="out-quiz">
-        <div class="placeholder">Your quiz will appear here…</div>
+    <!-- ═══ PHASE 1b: Outline review ═══ -->
+    <section class="card" id="phase-outline" style="display:none">
+      <h2>2 · Review Outline</h2>
+      <p style="color:var(--c-muted);font-size:0.88rem;margin-bottom:12px">
+        Edit the knowledge points below. Add or remove lines freely, then confirm to generate your quiz.
+      </p>
+      <textarea id="outlineText" class="input" rows="12" placeholder="Loading outline…"></textarea>
+
+      <div class="btn-row" style="margin-top:14px">
+        <button id="generateBtn" class="btn btn-primary"></button>
+        <button id="backBtn" class="btn btn-ghost"></button>
       </div>
-      <div class="btn-row" style="margin-top:12px">
+    </section>
+
+    <!-- ═══ PHASE 3: Quiz execution ═══ -->
+    <section class="card" id="phase-quiz" style="display:none">
+      <h2>3 · Answer the Quiz</h2>
+      <div id="quiz-container"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="submitBtn" class="btn btn-primary"></button>
+      </div>
+    </section>
+
+    <!-- ═══ PHASE 4: Results ═══ -->
+    <section class="card" id="phase-results" style="display:none">
+      <h2>4 · Results</h2>
+      <div id="score-display"></div>
+      <div id="results-container"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="retryBtn" class="btn btn-ghost"></button>
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
-        <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
   </main>
@@ -78,398 +115,234 @@
   <script src="vortex.js"></script>
   <script src="global-chat.js"></script>
   <script>
-    // Inject SVG icon buttons
-    const runBtn    = document.getElementById('runBtn');
-    const revealBtn = document.getElementById('revealBtn');
-    const resetBtn  = document.getElementById('resetBtn');
-    const exportBtn = document.getElementById('exportBtn');
+    /* ════════════════════════════════════════════════════════════════════
+     *  Quiz Generator — 4-phase workflow
+     * ════════════════════════════════════════════════════════════════════ */
 
-    runBtn.innerHTML    = `${iconHtml('bolt')}<span>Generate Quiz</span>`;
-    resetBtn.innerHTML  = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
-    exportBtn.innerHTML = `${iconHtml('download')}<span>Export PDF</span>`;
-    document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI</span>`;
-    setRevealBtn(false);
+    // Button icons
+    document.getElementById('outlineBtn').innerHTML  = `${iconHtml('bolt')}<span>Generate Outline</span>`;
+    document.getElementById('generateBtn').innerHTML = `${iconHtml('bolt')}<span>Confirm &amp; Generate Quiz</span>`;
+    document.getElementById('backBtn').innerHTML     = `${iconHtml('refresh','btn-icon-rotate')}<span>Back to Setup</span>`;
+    document.getElementById('submitBtn').innerHTML   = `${iconHtml('eye')}<span>Submit &amp; Show Results</span>`;
+    document.getElementById('retryBtn').innerHTML    = `${iconHtml('refresh','btn-icon-rotate')}<span>New Quiz</span>`;
+    document.getElementById('exportBtn').innerHTML   = `${iconHtml('download')}<span>Export PDF</span>`;
 
-    function setRevealBtn(revealed) {
-      revealBtn.dataset.revealed = revealed ? '1' : '0';
-      revealBtn.innerHTML = revealed
-        ? `${iconHtml('eyeOff')}<span>Hide Answers</span>`
-        : `${iconHtml('eye')}<span>Show Answers</span>`;
-    }
+    let uploadedFile = { data: null, mime: null, name: null };
+    setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
 
-    /* ─── Quiz parser ───────────────────────────────────────────────── */
-    function parseQuiz(raw) {
-      const lines = raw.split(/\r?\n/);
-      const questions = [];
-      let cur = null;
-      let collectingExplanation = false;
+    let quizData = [];   // parsed JSON questions
+    let userAnswers = {}; // { 0: 'A', 1: 'C', ... }
 
-      const QHEADER  = /^(?:Q(?:uestion)?\s*)?(\d+)\s*[.):\-]\s*(.+?)$/i;
-      const QHEADER2 = /^(?:Q(?:uestion)?)\s*(\d+)\s*$/i;
-      const OPT      = /^\s*[*\-]?\s*\*{0,2}([A-D])\*{0,2}\s*[.):)\]]\s*(.+?)\s*$/i;
-      const ANSWER   = /(?:✅|Correct\s*Answer|Answer)[\s*:\-]*([A-D])\b/i;
-      const EXPLAIN  = /(?:💡\s*Explanation|💡|Explanation)[\s*:\-]*(.*)$/i;
-
-      function pushQ() {
-        if (cur && cur.options.length >= 2) questions.push(cur);
-      }
-
-      for (let raw of lines) {
-        const line = raw.trim();
-        if (!line) { collectingExplanation = false; continue; }
-
-        // Strip markdown emphasis around whole line for header detection
-        const stripped = line.replace(/^[#>*\-\s]+/, '').replace(/\*\*/g, '');
-
-        // Question with text on same line
-        const qm = stripped.match(QHEADER);
-        const qm2 = stripped.match(QHEADER2);
-        const optm = line.match(OPT);
-        const ansm = line.match(ANSWER);
-        const expm = line.match(EXPLAIN);
-
-        if (optm) {
-          // Option line — must come after a question
-          if (cur) {
-            cur.options.push({ letter: optm[1].toUpperCase(), text: optm[2].replace(/\*\*/g, '').trim() });
-          }
-          collectingExplanation = false;
-          continue;
-        }
-        if (ansm) {
-          if (cur) cur.correct = ansm[1].toUpperCase();
-          collectingExplanation = false;
-          continue;
-        }
-        if (expm) {
-          if (cur) {
-            const tail = (expm[1] || '').replace(/\*\*/g, '').trim();
-            cur.explanation = (cur.explanation ? cur.explanation + ' ' : '') + tail;
-          }
-          collectingExplanation = !!cur;
-          continue;
-        }
-        // Question header (with text)
-        if (qm && !optm) {
-          pushQ();
-          cur = { number: qm[1], text: qm[2].replace(/\*\*/g, '').trim(), options: [], correct: null, explanation: '' };
-          collectingExplanation = false;
-          continue;
-        }
-        // Question header alone (text on next line)
-        if (qm2) {
-          pushQ();
-          cur = { number: qm2[1], text: '', options: [], correct: null, explanation: '' };
-          collectingExplanation = false;
-          continue;
-        }
-
-        // Continuation line
-        if (cur) {
-          if (collectingExplanation) {
-            const cleaned = line.replace(/\*\*/g, '').trim();
-            cur.explanation = (cur.explanation ? cur.explanation + ' ' : '') + cleaned;
-          } else if (!cur.text && cur.options.length === 0) {
-            // Question text on its own line right after the header
-            cur.text = line.replace(/\*\*/g, '').replace(/^\*+|\*+$/g, '').trim();
-          }
-        }
-      }
-      pushQ();
-      return questions.filter(q => q.options.length >= 2 && q.correct);
-    }
-
-    /* ─── Particles for correct answer celebration ──────────────────── */
-    function spawnParticles(centerEl) {
-      const r = centerEl.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      const colors = ['#4caf50', '#7e57c2', '#42a5f5', '#ffd54f', '#ff7043'];
-      for (let i = 0; i < 18; i++) {
-        const p = document.createElement('div');
-        p.className = 'particle';
-        p.style.left = `${cx}px`;
-        p.style.top  = `${cy}px`;
-        p.style.background = colors[Math.floor(Math.random() * colors.length)];
-        const angle = Math.random() * Math.PI * 2;
-        const dist  = 80 + Math.random() * 70;
-        p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
-        p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
-        document.body.appendChild(p);
-        setTimeout(() => p.remove(), 950);
-      }
-    }
-
-    /* ─── Quiz state ────────────────────────────────────────────────── */
-    let quizState = null; // { questions, answers[], subject, topic, difficulty }
-
-    function bestScoreKey(s) {
-      return `vsl.bestScore.${s.subject}|${s.topic}|${s.difficulty}`;
-    }
-    function getBestScore(state) {
-      try {
-        const v = localStorage.getItem(bestScoreKey(state));
-        return v ? JSON.parse(v) : null;
-      } catch (e) { return null; }
-    }
-    function setBestScore(state, score) {
-      try {
-        const prev = getBestScore(state);
-        if (!prev || score.percent > prev.percent) {
-          localStorage.setItem(bestScoreKey(state), JSON.stringify(score));
-          return true;
-        }
-      } catch (e) {}
-      return false;
-    }
-
-    function renderScoreboard() {
-      if (!quizState) return;
-      const total = quizState.questions.length;
-      const answered = quizState.answers.filter(a => a !== null).length;
-      const correct  = quizState.answers.filter(a => a && a.correct).length;
-      const stars = total > 0 ? Math.round((correct / total) * 5) : 0;
-      const filled = '⭐'.repeat(stars);
-      const empty  = '☆'.repeat(Math.max(0, 5 - stars));
-      const host = document.getElementById('quizScoreboardHost');
-      host.innerHTML = `
-        <div class="quiz-scoreboard" role="status" aria-live="polite">
-          <div class="score-label">Score: <strong>${correct}/${total}</strong>
-            <span style="color:var(--c-muted); font-weight:500"> · ${answered}/${total} answered</span>
-          </div>
-          <div class="score-stars">${filled}${empty}</div>
-        </div>`;
-    }
-
-    function gradeFor(pct) {
-      if (pct >= 90) return 'A';
-      if (pct >= 80) return 'B';
-      if (pct >= 70) return 'C';
-      if (pct >= 60) return 'D';
-      return 'F';
-    }
-
-    function renderSummary(panel) {
-      const total = quizState.questions.length;
-      const correct = quizState.answers.filter(a => a && a.correct).length;
-      const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
-      const grade = gradeFor(pct);
-      const isNewBest = setBestScore(quizState, { percent: pct, correct, total, grade, at: new Date().toISOString() });
-      const best = getBestScore(quizState);
-
-      const color = pct >= 80 ? 'var(--c-success-fg)'
-                  : pct >= 60 ? '#f9a825'
-                  : 'var(--c-error-fg)';
-
-      const summary = document.createElement('div');
-      summary.className = 'quiz-summary';
-      summary.innerHTML = `
-        <h3>🎉 Quiz Complete!</h3>
-        <div class="summary-row">
-          <div class="circular-progress" style="--pct:0; --col:${color}">
-            <span>${pct}%</span>
-          </div>
-          <div>
-            <div class="summary-grade" style="color:${color}">${grade}</div>
-            <div class="summary-meta">${correct} / ${total} correct</div>
-          </div>
-        </div>
-        <div class="summary-best">
-          ${isNewBest ? '🏆 <strong>New best score!</strong>' : '⭐ Best so far: <strong>' + (best ? best.percent + '% (' + best.grade + ')' : '—') + '</strong>'}
-        </div>`;
-      panel.appendChild(summary);
-
-      // Animate the conic gradient up to the percent
-      requestAnimationFrame(() => {
-        const ring = summary.querySelector('.circular-progress');
-        ring.style.transition = 'background 1.1s ease';
-        ring.style.setProperty('--pct', pct);
-        // because conic-gradient is recomputed via the var, just nudge it
-        ring.style.background = `conic-gradient(${color} ${pct}%, var(--c-input-bg) 0)`;
+    /* ─── Phase navigation ─────────────────────────────────────────── */
+    function showPhase(id) {
+      ['phase-setup','phase-outline','phase-quiz','phase-results'].forEach(p => {
+        document.getElementById(p).style.display = p === id ? '' : 'none';
       });
-
-      // Save to progress + toast
-      recordQuizResult({ subject: quizState.subject, total, correct });
-      showToast(isNewBest ? `New best: ${pct}% (${grade})` : `Score: ${pct}% (${grade})`,
-                pct >= 60 ? 'success' : 'warning', 5000);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function renderInteractiveQuiz(panel) {
-      panel.innerHTML = '';
-      panel.classList.remove('answer-hidden');
-      quizState.questions.forEach((q, qi) => {
+    /* ─── Phase 1: Generate outline (streaming) ────────────────────── */
+    document.getElementById('outlineBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('outlineBtn');
+      const topic = document.getElementById('topic').value.trim();
+      if (!topic) { showToast('Enter a topic first', 'warning'); return; }
+
+      const url = window.STREAM_URLS && window.STREAM_URLS.science_quiz;
+      if (!url || url.startsWith('__URL_')) {
+        showToast('Quiz URL not configured', 'error'); return;
+      }
+
+      setButtonLoading(btn, true, 'Generating outline…');
+      const body = {
+        action: 'outline',
+        subject: document.getElementById('subject').value,
+        topic,
+        difficulty: document.getElementById('difficulty').value,
+      };
+      if (uploadedFile.data) {
+        body.file_data = uploadedFile.data;
+        body.file_mime = uploadedFile.mime;
+      }
+
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder('utf-8');
+        let full = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          full += dec.decode(value, { stream: true });
+        }
+        document.getElementById('outlineText').value = full;
+        showPhase('phase-outline');
+        showToast('Outline ready — review and edit, then generate', 'success');
+      } catch (err) {
+        showToast('Outline failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    /* ─── Phase 1b → back to setup ─────────────────────────────────── */
+    document.getElementById('backBtn').addEventListener('click', () => showPhase('phase-setup'));
+
+    /* ─── Phase 2: Generate quiz (JSON) ────────────────────────────── */
+    document.getElementById('generateBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('generateBtn');
+      const outline = document.getElementById('outlineText').value.trim();
+      if (!outline) { showToast('Outline is empty', 'warning'); return; }
+
+      const url = window.STREAM_URLS && window.STREAM_URLS.science_quiz;
+      if (!url || url.startsWith('__URL_')) {
+        showToast('Quiz URL not configured', 'error'); return;
+      }
+
+      setButtonLoading(btn, true, 'Generating quiz…');
+      const body = {
+        action: 'generate',
+        subject: document.getElementById('subject').value,
+        topic: document.getElementById('topic').value.trim(),
+        difficulty: document.getElementById('difficulty').value,
+        outline,
+        num_questions: parseInt(document.getElementById('numQ').value, 10),
+      };
+
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify(body),
+        });
+        const json = await resp.json();
+        if (json.error && !json.questions) {
+          throw new Error(json.error);
+        }
+        quizData = json.questions || [];
+        if (!quizData.length) throw new Error('No questions returned');
+        userAnswers = {};
+        renderQuiz();
+        showPhase('phase-quiz');
+        showToast(`${quizData.length} questions generated`, 'success');
+        recordActivity(document.getElementById('subject').value);
+      } catch (err) {
+        showToast('Quiz generation failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    /* ─── Phase 3: Render interactive quiz ─────────────────────────── */
+    function renderQuiz() {
+      const container = document.getElementById('quiz-container');
+      container.innerHTML = '';
+      quizData.forEach((q, qi) => {
         const card = document.createElement('div');
         card.className = 'quiz-question';
+        card.dataset.qi = qi;
         card.innerHTML = `
-          <div class="quiz-q-title">Q${qi + 1}. ${escapeHtml(q.text || '(see below)')}</div>
-          <div class="quiz-options"></div>`;
+          <div class="quiz-q-title">Q${qi + 1}. ${escapeHtml(q.question_stem)}</div>
+          <div class="quiz-options" data-qi="${qi}"></div>`;
         const optsHost = card.querySelector('.quiz-options');
-        q.options.forEach(opt => {
-          const b = document.createElement('button');
-          b.className = 'quiz-option';
-          b.type = 'button';
-          b.dataset.letter = opt.letter;
-          b.innerHTML = `<span class="opt-letter">${opt.letter}</span><span>${escapeHtml(opt.text)}</span>`;
-          b.addEventListener('click', () => onPick(qi, opt.letter, b, card));
-          optsHost.appendChild(b);
+        ['A','B','C','D'].forEach(letter => {
+          const text = (q.options && q.options[letter]) || '';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'quiz-option';
+          btn.dataset.letter = letter;
+          btn.dataset.qi = qi;
+          btn.innerHTML = `<span class="opt-letter">${letter}</span><span>${escapeHtml(text)}</span>`;
+          btn.addEventListener('click', () => selectOption(qi, letter));
+          optsHost.appendChild(btn);
         });
-        panel.appendChild(card);
+        container.appendChild(card);
       });
-      renderScoreboard();
     }
 
-    function onPick(qi, letter, btn, card) {
-      if (quizState.answers[qi]) return; // already answered
-      const q = quizState.questions[qi];
-      const isCorrect = letter === q.correct;
-      quizState.answers[qi] = { picked: letter, correct: isCorrect };
-
-      // Disable all options in this question
-      card.querySelectorAll('.quiz-option').forEach(b => {
-        b.disabled = true;
-        if (b.dataset.letter === q.correct) b.classList.add(isCorrect ? 'correct' : 'reveal');
+    function selectOption(qi, letter) {
+      // Record choice
+      userAnswers[qi] = letter;
+      // Visual: highlight selected, unhighlight others
+      const card = document.querySelector(`.quiz-question[data-qi="${qi}"]`);
+      card.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.letter === letter);
       });
-      if (!isCorrect) btn.classList.add('incorrect');
-
-      // Append explanation
-      if (q.explanation) {
-        const ex = document.createElement('div');
-        ex.className = 'quiz-explanation';
-        ex.innerHTML = `<strong>${isCorrect ? '✅ Correct' : `❌ Correct answer: ${q.correct}`}.</strong> ${escapeHtml(q.explanation)}`;
-        card.appendChild(ex);
-      } else {
-        const ex = document.createElement('div');
-        ex.className = 'quiz-explanation';
-        ex.innerHTML = `<strong>${isCorrect ? '✅ Correct!' : `❌ Correct answer: ${q.correct}`}.</strong>`;
-        card.appendChild(ex);
-      }
-
-      if (isCorrect) spawnParticles(btn);
-      renderScoreboard();
-
-      // If all answered, render summary
-      if (quizState.answers.every(a => a !== null) && !document.querySelector('.quiz-summary')) {
-        renderSummary(document.getElementById('out-quiz'));
-      }
     }
 
-    /* ─── Wire up controls ──────────────────────────────────────────── */
-    runBtn.addEventListener('click', () => {
-      const subject    = document.getElementById('subject').value;
-      const quiz_topic = document.getElementById('topic').value.trim();
-      const difficulty = document.getElementById('difficulty').value;
-      const out = document.getElementById('out-quiz');
-      if (!quiz_topic) {
-        out.innerHTML = '<div class="error-msg">⚠️ Please enter a quiz topic first.</div>';
-        showToast('Please enter a quiz topic', 'warning');
-        return;
+    /* ─── Phase 4: Submit & evaluate ───────────────────────────────── */
+    document.getElementById('submitBtn').addEventListener('click', () => {
+      const answered = Object.keys(userAnswers).length;
+      if (answered < quizData.length) {
+        const skip = quizData.length - answered;
+        if (!confirm(`You have ${skip} unanswered question${skip>1?'s':''}. Submit anyway?`)) return;
       }
-      out.classList.add('answer-hidden');
-      document.getElementById('quizScoreboardHost').innerHTML = '';
-      quizState = null;
-      setRevealBtn(false);
+      evaluate();
+    });
 
-      streamToPanel(window.STREAM_URLS.science_quiz,
-        { subject, quiz_topic, difficulty },
-        'out-quiz', runBtn,
-        {
-          successToast: 'Quiz generated successfully!',
-          onComplete: (fullText, panel) => {
-            const questions = parseQuiz(fullText);
-            if (questions.length === 0) {
-              showToast('Could not detect quiz format — showing raw text', 'warning');
-              return;
-            }
-            quizState = {
-              questions,
-              answers: new Array(questions.length).fill(null),
-              subject, topic: quiz_topic, difficulty,
-            };
-            renderInteractiveQuiz(panel);
-          }
+    function evaluate() {
+      let correct = 0;
+      const resultsContainer = document.getElementById('results-container');
+      resultsContainer.innerHTML = '';
+
+      quizData.forEach((q, qi) => {
+        const picked = userAnswers[qi] || null;
+        const isCorrect = picked === q.correct_answer;
+        if (isCorrect) correct++;
+
+        const card = document.createElement('div');
+        card.className = 'quiz-question ' + (isCorrect ? 'result-correct' : 'result-incorrect');
+        let optsHtml = '';
+        ['A','B','C','D'].forEach(letter => {
+          const text = (q.options && q.options[letter]) || '';
+          let cls = 'quiz-option disabled';
+          if (letter === q.correct_answer) cls += ' correct';
+          if (letter === picked && !isCorrect) cls += ' incorrect';
+          if (letter === picked) cls += ' selected';
+          optsHtml += `<div class="${cls}"><span class="opt-letter">${letter}</span><span>${escapeHtml(text)}</span></div>`;
         });
-    });
 
-    revealBtn.addEventListener('click', () => {
-      if (quizState) {
-        // Interactive mode — reveal all unanswered correct answers + explanations
-        const cards = document.querySelectorAll('.quiz-question');
-        const willReveal = revealBtn.dataset.revealed !== '1';
-        cards.forEach((card, qi) => {
-          const q = quizState.questions[qi];
-          if (willReveal) {
-            card.querySelectorAll('.quiz-option').forEach(b => {
-              if (b.dataset.letter === q.correct) b.classList.add('reveal');
-              b.disabled = true;
-            });
-            if (!card.querySelector('.quiz-explanation')) {
-              const ex = document.createElement('div');
-              ex.className = 'quiz-explanation';
-              ex.innerHTML = `<strong>Correct answer: ${q.correct}.</strong> ${escapeHtml(q.explanation || '')}`;
-              card.appendChild(ex);
-            }
-          } else {
-            // hide reveal markers & explanations for unanswered questions
-            if (!quizState.answers[qi]) {
-              card.querySelectorAll('.quiz-option').forEach(b => {
-                b.classList.remove('reveal');
-                b.disabled = false;
-              });
-              const ex = card.querySelector('.quiz-explanation');
-              if (ex) ex.remove();
-            }
-          }
-        });
-        setRevealBtn(willReveal);
-      } else {
-        // Fallback (raw-text view): toggle blur
-        const out = document.getElementById('out-quiz');
-        const willReveal = out.classList.contains('answer-hidden');
-        out.classList.toggle('answer-hidden');
-        setRevealBtn(willReveal);
-      }
-    });
-
-    resetBtn.addEventListener('click', () => {
-      // Note: subject is intentionally NOT reset — the user picked it on purpose.
-      document.getElementById('topic').value = '';
-      document.getElementById('difficulty').value = 'Standard';
-      quizState = null;
-      const o = document.getElementById('out-quiz');
-      o.classList.add('answer-hidden');
-      o.innerHTML = '<div class="placeholder">Your quiz will appear here…</div>';
-      document.getElementById('quizScoreboardHost').innerHTML = '';
-      setRevealBtn(false);
-    });
-
-    exportBtn.addEventListener('click', () => {
-      exportToPDF('out-quiz', 'Science Quiz');
-    });
-
-    document.getElementById('sendToAiBtn').addEventListener('click', () => {
-      if (!quizState) {
-        showToast('Generate and answer a quiz first', 'warning');
-        return;
-      }
-      const total = quizState.questions.length;
-      const correct = quizState.answers.filter(a => a && a.correct).length;
-      const incorrect = [];
-      quizState.questions.forEach((q, i) => {
-        const a = quizState.answers[i];
-        if (a && !a.correct) {
-          incorrect.push(`Q${i+1}: "${q.text}" — picked ${a.picked}, correct: ${q.correct}`);
-        }
+        card.innerHTML = `
+          <div class="quiz-q-title">Q${qi + 1}. ${escapeHtml(q.question_stem)}</div>
+          <div class="quiz-options">${optsHtml}</div>
+          <div class="quiz-explanation">
+            <strong>${isCorrect ? '✅ Correct' : `❌ Correct answer: ${q.correct_answer}`}</strong><br/>
+            ${escapeHtml(q.detailed_explanation || '')}
+          </div>`;
+        resultsContainer.appendChild(card);
       });
-      const summary =
-        `Quiz Results — ${quizState.subject} / ${quizState.topic} (${quizState.difficulty})\n` +
-        `Score: ${correct}/${total}\n\n` +
-        (incorrect.length
-          ? `Questions to review:\n` + incorrect.map(s => '• ' + s).join('\n')
-          : `All correct! 🎉`);
-      window.GlobalChat && window.GlobalChat.injectContent(
-        summary, 'quiz',
-        `📝 Quiz: ${quizState.topic} (${correct}/${total})`
-      );
+
+      // Score display
+      const total = quizData.length;
+      const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+      document.getElementById('score-display').innerHTML = `
+        <div class="quiz-scoreboard">
+          <div class="score-label">Score: <strong>${correct}/${total}</strong> · ${pct}% Accuracy</div>
+          <div class="score-stars">${'⭐'.repeat(Math.round(pct/20))}${'☆'.repeat(5 - Math.round(pct/20))}</div>
+        </div>`;
+
+      recordQuizResult({
+        subject: document.getElementById('subject').value,
+        total,
+        correct,
+      });
+
+      showPhase('phase-results');
+      showToast(`Score: ${correct}/${total} (${pct}%)`, pct >= 60 ? 'success' : 'warning', 5000);
+    }
+
+    /* ─── Retry / Export ───────────────────────────────────────────── */
+    document.getElementById('retryBtn').addEventListener('click', () => {
+      quizData = [];
+      userAnswers = {};
+      showPhase('phase-setup');
+    });
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      exportToPDF('results-container', 'Quiz Results');
     });
   </script>
 </body>

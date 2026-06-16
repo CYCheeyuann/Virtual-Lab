@@ -569,12 +569,28 @@ select option:hover {
   animation: shakeBox 0.4s ease;
 }
 .quiz-option.incorrect .opt-letter { color: var(--c-error-fg); }
+/* During answering: selected but not yet graded */
+.quiz-option.selected {
+  background: var(--c-accent-soft);
+  border-color: var(--c-accent);
+  color: var(--c-accent-2);
+  font-weight: 600;
+}
+.quiz-option.selected .opt-letter { color: var(--c-accent); }
+.quiz-option.disabled {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.85;
+}
 .quiz-option.reveal {
   background: var(--c-success-bg);
   border-color: var(--c-success-fg);
   color: var(--c-success-fg);
   font-weight: 600;
 }
+/* Result phase: question cards with a subtle left border */
+.quiz-question.result-correct { border-left: 4px solid var(--c-success-fg); }
+.quiz-question.result-incorrect { border-left: 4px solid var(--c-error-fg); }
 @keyframes correctPop {
   0%   { transform: scale(1); }
   40%  { transform: scale(1.04); }

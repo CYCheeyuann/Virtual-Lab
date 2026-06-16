@@ -241,6 +241,24 @@ label {
 .input::placeholder { color: rgba(255, 255, 255, 0.30); }
 select.input { cursor: pointer; }
 
+/* Native <option> elements ignore most CSS but accept background-color and
+   color in modern Chrome / Firefox / Safari. Without these overrides the
+   browser falls back to the OS-level light dropdown which is unreadable
+   over our dark theme (text is white on white). */
+.input option,
+select option {
+  background-color: #1f1330;
+  color: var(--c-text);
+  padding: 6px 10px;
+}
+.input option:checked,
+select option:checked,
+.input option:hover,
+select option:hover {
+  background-color: var(--c-accent);
+  color: #14101e;
+}
+
 /* ─── Buttons ────────────────────────────────────────────────────────── */
 .btn {
   border: none;

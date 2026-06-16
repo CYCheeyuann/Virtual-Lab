@@ -54,12 +54,12 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0"
                   - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
-              # Amazon Nova Canvas — image generation in ap-northeast-1 only.
+              # Amazon Titan Image Generator v2 — image generation in us-east-1.
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                 Resource:
-                  - "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.nova-canvas-v1:0"
+                  - "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v2:0"
 
   # ─── Chapter Assistant Lambda ───────────────────────────────────────────────
   ChapterAssistantFunction:
@@ -198,9 +198,9 @@ Resources:
           # Claude (text) runs in Singapore via global inference profile.
           BEDROCK_REGION: ap-southeast-1
           MODEL_ID: global.anthropic.claude-haiku-4-5-20251001-v1:0
-          # Nova Canvas (image) is only in ap-northeast-1 / us-east-1.
-          IMAGE_REGION: ap-northeast-1
-          IMAGE_MODEL_ID: amazon.nova-canvas-v1:0
+          # Titan Image Generator v2 in N. Virginia (us-east-1).
+          IMAGE_REGION: us-east-1
+          IMAGE_MODEL_ID: amazon.titan-image-generator-v2:0
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: BUFFERED

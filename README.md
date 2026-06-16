@@ -9,8 +9,8 @@ An AI-powered learning companion for Biology, Chemistry, and Physics — sliced 
   - Text: Claude Haiku 4.5 via the **global** inference profile
     (`global.anthropic.claude-haiku-4-5-20251001-v1:0`), called from
     `ap-southeast-1`.
-  - Image: **Amazon Nova Canvas** (`amazon.nova-canvas-v1:0`), called from
-    `ap-northeast-1` (Nova Canvas is not available in Singapore).
+  - Image: **Amazon Titan Image Generator v2**
+    (`amazon.titan-image-generator-v2:0`), called from `us-east-1`.
 - **Amazon S3** — static website hosting (multi-page)
 - **GitHub Actions** — CI/CD via AWS SAM
 
@@ -37,7 +37,7 @@ Lambda Function URLs (7 Flask apps; 6 RESPONSE_STREAM, 1 BUFFERED)
     ├──► Amazon Bedrock — Claude Haiku 4.5 (global inference profile, ap-southeast-1)
     │       ↳ chapter, experiment, quiz, tutor, safety, what-if, image-prompt expansion
     │
-    └──► Amazon Bedrock — Nova Canvas (ap-northeast-1)
+    └──► Amazon Bedrock — Titan Image Generator v2 (us-east-1)
             ↳ image generator (rendered from Claude-expanded prompt)
 ```
 
@@ -82,7 +82,7 @@ Lambda Function URLs (7 Flask apps; 6 RESPONSE_STREAM, 1 BUFFERED)
 1. **Enable Bedrock model access** — request access in **both** regions:
    - `ap-southeast-1` (Singapore): Claude Haiku 4.5 (request via the
      `global.anthropic.claude-haiku-4-5-20251001-v1:0` global profile).
-   - `ap-northeast-1` (Tokyo): `amazon.nova-canvas-v1:0`.
+   - `us-east-1` (N. Virginia): `amazon.titan-image-generator-v2:0`.
 
 2. **Create an S3 bucket** for SAM deployment artifacts (any name, in `ap-southeast-1`).
 

@@ -55,6 +55,9 @@
 
   let isOpen = false;
   let hasUnread = false;
+  // Tracks the currently streaming reply so the user can abort it via the
+  // 🗑️ clear button (or simply by sending another message).
+  let activeAbort = null;
 
   /* ── DOM build ────────────────────────────────────────────── */
   // Reuse the global escapeHtml from common.js when available, else fall back
@@ -182,6 +185,11 @@
       return;
     }
 
+    // If a previous reply is still streaming, abort it first.
+    if (activeAbort) { try { activeAbort.abort(); } catch (_) {} }
+    activeAbort = new AbortController();
+    const localAbort = activeAbort;
+
     // History snapshot BEFORE we add the placeholder assistant bubble.
     const apiHistory = buildApiHistory();
     // The just-pushed user message is already in apiHistory; the backend
@@ -215,6 +223,7 @@
           message: userText,
           history: apiHistory,
         }),
+        signal: localAbort.signal,
       });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
@@ -225,18 +234,30 @@
         const { done, value } = await reader.read();
         if (done) break;
         full += decoder.decode(value, { stream: true });
+        // Bail quietly if the user cleared the chat mid-stream — the bubble
+        // is already gone and we don't want to revive it.
+        if (localAbort.signal.aborted || !state.messages[idx]) return;
         state.messages[idx].content = full;
         render();
       }
+      if (!state.messages[idx]) return;
       state.messages[idx].content = full || '(no response)';
       state.messages[idx].source  = 'manual';
       saveHistory(state);
       render();
     } catch (err) {
-      state.messages[idx].content = '⚠️ ' + (err.message || 'request failed');
-      state.messages[idx].source  = 'system';
-      saveHistory(state);
-      render();
+      if (err && err.name === 'AbortError') {
+        // User clicked clear; nothing to surface.
+        return;
+      }
+      if (state.messages[idx]) {
+        state.messages[idx].content = '⚠️ ' + (err.message || 'request failed');
+        state.messages[idx].source  = 'system';
+        saveHistory(state);
+        render();
+      }
+    } finally {
+      if (activeAbort === localAbort) activeAbort = null;
     }
   }
 
@@ -288,6 +309,10 @@
   function toggle() { isOpen ? close() : open(); }
 
   function clearHistory() {
+    // Stop any in-flight streaming reply so it can't keep appending after
+    // we've reset the message list.
+    if (activeAbort) { try { activeAbort.abort(); } catch (_) {} }
+    activeAbort = null;
     state = { messages: [] };
     saveHistory(state);
     state.messages.push({

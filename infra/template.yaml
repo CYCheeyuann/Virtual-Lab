@@ -54,12 +54,17 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0"
                   - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
-              # Amazon Nova Canvas — image generation in us-east-1 (Titan v2 is
-              # End-of-Life on 2026-06-30; Nova Canvas is the supported successor).
+              # Image generation in us-east-1 — IAM allows BOTH Titan v2 and
+              # Nova Canvas so the runtime model can be switched via the
+              # IMAGE_MODEL_ID env var alone, no IAM redeploy required.
+              # (Titan v2 is Legacy / EOL 2026-06-30; Nova Canvas is the
+              # supported successor.)
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                 Resource:
+                  - "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v2:0"
+                  - "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v1"
                   - "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-canvas-v1:0"
 
   # ─── Chapter Assistant Lambda ───────────────────────────────────────────────
@@ -199,9 +204,11 @@ Resources:
           # Claude (text) runs in Singapore via global inference profile.
           BEDROCK_REGION: ap-southeast-1
           MODEL_ID: global.anthropic.claude-haiku-4-5-20251001-v1:0
-          # Nova Canvas in N. Virginia (us-east-1).
+          # Titan Image Generator v2 in N. Virginia (us-east-1).
+          # The IAM policy also covers Nova Canvas / Titan v1, so to swap
+          # just change IMAGE_MODEL_ID below — no other infra change needed.
           IMAGE_REGION: us-east-1
-          IMAGE_MODEL_ID: amazon.nova-canvas-v1:0
+          IMAGE_MODEL_ID: amazon.titan-image-generator-v2:0
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: BUFFERED

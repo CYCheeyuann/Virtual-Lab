@@ -36,7 +36,9 @@ def _friendly_error(error_code, message):
         "ModelStreamErrorException": "⚠️ Streaming error from the AI model. Please try again.",
         "ModelErrorException": "⚠️ The AI model returned an error. Please try again.",
         "ResourceNotFoundException": (
-            "⚠️ Model or inference profile not found. Verify MODEL_ID and region."
+            "⚠️ Model not found. Open AWS Console → Bedrock → Model access in "
+            "the model's home region and verify access has been granted "
+            "(MODEL_ID + region must both match a model your account can use)."
         ),
         "ServiceQuotaExceededException": (
             "⚠️ Service quota exceeded. Please try again later."

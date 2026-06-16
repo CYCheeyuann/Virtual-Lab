@@ -7,12 +7,23 @@ Parameters:
     Type: String
     Default: "*"
     Description: CORS allowed origin (set to S3 website URL after first deploy)
+  ApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: |
+      Optional shared secret. When set, every Lambda Function URL requires
+      `X-Api-Key: <value>` on the request. Empty string disables the check.
 
 Globals:
   Function:
     Timeout: 180
     MemorySize: 512
     Runtime: python3.12
+    Environment:
+      Variables:
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+        API_KEY:        !Ref ApiKey
 
 Resources:
   # ─── IAM Role ───────────────────────────────────────────────────────────────

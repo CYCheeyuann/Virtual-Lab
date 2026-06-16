@@ -369,7 +369,7 @@
           try {
             const resp = await fetch(url, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: apiHeaders(),
               body: JSON.stringify(p),
             });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

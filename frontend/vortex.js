@@ -96,7 +96,14 @@
   class Vortex {
     constructor(canvas, opts) {
       this.canvas = canvas;
-      this.ctx    = canvas.getContext('2d');
+      this.ctx    = canvas.getContext && canvas.getContext('2d');
+      if (!this.ctx) {
+        // Headless browsers, strict privacy modes, or out-of-memory canvases
+        // can return null. Bail silently — the rest of the site keeps working.
+        // eslint-disable-next-line no-console
+        console.warn('[vortex] 2D canvas unavailable; particle background disabled');
+        return;
+      }
       this.opts   = Object.assign({
         particleCount:   500,
         rangeY:          100,
@@ -130,6 +137,7 @@
 
     /* Public API */
     setHue(baseHue, rangeHue) {
+      if (!this.ctx) return;
       const oldBase  = this.opts.baseHue;
       const oldRange = this.opts.rangeHue;
       this.opts.baseHue  = baseHue;
@@ -144,10 +152,14 @@
         props[i] = baseHue + t * this.opts.rangeHue;
       }
     }
-    pause()   { this.paused = true;  if (this.rafId) cancelAnimationFrame(this.rafId); }
-    resume()  { if (!this.paused) return; this.paused = false; this.rafId = requestAnimationFrame(this._loop); }
+    pause()   { this.paused = true; if (this.rafId) cancelAnimationFrame(this.rafId); }
+    resume()  {
+      if (!this.ctx || !this.paused) return;
+      this.paused = false;
+      this.rafId = requestAnimationFrame(this._loop);
+    }
     destroy() {
-      cancelAnimationFrame(this.rafId);
+      if (this.rafId) cancelAnimationFrame(this.rafId);
       window.removeEventListener('resize', this._onResize);
     }
 

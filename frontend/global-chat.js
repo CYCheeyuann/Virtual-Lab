@@ -1,6 +1,7 @@
 /* ─── Global persistent AI chatbot ───────────────────────────────────── */
 (function () {
   const STORAGE_KEY = 'vsl.globalChat';
+  const MAX_MESSAGES = 100; // cap localStorage growth
   const PLACEHOLDER_REPLY =
     '⚠️ AI not connected yet — will be enabled after backend setup.';
 
@@ -27,7 +28,21 @@
     }
   }
   function saveHistory(state) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    // Drop oldest messages once we exceed MAX_MESSAGES so localStorage can't
+    // balloon past the 5–10 MB browser quota.
+    if (state.messages.length > MAX_MESSAGES) {
+      const dropped = state.messages.length - MAX_MESSAGES;
+      state.messages.splice(0, dropped);
+      if (typeof window.showToast === 'function') {
+        window.showToast(`Older chat messages trimmed (kept ${MAX_MESSAGES})`, 'info', 3000);
+      }
+    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) {
+      if (typeof window.showToast === 'function') {
+        window.showToast('Chat history is full — clear it to keep saving.', 'warning');
+      }
+    }
   }
   let state = loadHistory();
   if (state.messages.length === 0) {
@@ -44,11 +59,15 @@
   let hasUnread = false;
 
   /* ── DOM build ────────────────────────────────────────────── */
-  function escapeHtmlGC(s) {
-    return String(s ?? '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
+  // Reuse the global escapeHtml from common.js when available, else fall back
+  // to a tiny local copy so this file still works in isolation.
+  const esc = (typeof window.escapeHtml === 'function')
+    ? window.escapeHtml
+    : function (s) {
+        return String(s ?? '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      };
 
   function buildDom() {
     if (document.getElementById('gc-fab')) return;
@@ -113,9 +132,9 @@
       div.className = cls;
 
       const tag = m.sourceLabel
-        ? `<div class="gc-source-tag">${escapeHtmlGC(m.sourceLabel)}</div>`
+        ? `<div class="gc-source-tag">${esc(m.sourceLabel)}</div>`
         : '';
-      const body = escapeHtmlGC(m.content);
+      const body = esc(m.content);
       div.innerHTML = `${tag}${body}`;
       host.appendChild(div);
     }

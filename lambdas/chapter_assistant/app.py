@@ -1,5 +1,6 @@
 """Chapter Assistant — generates subject chapter overview via Bedrock streaming."""
 
+import json
 import logging
 import os
 import sys
@@ -32,7 +33,7 @@ def handler(path):
 
     # Auth check
     if not validate_api_key(request):
-        return Response('{"error":"Unauthorized"}', status=401,
+        return Response(json.dumps({"error": "Unauthorized"}), status=401,
                         content_type="application/json", headers=cors_headers())
 
     body = request.get_json(force=True, silent=True) or {}

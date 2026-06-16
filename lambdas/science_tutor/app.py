@@ -1,5 +1,6 @@
 """Science Tutor — streaming chatbot with conversation memory and file analysis."""
 
+import json
 import logging
 import os
 import sys
@@ -32,7 +33,7 @@ def handler(path):
         return Response("Science Tutor ready", status=200, headers=cors_headers())
 
     if not validate_api_key(request):
-        return Response('{"error":"Unauthorized"}', status=401,
+        return Response(json.dumps({"error": "Unauthorized"}), status=401,
                         content_type="application/json", headers=cors_headers())
 
     body = request.get_json(force=True, silent=True) or {}
@@ -50,7 +51,7 @@ def handler(path):
     if file_err:
         h = cors_headers()
         h["Content-Type"] = "application/json"
-        return Response(f'{{"error":"{file_err}"}}', status=413, headers=h)
+        return Response(json.dumps({"error": file_err}), status=413, headers=h)
 
     system_prompt = (
         f"You are a Virtual Science Tutor specializing in {subject}. "
@@ -61,15 +62,20 @@ def handler(path):
         "Remember the conversation context and build upon previous exchanges."
     )
 
-    # Build messages from history
+    # Build messages from history. Per-message content cap prevents a
+    # malicious client from sending 20 huge turns and burning through the
+    # Bedrock token budget — `trim_history` only caps the count.
+    MAX_HISTORY_MSG_CHARS = 4000
     messages = []
     for msg in history:
         role = msg.get("role", "user")
         content = msg.get("content", "")
+        if not isinstance(content, str):
+            continue
         if role in ("user", "assistant") and content:
             messages.append({
                 "role": role,
-                "content": [{"type": "text", "text": content}],
+                "content": [{"type": "text", "text": content[:MAX_HISTORY_MSG_CHARS]}],
             })
 
     # New user message with optional file

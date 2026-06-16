@@ -37,6 +37,22 @@ jobs:
       - name: SAM Build
         run: sam build --template infra/template.yaml
 
+      - name: Resolve AllowedOrigin from existing stack (if any)
+        id: origin
+        run: |
+          # On first deploy the stack doesn't exist yet → fall back to "*".
+          # On subsequent deploys we read the WebsiteUrl from the previous
+          # stack so CORS is locked to the exact bucket origin.
+          set +e
+          URL=$(aws cloudformation describe-stacks \
+                  --stack-name virtual-science-lab-assistant \
+                  --query "Stacks[0].Outputs[?OutputKey=='WebsiteUrl'].OutputValue" \
+                  --output text 2>/dev/null)
+          set -e
+          if [ -z "$URL" ] || [ "$URL" = "None" ]; then URL="*"; fi
+          echo "value=$URL" >> "$GITHUB_OUTPUT"
+          echo "Using AllowedOrigin=$URL"
+
       - name: SAM Deploy
         run: |
           sam deploy \
@@ -45,7 +61,10 @@ jobs:
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --region ap-southeast-1 \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+                AllowedOrigin='${{ steps.origin.outputs.value }}' \
+                ApiKey='${{ secrets.API_KEY }}'
 
       - name: Inject Lambda URLs into frontend config
         run: |
@@ -76,6 +95,11 @@ jobs:
 
           URL=$(get_output ImageGeneratorUrl)
           sed -i "s|__URL_IMAGE_GENERATOR__|$URL|g" frontend/config.js
+
+          # Inject the API key (or empty string) so the frontend sends X-Api-Key
+          # on every fetch. Using a different sed delimiter to avoid clashing
+          # with characters that may appear in the secret.
+          sed -i "s#__API_KEY__#${{ secrets.API_KEY }}#g" frontend/config.js
 
       - name: Deploy frontend to S3
         run: |

@@ -1,5 +1,6 @@
 """Safety Assistant — generates a lab-safety report via Bedrock streaming."""
 
+import json
 import logging
 import os
 import sys
@@ -35,7 +36,7 @@ def handler(path):
         return Response("Safety Assistant ready", status=200, headers=cors_headers())
 
     if not validate_api_key(request):
-        return Response('{"error":"Unauthorized"}', status=401,
+        return Response(json.dumps({"error": "Unauthorized"}), status=401,
                         content_type="application/json", headers=cors_headers())
 
     body = request.get_json(force=True, silent=True) or {}

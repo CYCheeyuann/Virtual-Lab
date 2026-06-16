@@ -24,6 +24,7 @@ from flask import Flask, request, Response
 
 from cors import cors_headers, preflight_response
 from validators import validate_api_key, sanitize_subject, sanitize_topic
+from bedrock_stream import friendly_error
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -99,11 +100,11 @@ def handler(path):
     try:
         explanation, image_prompt = _claude_step(subject, concept, style, detail)
     except ClientError as e:
-        return _bedrock_error("Claude prompt generation failed", e)
-    except Exception as e:           # noqa: BLE001
+        return _bedrock_error(e)
+    except Exception:                 # noqa: BLE001
         logger.exception("Claude step failed")
         return _json_response(
-            {"error": f"Claude prompt generation failed: {type(e).__name__}: {e}"},
+            {"error": friendly_error("InternalServerException", "")},
             status=500,
         )
 
@@ -111,15 +112,12 @@ def handler(path):
     try:
         image_b64 = _nova_step(image_prompt)
     except ClientError as e:
-        return _bedrock_error(
-            "Nova Canvas image generation failed", e,
-            fallback_text=explanation, prompt_used=image_prompt,
-        )
-    except Exception as e:           # noqa: BLE001
+        return _bedrock_error(e, fallback_text=explanation, prompt_used=image_prompt)
+    except Exception:                 # noqa: BLE001
         logger.exception("Nova Canvas step failed")
         return _json_response(
             {
-                "error": f"Nova Canvas image generation failed: {type(e).__name__}: {e}",
+                "error":       friendly_error("InternalServerException", ""),
                 "explanation": explanation,
                 "prompt_used": image_prompt,
             },
@@ -255,11 +253,12 @@ def _json_response(obj, status=200):
     return Response(json.dumps(obj), status=status, headers=headers)
 
 
-def _bedrock_error(prefix, err, fallback_text=None, prompt_used=None):
+def _bedrock_error(err, fallback_text=None, prompt_used=None):
+    """Log the raw Bedrock error to CloudWatch, return a friendly payload."""
     code = err.response.get("Error", {}).get("Code", "")
     msg  = err.response.get("Error", {}).get("Message", str(err))
-    logger.exception("%s code=%s message=%s", prefix, code, msg)
-    payload = {"error": f"{prefix} ({code}): {msg}"}
+    logger.exception("Bedrock ClientError code=%s message=%s", code, msg)
+    payload = {"error": friendly_error(code, msg)}
     if fallback_text is not None: payload["explanation"]  = fallback_text
     if prompt_used   is not None: payload["prompt_used"]  = prompt_used
     return _json_response(payload, status=500)

@@ -32,6 +32,19 @@ function iconHtml(name, extraClass = '') {
 }
 
 /* ============================================================
+ *  API HEADERS — shared key + content-type for every fetch.
+ * ============================================================ */
+function apiHeaders(extra) {
+  const h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+  // window.API_KEY is sed-injected by the deploy workflow. Leave the header
+  // off when the placeholder is still there (local dev) or when the secret
+  // is empty (auth disabled).
+  const key = (typeof window !== 'undefined' && window.API_KEY) || '';
+  if (key && !key.startsWith('__')) h['X-Api-Key'] = key;
+  return h;
+}
+
+/* ============================================================
  *  ESCAPING
  * ============================================================ */
 function escapeHtml(s) {
@@ -221,7 +234,7 @@ async function streamToPanel(url, body, panelId, btn, options = {}) {
   try {
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(),
       body: JSON.stringify(body),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status} — ${resp.statusText}`);
@@ -250,7 +263,6 @@ async function streamToPanel(url, body, panelId, btn, options = {}) {
     }
     if (buffer) {
       appendMarkdownLine(panel, buffer, panelId);
-      fullText += '';
     }
     if (cursor.parentNode) cursor.remove();
 
@@ -307,7 +319,13 @@ function setupDropzone(zoneId, inputId, infoId, onLoad) {
 
 function clearPanel(id, msg) {
   const p = document.getElementById(id);
-  if (p) p.innerHTML = `<div class="placeholder">${msg || 'Output will appear here…'}</div>`;
+  if (!p) return;
+  // Build the placeholder via DOM nodes so `msg` can never be interpreted
+  // as HTML even if a future caller passes user-controlled text.
+  const div = document.createElement('div');
+  div.className = 'placeholder';
+  div.textContent = msg || 'Output will appear here…';
+  p.replaceChildren(div);
 }
 
 /* ============================================================

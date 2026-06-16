@@ -1,5 +1,6 @@
 """Experiment Guide — generates lab guides with optional file analysis via Bedrock."""
 
+import json
 import logging
 import os
 import sys
@@ -32,7 +33,7 @@ def handler(path):
         return Response("Experiment Guide ready", status=200, headers=cors_headers())
 
     if not validate_api_key(request):
-        return Response('{"error":"Unauthorized"}', status=401,
+        return Response(json.dumps({"error": "Unauthorized"}), status=401,
                         content_type="application/json", headers=cors_headers())
 
     body = request.get_json(force=True, silent=True) or {}
@@ -50,7 +51,7 @@ def handler(path):
     if file_err:
         h = cors_headers()
         h["Content-Type"] = "application/json"
-        return Response(f'{{"error":"{file_err}"}}', status=413, headers=h)
+        return Response(json.dumps({"error": file_err}), status=413, headers=h)
 
     prompt = f"""You are an expert science educator and lab instructor.
 

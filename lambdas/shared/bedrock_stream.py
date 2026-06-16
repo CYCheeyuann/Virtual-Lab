@@ -49,6 +49,10 @@ def _friendly_error(error_code, message):
     )
 
 
+# Public alias so other lambdas can render the same friendly error text.
+friendly_error = _friendly_error
+
+
 def stream_bedrock(messages, system=None, max_tokens=4096):
     """
     Generator that yields text chunks from Bedrock invoke_model_with_response_stream.

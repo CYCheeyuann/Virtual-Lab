@@ -102,6 +102,7 @@
     let chaptersData = [];
     let chapterContext = '';
     let copilotHistory = [];
+    let detailCache = {};  // keyed by chapter title → detail JSON
 
     // ── Generate chapter grid ──
     document.getElementById('runBtn').addEventListener('click', async () => {
@@ -144,33 +145,45 @@
       document.getElementById('copilot-section').style.display = 'none';
       document.getElementById('chapter-grid').innerHTML = '';
       chaptersData = [];
+      detailCache = {};
     });
 
-    // ── Render card grid ──
+    // ── Render card grid (5 per row) ──
     function renderGrid() {
       const grid = document.getElementById('chapter-grid');
       grid.innerHTML = '';
       chaptersData.forEach((ch, i) => {
         const card = document.createElement('div');
-        card.className = 'chapter-card';
+        card.className = 'chapter-card' + (detailCache[ch.title] ? ' cached' : '');
         card.style.animationDelay = `${i * 0.08}s`;
         card.dataset.index = i;
         card.innerHTML = `
           <div class="chapter-card-num">Ch. ${escapeHtml(ch.chapterNumber || String(i+1))}</div>
           <div class="chapter-card-title">${escapeHtml(ch.title || 'Untitled')}</div>
           <div class="chapter-card-desc">${escapeHtml(ch.shortDescription || '')}</div>`;
-        card.addEventListener('click', () => openDetail(ch));
+        card.addEventListener('click', () => openDetail(ch, card));
         grid.appendChild(card);
       });
     }
 
-    // ── Detail modal ──
-    async function openDetail(ch) {
+    // ── Detail modal with caching ──
+    async function openDetail(ch, cardEl) {
       const backdrop = document.getElementById('modal-backdrop');
       const content = document.getElementById('modal-content');
       backdrop.style.display = 'flex';
-      content.innerHTML = '<div class="skeleton"><div class="skeleton-line title"></div><div class="skeleton-line long"></div><div class="skeleton-line medium"></div><div class="skeleton-line long"></div></div>';
       requestAnimationFrame(() => backdrop.classList.add('show'));
+
+      const cacheKey = ch.title || '';
+
+      // If cached, show immediately — no loading, no fetch
+      if (detailCache[cacheKey]) {
+        renderDetailContent(content, detailCache[cacheKey], ch);
+        chapterContext = JSON.stringify(detailCache[cacheKey]);
+        return;
+      }
+
+      // First time — show skeleton and fetch
+      content.innerHTML = '<div class="skeleton"><div class="skeleton-line title"></div><div class="skeleton-line long"></div><div class="skeleton-line medium"></div><div class="skeleton-line long"></div></div>';
 
       const url = window.STREAM_URLS.chapter_assistant;
       try {
@@ -186,17 +199,26 @@
         const json = await resp.json();
         if (json.error && !json.data) throw new Error(json.error);
         const d = json.data;
-        content.innerHTML = `
-          <h2 style="color:var(--c-accent-2);margin-bottom:14px">${escapeHtml(d.title || ch.title)}</h2>
-          ${d.subtopics ? `<h3>📋 Subtopics</h3><ul>${d.subtopics.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
-          ${d.learningObjectives ? `<h3>🎯 Learning Objectives</h3><ul>${d.learningObjectives.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
-          ${d.keyConcepts ? `<h3>🧠 Key Concepts</h3><ul>${d.keyConcepts.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
-          ${d.keyTerms ? `<h3>📖 Key Terms</h3><dl>${d.keyTerms.map(t=>'<dt>'+escapeHtml(t.term)+'</dt><dd>'+escapeHtml(t.definition)+'</dd>').join('')}</dl>` : ''}`;
-        // Add to co-pilot context
+
+        // Cache it
+        detailCache[cacheKey] = d;
+        // Mark card as cached visually
+        if (cardEl) cardEl.classList.add('cached');
+
+        renderDetailContent(content, d, ch);
         chapterContext = JSON.stringify(d);
       } catch (err) {
         content.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(err.message)}</div>`;
       }
+    }
+
+    function renderDetailContent(content, d, ch) {
+      content.innerHTML = `
+        <h2 style="color:var(--c-accent-2);margin-bottom:14px">${escapeHtml(d.title || ch.title)}</h2>
+        ${d.subtopics ? `<h3>📋 Subtopics</h3><ul>${d.subtopics.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+        ${d.learningObjectives ? `<h3>🎯 Learning Objectives</h3><ul>${d.learningObjectives.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+        ${d.keyConcepts ? `<h3>🧠 Key Concepts</h3><ul>${d.keyConcepts.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+        ${d.keyTerms ? `<h3>📖 Key Terms</h3><dl>${d.keyTerms.map(t=>'<dt>'+escapeHtml(t.term)+'</dt><dd>'+escapeHtml(t.definition)+'</dd>').join('')}</dl>` : ''}`;
     }
 
     document.getElementById('modal-close').addEventListener('click', closeDetail);

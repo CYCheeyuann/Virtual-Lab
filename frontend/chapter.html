@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>📖 Chapter Assistant</title>
-  <meta name="description" content="Generate a structured chapter overview for Biology, Chemistry, or Physics using AI." />
+  <meta name="description" content="Interactive chapter overview with card grid, detail modal, and AI co-pilot." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
@@ -28,10 +28,11 @@
   <main class="page">
     <div class="page-header">
       <h1>📖 Chapter Assistant</h1>
-      <p>Pick a subject and get a structured overview of its main chapters and key concepts.</p>
+      <p>Select a subject and level to see all chapters, or type a specific topic to filter. Click any card to expand.</p>
     </div>
 
-    <section class="card">
+    <!-- Setup card (Yellow Area — always visible) -->
+    <section class="card" id="setup-card">
       <h2>Setup</h2>
       <label for="subject">Subject</label>
       <select id="subject" class="input">
@@ -48,9 +49,9 @@
         <option value="University">University</option>
       </select>
 
-      <label for="chapterTopic">Topic / Chapter (optional — leave blank for full syllabus)</label>
+      <label for="chapterTopic">Topic (leave blank for full syllabus)</label>
       <input id="chapterTopic" type="text" class="input"
-        placeholder="e.g. Cell Division, Organic Chemistry, Waves & Optics…" />
+        placeholder="e.g. Chapter 3, Organic Chemistry, Waves…" />
 
       <div class="btn-row" style="margin-top:18px">
         <button id="runBtn" class="btn btn-primary"></button>
@@ -58,22 +59,26 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>📑 Chapter Overview</h2>
-      <div class="output-panel text-panel" id="out-chapter">
-        <div class="placeholder">Chapter overview will appear here…</div>
-      </div>
-      <div class="btn-row" style="margin-top:12px">
-        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
-        <button id="sendToAiBtn" class="btn btn-ghost"></button>
-      </div>
+    <!-- Chapter card grid -->
+    <section id="chapter-grid-section" style="display:none">
+      <div class="chapter-grid" id="chapter-grid"></div>
     </section>
 
-    <!-- Co-pilot: Deep-dive chatbox with chapter context -->
+    <!-- Detail modal (overlay) -->
+    <div class="chapter-modal-backdrop" id="modal-backdrop" style="display:none">
+      <div class="chapter-modal" id="chapter-modal">
+        <button class="chapter-modal-close" id="modal-close">✕</button>
+        <div id="modal-content">
+          <div class="skeleton"><div class="skeleton-line title"></div><div class="skeleton-line long"></div><div class="skeleton-line medium"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Co-pilot (stays below grid) -->
     <section class="card" id="copilot-section" style="display:none">
       <h2>💬 Deep-Dive Co-pilot</h2>
       <p style="color:var(--c-muted);font-size:0.85rem;margin-bottom:10px">
-        Ask follow-up questions about the overview above. The AI remembers the full chapter context.
+        Ask follow-up questions about any chapter. The AI has full context.
       </p>
       <div class="chat-panel" id="copilot-chat" style="min-height:200px;max-height:360px"></div>
       <div class="chat-input-row">
@@ -90,92 +95,149 @@
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
   <script>
-    // Inject SVG icon buttons
-    document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Overview</span>`;
-    document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
-    document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
-    document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI</span>`;
-    document.getElementById('copilotSend').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Ask</span>`;
+    document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate</span>`;
+    document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Reset</span>`;
+    document.getElementById('copilotSend').innerHTML = `${iconHtml('plane','btn-icon-plane')}<span>Ask</span>`;
 
-    let chapterContext = '';  // stores the generated overview for co-pilot context
+    let chaptersData = [];
+    let chapterContext = '';
     let copilotHistory = [];
 
-    document.getElementById('runBtn').addEventListener('click', () => {
+    // ── Generate chapter grid ──
+    document.getElementById('runBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBtn');
-      const subject = document.getElementById('subject').value;
-      const level = document.getElementById('level').value;
-      const topic = document.getElementById('chapterTopic').value.trim();
-      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject, level, topic }, 'out-chapter', btn, {
-        successToast: 'Chapter overview generated',
-        onComplete: (fullText) => {
-          chapterContext = fullText;
-          copilotHistory = [];
-          document.getElementById('copilot-section').style.display = '';
-          document.getElementById('copilot-chat').innerHTML =
-            '<div class="chat-bubble bot">📖 Chapter overview loaded. Ask me anything about it!</div>';
-          recordActivity(subject);
-        }
-      });
-    });
-    document.getElementById('resetBtn').addEventListener('click', () => {
-      clearPanel('out-chapter', 'Chapter overview will appear here…');
-      document.getElementById('copilot-section').style.display = 'none';
-      chapterContext = '';
-      copilotHistory = [];
-    });
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      exportToPDF('out-chapter', 'Chapter Overview');
-    });
-    document.getElementById('sendToAiBtn').addEventListener('click', () => {
-      const text = document.getElementById('out-chapter').innerText.trim();
-      if (!text || text.startsWith('Chapter overview')) {
-        showToast('Generate something first', 'warning');
-        return;
+      const url = window.STREAM_URLS && window.STREAM_URLS.chapter_assistant;
+      if (!url || url.startsWith('__URL_')) { showToast('URL not configured','error'); return; }
+
+      setButtonLoading(btn, true, 'Generating…');
+      const body = {
+        action: 'list',
+        subject: document.getElementById('subject').value,
+        level: document.getElementById('level').value,
+        topic: document.getElementById('chapterTopic').value.trim(),
+      };
+
+      try {
+        const resp = await fetch(url, { method:'POST', headers: apiHeaders(), body: JSON.stringify(body) });
+        const json = await resp.json();
+        if (json.error && !json.data) throw new Error(json.error);
+        chaptersData = json.data || [];
+        if (!Array.isArray(chaptersData)) chaptersData = [chaptersData];
+        renderGrid();
+        document.getElementById('chapter-grid-section').style.display = '';
+        document.getElementById('copilot-section').style.display = '';
+        document.getElementById('copilot-chat').innerHTML =
+          '<div class="chat-bubble bot">📖 Chapters loaded! Click a card to expand, or ask me anything.</div>';
+        chapterContext = JSON.stringify(chaptersData);
+        copilotHistory = [];
+        recordActivity(body.subject);
+        showToast(`${chaptersData.length} chapter${chaptersData.length>1?'s':''} found`, 'success');
+      } catch (err) {
+        showToast('Failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
       }
-      const subject = document.getElementById('subject').value;
-      window.GlobalChat && window.GlobalChat.injectContent(text, 'chapter', '📖 Chapter: ' + subject);
     });
 
-    // ── Co-pilot chat ──
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('chapter-grid-section').style.display = 'none';
+      document.getElementById('copilot-section').style.display = 'none';
+      document.getElementById('chapter-grid').innerHTML = '';
+      chaptersData = [];
+    });
+
+    // ── Render card grid ──
+    function renderGrid() {
+      const grid = document.getElementById('chapter-grid');
+      grid.innerHTML = '';
+      chaptersData.forEach((ch, i) => {
+        const card = document.createElement('div');
+        card.className = 'chapter-card';
+        card.style.animationDelay = `${i * 0.08}s`;
+        card.dataset.index = i;
+        card.innerHTML = `
+          <div class="chapter-card-num">Ch. ${escapeHtml(ch.chapterNumber || String(i+1))}</div>
+          <div class="chapter-card-title">${escapeHtml(ch.title || 'Untitled')}</div>
+          <div class="chapter-card-desc">${escapeHtml(ch.shortDescription || '')}</div>`;
+        card.addEventListener('click', () => openDetail(ch));
+        grid.appendChild(card);
+      });
+    }
+
+    // ── Detail modal ──
+    async function openDetail(ch) {
+      const backdrop = document.getElementById('modal-backdrop');
+      const content = document.getElementById('modal-content');
+      backdrop.style.display = 'flex';
+      content.innerHTML = '<div class="skeleton"><div class="skeleton-line title"></div><div class="skeleton-line long"></div><div class="skeleton-line medium"></div><div class="skeleton-line long"></div></div>';
+      requestAnimationFrame(() => backdrop.classList.add('show'));
+
+      const url = window.STREAM_URLS.chapter_assistant;
+      try {
+        const resp = await fetch(url, {
+          method: 'POST', headers: apiHeaders(),
+          body: JSON.stringify({
+            action: 'detail',
+            subject: document.getElementById('subject').value,
+            level: document.getElementById('level').value,
+            chapter_title: ch.title || '',
+          }),
+        });
+        const json = await resp.json();
+        if (json.error && !json.data) throw new Error(json.error);
+        const d = json.data;
+        content.innerHTML = `
+          <h2 style="color:var(--c-accent-2);margin-bottom:14px">${escapeHtml(d.title || ch.title)}</h2>
+          ${d.subtopics ? `<h3>📋 Subtopics</h3><ul>${d.subtopics.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+          ${d.learningObjectives ? `<h3>🎯 Learning Objectives</h3><ul>${d.learningObjectives.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+          ${d.keyConcepts ? `<h3>🧠 Key Concepts</h3><ul>${d.keyConcepts.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+          ${d.keyTerms ? `<h3>📖 Key Terms</h3><dl>${d.keyTerms.map(t=>'<dt>'+escapeHtml(t.term)+'</dt><dd>'+escapeHtml(t.definition)+'</dd>').join('')}</dl>` : ''}`;
+        // Add to co-pilot context
+        chapterContext = JSON.stringify(d);
+      } catch (err) {
+        content.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    document.getElementById('modal-close').addEventListener('click', closeDetail);
+    document.getElementById('modal-backdrop').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeDetail();
+    });
+    function closeDetail() {
+      const backdrop = document.getElementById('modal-backdrop');
+      backdrop.classList.remove('show');
+      setTimeout(() => { backdrop.style.display = 'none'; }, 300);
+    }
+
+    // ── Co-pilot ──
     async function copilotSend() {
       const input = document.getElementById('copilotInput');
       const msg = input.value.trim();
       if (!msg) return;
       input.value = '';
       const panel = document.getElementById('copilot-chat');
-
-      // User bubble
       const userBubble = document.createElement('div');
       userBubble.className = 'chat-bubble user';
       userBubble.textContent = msg;
       panel.appendChild(userBubble);
       panel.scrollTop = panel.scrollHeight;
 
-      // Bot placeholder
       const botBubble = document.createElement('div');
       botBubble.className = 'chat-bubble bot';
       botBubble.innerHTML = '<span class="spinner"></span>Thinking…';
       panel.appendChild(botBubble);
 
       const url = window.STREAM_URLS && window.STREAM_URLS.science_tutor;
-      if (!url || url.startsWith('__URL_')) {
-        botBubble.innerHTML = '⚠️ Tutor URL not configured.';
-        return;
-      }
+      if (!url || url.startsWith('__URL_')) { botBubble.innerHTML = '⚠️ Not configured.'; return; }
 
-      // Build history with chapter context as first message
       const subject = document.getElementById('subject').value;
       const level = document.getElementById('level').value;
-      const contextMsg = { role: 'user', content: `[Context: ${subject} chapter overview at ${level} level]\n${chapterContext}` };
-      const history = [contextMsg, ...copilotHistory];
+      const ctxMsg = { role:'user', content:`[Chapter context: ${subject} ${level}]\n${chapterContext}` };
+      const history = [ctxMsg, ...copilotHistory];
 
       try {
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: apiHeaders(),
-          body: JSON.stringify({ subject, message: msg, history }),
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const resp = await fetch(url, { method:'POST', headers: apiHeaders(), body: JSON.stringify({ subject, message: msg, history }) });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const reader = resp.body.getReader();
         const dec = new TextDecoder('utf-8');
         let full = '';
@@ -184,13 +246,12 @@
           const { done, value } = await reader.read();
           if (done) break;
           full += dec.decode(value, { stream: true });
-          botBubble.innerHTML = escapeHtml(full).replace(/\n/g, '<br>') + '<span class="streaming-cursor"></span>';
+          botBubble.innerHTML = escapeHtml(full).replace(/\n/g,'<br>') + '<span class="streaming-cursor"></span>';
           panel.scrollTop = panel.scrollHeight;
         }
-        botBubble.innerHTML = escapeHtml(full).replace(/\n/g, '<br>');
-        copilotHistory.push({ role: 'user', content: msg });
-        copilotHistory.push({ role: 'assistant', content: full });
-        // Keep last 10 turns
+        botBubble.innerHTML = escapeHtml(full).replace(/\n/g,'<br>');
+        copilotHistory.push({ role:'user', content: msg });
+        copilotHistory.push({ role:'assistant', content: full });
         if (copilotHistory.length > 20) copilotHistory = copilotHistory.slice(-20);
       } catch (err) {
         botBubble.innerHTML = `<span class="error-msg">⚠️ ${escapeHtml(err.message)}</span>`;

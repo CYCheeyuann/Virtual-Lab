@@ -1195,3 +1195,125 @@ select option:hover {
   .image-output { page-break-inside: avoid; border: 1px solid #ccc; }
   .tab-bar, .preset-grid { display: none !important; }
 }
+
+/* ─── Chapter Assistant: Card Grid + Modal ───────────────────────────── */
+.chapter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  padding: 4px 0;
+}
+.chapter-card {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border-radius: 16px;
+  padding: 22px;
+  cursor: pointer;
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.25);
+  transition: transform 0.2s, box-shadow 0.3s;
+  animation: cardEntrance 0.4s ease both;
+  position: relative;
+  overflow: hidden;
+}
+.chapter-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.15), transparent 60%);
+  pointer-events: none;
+}
+.chapter-card:hover {
+  transform: scale(1.02) translateY(-2px);
+  box-shadow: 0 10px 36px rgba(249, 115, 22, 0.40);
+}
+.chapter-card-num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+.chapter-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+.chapter-card-desc {
+  font-size: 0.82rem;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+@keyframes cardEntrance {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Detail modal */
+.chapter-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.chapter-modal-backdrop.show { opacity: 1; }
+.chapter-modal {
+  background: var(--c-bg-glass-2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  padding: 30px 32px;
+  width: 600px;
+  max-width: calc(100vw - 40px);
+  max-height: 75vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+  position: relative;
+  color: var(--c-text);
+}
+.chapter-modal-backdrop.show .chapter-modal { transform: scale(1); }
+.chapter-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--c-muted);
+  font-size: 1.3rem;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, transform 0.2s, background 0.2s;
+}
+.chapter-modal-close:hover {
+  color: #f87171;
+  transform: rotate(90deg);
+  background: rgba(248,113,113,0.12);
+}
+.chapter-modal h2 { font-size: 1.4rem; margin-bottom: 14px; }
+.chapter-modal h3 { font-size: 1rem; color: var(--c-accent); margin: 16px 0 8px; font-weight: 600; }
+.chapter-modal ul { padding-left: 20px; margin-bottom: 8px; }
+.chapter-modal li { margin-bottom: 4px; font-size: 0.9rem; line-height: 1.55; }
+.chapter-modal dl { margin-bottom: 8px; }
+.chapter-modal dt { font-weight: 600; color: var(--c-accent-2); font-size: 0.9rem; margin-top: 8px; }
+.chapter-modal dd { font-size: 0.85rem; color: var(--c-muted); margin-left: 0; padding-left: 12px; border-left: 2px solid var(--c-border); }
+
+@media (max-width: 600px) {
+  .chapter-grid { grid-template-columns: 1fr; }
+  .chapter-modal { padding: 22px 18px; border-radius: 16px; }
+}

@@ -372,13 +372,25 @@
               headers: apiHeaders(),
               body: JSON.stringify(p),
             });
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const json = await resp.json();
+            // Try to parse JSON whether the response is ok or not — the
+            // backend returns a friendly error message on 5xx that we want
+            // to display verbatim.
+            let json = {};
+            try { json = await resp.json(); } catch (_) {}
+            if (!resp.ok) {
+              throw new Error(json.error || `HTTP ${resp.status}`);
+            }
             text.innerHTML = '';
             (json.explanation || '').split('\n').forEach(line => appendMarkdownLine(text, line, 'lab-out-text'));
             if (json.image_base64) showImage(json.image_base64, p.concept);
             else setImageState('placeholder');
-            showToast('Image generated', 'success');
+            // Some failure modes return 200 with an `error` field + a partial
+            // explanation (e.g. Claude succeeded but Nova was blocked).
+            if (json.error) {
+              showToast(json.error, 'warning', 6000);
+            } else {
+              showToast('Image generated', 'success');
+            }
           } catch (err) {
             text.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(err.message)}</div>`;
             setImageState('placeholder');

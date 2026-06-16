@@ -2,8 +2,6 @@
 (function () {
   const STORAGE_KEY = 'vsl.globalChat';
   const MAX_MESSAGES = 100; // cap localStorage growth
-  const PLACEHOLDER_REPLY =
-    '⚠️ AI not connected yet — will be enabled after backend setup.';
 
   const SOURCE_LABEL = {
     safety:     '🦺 Safety',
@@ -153,12 +151,98 @@
     }
   }
 
+  // Build the conversation history we send to the backend. Page-injected
+  // content is folded in as a labeled "context" message so the model can
+  // answer follow-up questions referencing whatever the user pasted.
+  function buildApiHistory() {
+    const out = [];
+    for (const m of state.messages) {
+      if (m.source === 'streaming') continue;        // in-flight assistant placeholder
+      if (m.role === 'assistant' && m.source === 'system') continue; // welcome / errors
+      if (m.role === 'user' && m.source === 'page-inject') {
+        out.push({
+          role: 'user',
+          content: `[Context from ${m.sourceLabel || 'previous page'}]\n${m.content}`,
+        });
+      } else if (m.role === 'user' || m.role === 'assistant') {
+        out.push({ role: m.role, content: m.content });
+      }
+    }
+    return out;
+  }
+
+  async function streamReply(userText) {
+    const url = window.STREAM_URLS && window.STREAM_URLS.science_tutor;
+    if (!url || url.startsWith('__URL_')) {
+      pushMessage({
+        role: 'assistant',
+        content: '⚠️ Tutor URL not configured. Deploy via GitHub Actions first.',
+        source: 'system',
+      });
+      return;
+    }
+
+    // History snapshot BEFORE we add the placeholder assistant bubble.
+    const apiHistory = buildApiHistory();
+    // The just-pushed user message is already in apiHistory; the backend
+    // expects `message` separately and `history` to hold prior turns only.
+    apiHistory.pop();
+
+    const subject = (typeof window.getSavedSubject === 'function')
+      ? window.getSavedSubject()
+      : 'Biology';
+
+    // Add a streaming placeholder bubble we'll fill as chunks arrive.
+    state.messages.push({
+      ts: Date.now(),
+      role: 'assistant',
+      content: '',
+      source: 'streaming',
+    });
+    const idx = state.messages.length - 1;
+    render();
+
+    try {
+      const headers = (typeof window.apiHeaders === 'function')
+        ? window.apiHeaders()
+        : { 'Content-Type': 'application/json' };
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          subject,
+          message: userText,
+          history: apiHistory,
+        }),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+      const reader  = resp.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let full = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += decoder.decode(value, { stream: true });
+        state.messages[idx].content = full;
+        render();
+      }
+      state.messages[idx].content = full || '(no response)';
+      state.messages[idx].source  = 'manual';
+      saveHistory(state);
+      render();
+    } catch (err) {
+      state.messages[idx].content = '⚠️ ' + (err.message || 'request failed');
+      state.messages[idx].source  = 'system';
+      saveHistory(state);
+      render();
+    }
+  }
+
   function sendUser(text) {
     pushMessage({ role: 'user', content: text, source: 'manual' });
-    // Hardcoded placeholder reply for Phase 2
-    setTimeout(() => {
-      pushMessage({ role: 'assistant', content: PLACEHOLDER_REPLY, source: 'system' });
-    }, 400);
+    streamReply(text);
   }
 
   function injectContent(content, sourcePage, sourceLabel) {
@@ -171,14 +255,10 @@
       sourcePage,
       sourceLabel: label,
     });
-    // Acknowledgement assistant reply
-    setTimeout(() => {
-      pushMessage({
-        role: 'assistant',
-        content: `Got it — I've received the content from "${label}". ` + PLACEHOLDER_REPLY,
-        source: 'system',
-      });
-    }, 400);
+    // Ask the tutor to acknowledge + summarise so the user immediately sees
+    // the assistant has the context. We pipe a synthetic user message so the
+    // backend treats prior turns + the injected blob as conversation context.
+    streamReply(`I just shared content from "${label}". Briefly acknowledge what you received and offer to help.`);
     open();
   }
 

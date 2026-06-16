@@ -19,6 +19,7 @@ if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from flask import Flask, request, Response
 
@@ -61,10 +62,21 @@ def _get_text_client():
 
 
 def _get_image_client():
-    """bedrock-runtime client pinned to IMAGE_REGION (Tokyo)."""
+    """bedrock-runtime client pinned to IMAGE_REGION (Tokyo).
+
+    Nova Canvas at 1024×1024 / quality=premium can exceed boto3's default
+    60 s read timeout — AWS docs explicitly recommend bumping it to 5 min.
+    Lambda timeout for this function is 300 s so we match it.
+    """
     global _image_client
     if _image_client is None:
-        _image_client = boto3.client("bedrock-runtime", region_name=IMAGE_REGION)
+        cfg = Config(
+            region_name=IMAGE_REGION,
+            connect_timeout=10,
+            read_timeout=300,
+            retries={"max_attempts": 2, "mode": "standard"},
+        )
+        _image_client = boto3.client("bedrock-runtime", config=cfg)
     return _image_client
 
 

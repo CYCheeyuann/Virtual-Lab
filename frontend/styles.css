@@ -610,7 +610,56 @@ select option:hover {
   border-radius: 8px;
   font-size: 0.88rem;
   color: var(--c-text);
+  line-height: 1.6;
 }
+
+/* Quiz progress bar */
+.quiz-progress-bar {
+  position: relative;
+  height: 8px;
+  background: var(--c-input-bg);
+  border-radius: 6px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.quiz-progress-bar .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--c-accent-2), var(--c-accent));
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+.quiz-progress-bar .progress-label {
+  position: absolute;
+  right: 0;
+  top: 12px;
+  font-size: 0.75rem;
+  color: var(--c-muted);
+}
+
+/* Quiz history items */
+.quiz-history-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  background: var(--c-bg-glass-2);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.quiz-history-item .history-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.quiz-history-item .history-meta span { font-size: 0.78rem; color: var(--c-muted); }
+.quiz-history-item .history-score { text-align: right; }
+.quiz-history-item .score-good { color: var(--c-success-fg); font-weight: 700; }
+.quiz-history-item .score-warn { color: var(--c-warning-fg); font-weight: 700; }
+.quiz-history-item .history-status { display: block; font-size: 0.72rem; color: var(--c-muted); text-transform: uppercase; }
+.btn-sm { padding: 8px 14px; font-size: 0.82rem; }
 
 .particle {
   position: fixed;

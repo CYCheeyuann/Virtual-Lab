@@ -45,7 +45,7 @@
       <input id="topic" type="text" class="input"
         placeholder="e.g. Electrochemistry, Genetic Inheritance, Circular Motion…" />
 
-      <label for="difficulty">Difficulty</label>
+      <label for="difficulty">Difficulty / Level</label>
       <select id="difficulty" class="input">
         <option value="Form 4">Form 4</option>
         <option value="SPM" selected>SPM</option>
@@ -71,6 +71,7 @@
 
       <div class="btn-row" style="margin-top:18px">
         <button id="outlineBtn" class="btn btn-primary"></button>
+        <button id="historyBtn" class="btn btn-ghost"></button>
       </div>
     </section>
 
@@ -91,6 +92,7 @@
     <!-- ═══ PHASE 3: Quiz execution ═══ -->
     <section class="card" id="phase-quiz" style="display:none">
       <h2>3 · Answer the Quiz</h2>
+      <div class="quiz-progress-bar" id="quiz-progress"></div>
       <div id="quiz-container"></div>
       <div class="btn-row" style="margin-top:18px">
         <button id="submitBtn" class="btn btn-primary"></button>
@@ -104,7 +106,17 @@
       <div id="results-container"></div>
       <div class="btn-row" style="margin-top:18px">
         <button id="retryBtn" class="btn btn-ghost"></button>
+        <button id="newQuizBtn" class="btn btn-ghost"></button>
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
+      </div>
+    </section>
+
+    <!-- ═══ HISTORY panel ═══ -->
+    <section class="card" id="phase-history" style="display:none">
+      <h2>📊 Quiz History</h2>
+      <div id="history-list"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button id="historyBackBtn" class="btn btn-ghost"></button>
       </div>
     </section>
   </main>
@@ -116,26 +128,65 @@
   <script src="global-chat.js"></script>
   <script>
     /* ════════════════════════════════════════════════════════════════════
-     *  Quiz Generator — 4-phase workflow
+     *  Quiz Generator — 4-phase workflow + history + chatbox lock
      * ════════════════════════════════════════════════════════════════════ */
 
-    // Button icons
+    // ── Button icons ──
     document.getElementById('outlineBtn').innerHTML  = `${iconHtml('bolt')}<span>Generate Outline</span>`;
+    document.getElementById('historyBtn').innerHTML  = `${iconHtml('eye')}<span>Quiz History</span>`;
     document.getElementById('generateBtn').innerHTML = `${iconHtml('bolt')}<span>Confirm &amp; Generate Quiz</span>`;
     document.getElementById('backBtn').innerHTML     = `${iconHtml('refresh','btn-icon-rotate')}<span>Back to Setup</span>`;
     document.getElementById('submitBtn').innerHTML   = `${iconHtml('eye')}<span>Submit &amp; Show Results</span>`;
-    document.getElementById('retryBtn').innerHTML    = `${iconHtml('refresh','btn-icon-rotate')}<span>New Quiz</span>`;
+    document.getElementById('retryBtn').innerHTML    = `${iconHtml('refresh','btn-icon-rotate')}<span>Retake This Quiz</span>`;
+    document.getElementById('newQuizBtn').innerHTML  = `${iconHtml('bolt')}<span>New Quiz</span>`;
     document.getElementById('exportBtn').innerHTML   = `${iconHtml('download')}<span>Export PDF</span>`;
+    document.getElementById('historyBackBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Back</span>`;
 
     let uploadedFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
 
-    let quizData = [];   // parsed JSON questions
-    let userAnswers = {}; // { 0: 'A', 1: 'C', ... }
+    // ── State ──
+    const QUIZ_HISTORY_KEY = 'vsl.quizHistory';
+    let quizData = [];       // current quiz questions (JSON)
+    let userAnswers = {};    // { index: 'A'|'B'|'C'|'D' }
+    let quizMeta = {};       // { subject, topic, difficulty, numQ }
+    let quizActive = false;  // true while Phase 3 is showing
+
+    /* ─── Lab Assistant lockout during quiz ─────────────────────────── */
+    function lockChatbox() {
+      quizActive = true;
+      const fab = document.getElementById('gc-fab');
+      if (fab) {
+        fab.dataset.origTitle = fab.title;
+        fab.title = '🔒 Chat locked during quiz';
+        fab.style.opacity = '0.45';
+        fab.style.pointerEvents = 'none';
+      }
+    }
+    function unlockChatbox() {
+      quizActive = false;
+      const fab = document.getElementById('gc-fab');
+      if (fab) {
+        fab.title = fab.dataset.origTitle || 'Open AI Lab Assistant';
+        fab.style.opacity = '';
+        fab.style.pointerEvents = '';
+      }
+    }
+    // Intercept GlobalChat.open to block during quiz
+    const _origGCOpen = window.GlobalChat && window.GlobalChat.open;
+    if (window.GlobalChat) {
+      window.GlobalChat.open = function () {
+        if (quizActive) {
+          showToast('🔒 Lab Assistant is locked during the quiz. Complete or submit your quiz first.', 'warning');
+          return;
+        }
+        _origGCOpen && _origGCOpen();
+      };
+    }
 
     /* ─── Phase navigation ─────────────────────────────────────────── */
     function showPhase(id) {
-      ['phase-setup','phase-outline','phase-quiz','phase-results'].forEach(p => {
+      ['phase-setup','phase-outline','phase-quiz','phase-results','phase-history'].forEach(p => {
         document.getElementById(p).style.display = p === id ? '' : 'none';
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -166,9 +217,7 @@
 
       try {
         const resp = await fetch(url, {
-          method: 'POST',
-          headers: apiHeaders(),
-          body: JSON.stringify(body),
+          method: 'POST', headers: apiHeaders(), body: JSON.stringify(body),
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const reader = resp.body.getReader();
@@ -189,7 +238,6 @@
       }
     });
 
-    /* ─── Phase 1b → back to setup ─────────────────────────────────── */
     document.getElementById('backBtn').addEventListener('click', () => showPhase('phase-setup'));
 
     /* ─── Phase 2: Generate quiz (JSON) ────────────────────────────── */
@@ -204,32 +252,32 @@
       }
 
       setButtonLoading(btn, true, 'Generating quiz…');
-      const body = {
-        action: 'generate',
+      quizMeta = {
         subject: document.getElementById('subject').value,
         topic: document.getElementById('topic').value.trim(),
         difficulty: document.getElementById('difficulty').value,
+        numQ: parseInt(document.getElementById('numQ').value, 10),
+      };
+      const body = {
+        action: 'generate',
+        ...quizMeta,
         outline,
-        num_questions: parseInt(document.getElementById('numQ').value, 10),
+        num_questions: quizMeta.numQ,
       };
 
       try {
         const resp = await fetch(url, {
-          method: 'POST',
-          headers: apiHeaders(),
-          body: JSON.stringify(body),
+          method: 'POST', headers: apiHeaders(), body: JSON.stringify(body),
         });
         const json = await resp.json();
-        if (json.error && !json.questions) {
-          throw new Error(json.error);
-        }
+        if (json.error && !json.questions) throw new Error(json.error);
         quizData = json.questions || [];
         if (!quizData.length) throw new Error('No questions returned');
         userAnswers = {};
         renderQuiz();
         showPhase('phase-quiz');
-        showToast(`${quizData.length} questions generated`, 'success');
-        recordActivity(document.getElementById('subject').value);
+        lockChatbox();
+        showToast(`${quizData.length} questions generated — good luck!`, 'success');
       } catch (err) {
         showToast('Quiz generation failed: ' + err.message, 'error');
       } finally {
@@ -241,6 +289,7 @@
     function renderQuiz() {
       const container = document.getElementById('quiz-container');
       container.innerHTML = '';
+      updateProgress();
       quizData.forEach((q, qi) => {
         const card = document.createElement('div');
         card.className = 'quiz-question';
@@ -265,26 +314,43 @@
     }
 
     function selectOption(qi, letter) {
-      // Record choice
       userAnswers[qi] = letter;
-      // Visual: highlight selected, unhighlight others
       const card = document.querySelector(`.quiz-question[data-qi="${qi}"]`);
       card.querySelectorAll('.quiz-option').forEach(btn => {
         btn.classList.toggle('selected', btn.dataset.letter === letter);
       });
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const answered = Object.keys(userAnswers).length;
+      const total = quizData.length;
+      const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+      document.getElementById('quiz-progress').innerHTML =
+        `<div class="progress-fill" style="width:${pct}%"></div>
+         <span class="progress-label">${answered}/${total} answered</span>`;
     }
 
     /* ─── Phase 4: Submit & evaluate ───────────────────────────────── */
     document.getElementById('submitBtn').addEventListener('click', () => {
       const answered = Object.keys(userAnswers).length;
-      if (answered < quizData.length) {
-        const skip = quizData.length - answered;
-        if (!confirm(`You have ${skip} unanswered question${skip>1?'s':''}. Submit anyway?`)) return;
+      const total = quizData.length;
+      if (answered < total) {
+        const skip = total - answered;
+        const msg = `You have ${skip} unanswered question${skip>1?'s':''}.\n\n` +
+                    `Submitting now will NOT save this as a completed quiz ` +
+                    `and will NOT count toward your dashboard progress.\n\nSubmit anyway?`;
+        if (!confirm(msg)) return;
+        // Mark as incomplete
+        finishQuiz(false);
+      } else {
+        finishQuiz(true);
       }
-      evaluate();
     });
 
-    function evaluate() {
+    function finishQuiz(isComplete) {
+      unlockChatbox();
+
       let correct = 0;
       const resultsContainer = document.getElementById('results-container');
       resultsContainer.innerHTML = '';
@@ -295,7 +361,7 @@
         if (isCorrect) correct++;
 
         const card = document.createElement('div');
-        card.className = 'quiz-question ' + (isCorrect ? 'result-correct' : 'result-incorrect');
+        card.className = 'quiz-question ' + (picked ? (isCorrect ? 'result-correct' : 'result-incorrect') : '');
         let optsHtml = '';
         ['A','B','C','D'].forEach(letter => {
           const text = (q.options && q.options[letter]) || '';
@@ -310,35 +376,112 @@
           <div class="quiz-q-title">Q${qi + 1}. ${escapeHtml(q.question_stem)}</div>
           <div class="quiz-options">${optsHtml}</div>
           <div class="quiz-explanation">
-            <strong>${isCorrect ? '✅ Correct' : `❌ Correct answer: ${q.correct_answer}`}</strong><br/>
+            <strong>${picked ? (isCorrect ? '✅ Correct' : `❌ Correct: ${q.correct_answer}`) : '⚪ Not answered'}</strong><br/>
             ${escapeHtml(q.detailed_explanation || '')}
           </div>`;
         resultsContainer.appendChild(card);
       });
 
-      // Score display
+      // Score
       const total = quizData.length;
       const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+      const status = isComplete ? 'Completed' : 'Incomplete';
       document.getElementById('score-display').innerHTML = `
         <div class="quiz-scoreboard">
-          <div class="score-label">Score: <strong>${correct}/${total}</strong> · ${pct}% Accuracy</div>
+          <div class="score-label">
+            Score: <strong>${correct}/${total}</strong> · ${pct}% ·
+            <span style="color:${isComplete ? 'var(--c-success-fg)' : 'var(--c-warning-fg)'}">${status}</span>
+          </div>
           <div class="score-stars">${'⭐'.repeat(Math.round(pct/20))}${'☆'.repeat(5 - Math.round(pct/20))}</div>
         </div>`;
 
-      recordQuizResult({
-        subject: document.getElementById('subject').value,
-        total,
-        correct,
-      });
+      // Only record to dashboard if complete
+      if (isComplete) {
+        recordQuizResult({ subject: quizMeta.subject, total, correct });
+      }
+
+      // Save to history (localStorage)
+      saveToHistory({ ...quizMeta, correct, total, pct, status, questions: quizData, answers: userAnswers, ts: Date.now() });
 
       showPhase('phase-results');
-      showToast(`Score: ${correct}/${total} (${pct}%)`, pct >= 60 ? 'success' : 'warning', 5000);
+      showToast(
+        isComplete ? `Completed: ${correct}/${total} (${pct}%)` : `Incomplete — ${correct}/${total}`,
+        isComplete && pct >= 60 ? 'success' : 'warning', 5000
+      );
     }
 
-    /* ─── Retry / Export ───────────────────────────────────────────── */
+    /* ─── Quiz History (localStorage) ──────────────────────────────── */
+    function loadHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(QUIZ_HISTORY_KEY) || '[]');
+      } catch (e) { return []; }
+    }
+    function saveToHistory(entry) {
+      const hist = loadHistory();
+      entry.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      hist.unshift(entry);
+      // Keep last 50 entries
+      if (hist.length > 50) hist.length = 50;
+      try { localStorage.setItem(QUIZ_HISTORY_KEY, JSON.stringify(hist)); } catch (e) {}
+    }
+
+    document.getElementById('historyBtn').addEventListener('click', () => {
+      renderHistory();
+      showPhase('phase-history');
+    });
+    document.getElementById('historyBackBtn').addEventListener('click', () => showPhase('phase-setup'));
+
+    function renderHistory() {
+      const hist = loadHistory();
+      const host = document.getElementById('history-list');
+      if (!hist.length) {
+        host.innerHTML = '<p style="color:var(--c-muted);font-style:italic">No quiz history yet.</p>';
+        return;
+      }
+      host.innerHTML = hist.map(h => `
+        <div class="quiz-history-item">
+          <div class="history-meta">
+            <strong>${escapeHtml(h.topic || 'Untitled')}</strong>
+            <span>${h.subject} · ${h.difficulty} · ${new Date(h.ts).toLocaleDateString()}</span>
+          </div>
+          <div class="history-score">
+            <span class="${h.status === 'Completed' ? 'score-good' : 'score-warn'}">${h.correct}/${h.total} (${h.pct}%)</span>
+            <span class="history-status">${h.status}</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="retakeQuiz('${h.id}')">
+            ${iconHtml('refresh','btn-icon-rotate')}<span>Retake</span>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    window.retakeQuiz = function(id) {
+      const hist = loadHistory();
+      const entry = hist.find(h => h.id === id);
+      if (!entry || !entry.questions) {
+        showToast('Quiz data not found', 'error'); return;
+      }
+      quizData = entry.questions;
+      quizMeta = { subject: entry.subject, topic: entry.topic, difficulty: entry.difficulty, numQ: entry.total };
+      userAnswers = {};
+      renderQuiz();
+      showPhase('phase-quiz');
+      lockChatbox();
+      showToast('Retaking quiz — good luck!', 'success');
+    };
+
+    /* ─── Retry / New / Export ──────────────────────────────────────── */
     document.getElementById('retryBtn').addEventListener('click', () => {
+      userAnswers = {};
+      renderQuiz();
+      showPhase('phase-quiz');
+      lockChatbox();
+      showToast('Quiz reset — try again!', 'success');
+    });
+    document.getElementById('newQuizBtn').addEventListener('click', () => {
       quizData = [];
       userAnswers = {};
+      unlockChatbox();
       showPhase('phase-setup');
     });
     document.getElementById('exportBtn').addEventListener('click', () => {

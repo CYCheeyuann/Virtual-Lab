@@ -31,12 +31,20 @@
     </div>
 
     <section class="card">
-      <h2>Subject</h2>
-      <label for="subject">Select Science Subject</label>
+      <h2>Setup</h2>
+      <label for="subject">Subject</label>
       <select id="subject" class="input">
         <option value="Biology">Biology</option>
         <option value="Chemistry">Chemistry</option>
         <option value="Physics">Physics</option>
+      </select>
+
+      <label for="level">Academic Level</label>
+      <select id="level" class="input">
+        <option value="Form 4">Form 4</option>
+        <option value="SPM" selected>SPM</option>
+        <option value="STPM">STPM</option>
+        <option value="University">University</option>
       </select>
 
       <div class="btn-row" style="margin-top:18px">
@@ -55,6 +63,19 @@
         <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
+
+    <!-- Co-pilot: Deep-dive chatbox with chapter context -->
+    <section class="card" id="copilot-section" style="display:none">
+      <h2>💬 Deep-Dive Co-pilot</h2>
+      <p style="color:var(--c-muted);font-size:0.85rem;margin-bottom:10px">
+        Ask follow-up questions about the overview above. The AI remembers the full chapter context.
+      </p>
+      <div class="chat-panel" id="copilot-chat" style="min-height:200px;max-height:360px"></div>
+      <div class="chat-input-row">
+        <input id="copilotInput" type="text" class="input" placeholder="Ask about this chapter…" />
+        <button id="copilotSend" class="btn btn-primary btn-send"></button>
+      </div>
+    </section>
   </main>
 
   <script src="config.js"></script>
@@ -68,21 +89,110 @@
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
     document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
     document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI</span>`;
+    document.getElementById('copilotSend').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Ask</span>`;
+
+    let chapterContext = '';  // stores the generated overview for co-pilot context
+    let copilotHistory = [];
 
     document.getElementById('runBtn').addEventListener('click', () => {
       const btn = document.getElementById('runBtn');
       const subject = document.getElementById('subject').value;
-      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject }, 'out-chapter', btn, {
+      const level = document.getElementById('level').value;
+      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject, level }, 'out-chapter', btn, {
         successToast: 'Chapter overview generated',
-        onComplete: () => recordActivity(subject)
+        onComplete: (fullText) => {
+          chapterContext = fullText;
+          copilotHistory = [];
+          document.getElementById('copilot-section').style.display = '';
+          document.getElementById('copilot-chat').innerHTML =
+            '<div class="chat-bubble bot">📖 Chapter overview loaded. Ask me anything about it!</div>';
+          recordActivity(subject);
+        }
       });
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
-      // Note: subject is intentionally NOT reset — the user picked it on purpose.
       clearPanel('out-chapter', 'Chapter overview will appear here…');
+      document.getElementById('copilot-section').style.display = 'none';
+      chapterContext = '';
+      copilotHistory = [];
     });
     document.getElementById('exportBtn').addEventListener('click', () => {
       exportToPDF('out-chapter', 'Chapter Overview');
+    });
+    document.getElementById('sendToAiBtn').addEventListener('click', () => {
+      const text = document.getElementById('out-chapter').innerText.trim();
+      if (!text || text.startsWith('Chapter overview')) {
+        showToast('Generate something first', 'warning');
+        return;
+      }
+      const subject = document.getElementById('subject').value;
+      window.GlobalChat && window.GlobalChat.injectContent(text, 'chapter', '📖 Chapter: ' + subject);
+    });
+
+    // ── Co-pilot chat ──
+    async function copilotSend() {
+      const input = document.getElementById('copilotInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      const panel = document.getElementById('copilot-chat');
+
+      // User bubble
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble user';
+      userBubble.textContent = msg;
+      panel.appendChild(userBubble);
+      panel.scrollTop = panel.scrollHeight;
+
+      // Bot placeholder
+      const botBubble = document.createElement('div');
+      botBubble.className = 'chat-bubble bot';
+      botBubble.innerHTML = '<span class="spinner"></span>Thinking…';
+      panel.appendChild(botBubble);
+
+      const url = window.STREAM_URLS && window.STREAM_URLS.science_tutor;
+      if (!url || url.startsWith('__URL_')) {
+        botBubble.innerHTML = '⚠️ Tutor URL not configured.';
+        return;
+      }
+
+      // Build history with chapter context as first message
+      const subject = document.getElementById('subject').value;
+      const level = document.getElementById('level').value;
+      const contextMsg = { role: 'user', content: `[Context: ${subject} chapter overview at ${level} level]\n${chapterContext}` };
+      const history = [contextMsg, ...copilotHistory];
+
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({ subject, message: msg, history }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder('utf-8');
+        let full = '';
+        botBubble.innerHTML = '<span class="streaming-cursor"></span>';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          full += dec.decode(value, { stream: true });
+          botBubble.innerHTML = escapeHtml(full).replace(/\n/g, '<br>') + '<span class="streaming-cursor"></span>';
+          panel.scrollTop = panel.scrollHeight;
+        }
+        botBubble.innerHTML = escapeHtml(full).replace(/\n/g, '<br>');
+        copilotHistory.push({ role: 'user', content: msg });
+        copilotHistory.push({ role: 'assistant', content: full });
+        // Keep last 10 turns
+        if (copilotHistory.length > 20) copilotHistory = copilotHistory.slice(-20);
+      } catch (err) {
+        botBubble.innerHTML = `<span class="error-msg">⚠️ ${escapeHtml(err.message)}</span>`;
+      }
+    }
+    document.getElementById('copilotSend').addEventListener('click', copilotSend);
+    document.getElementById('copilotInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); copilotSend(); }
+    });
     });
     document.getElementById('sendToAiBtn').addEventListener('click', () => {
       const text = document.getElementById('out-chapter').innerText.trim();

@@ -38,14 +38,23 @@ def handler(path):
 
     body = request.get_json(force=True, silent=True) or {}
     subject = sanitize_subject(body.get("subject", ""))
+    level = body.get("level", "SPM")
+    if level not in ("Form 4", "SPM", "STPM", "University"):
+        level = "SPM"
 
-    logger.info("Chapter request", extra={"subject": subject})
+    logger.info("Chapter request subject=%s level=%s", subject, level)
 
     prompt = (
-        f"I want to learn more about the chapters in {subject}. "
-        "Can you help me understand the topics better? "
-        "Provide a comprehensive overview of the main chapters, key concepts, "
-        "and important topics students should focus on."
+        f"You are an expert {subject} educator teaching at the **{level}** level.\n\n"
+        f"Generate a comprehensive, structured Chapter Overview for {subject} at {level} level.\n\n"
+        "Include:\n"
+        "- Main chapters/topics students cover at this level\n"
+        "- Core concepts and key definitions for each chapter\n"
+        "- Important formulas or equations (where applicable)\n"
+        "- Real-world laboratory applications\n"
+        "- Study tips specific to this academic tier\n\n"
+        "Use clear markdown headings (## for chapters, ### for subtopics). "
+        "Be thorough, accurate, and grade-appropriate."
     )
 
     messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]

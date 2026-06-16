@@ -13,7 +13,7 @@ if os.path.isdir(_shared):
 
 from flask import Flask, request, Response, stream_with_context
 from cors import cors_headers, preflight_response, ALLOWED_ORIGIN
-from validators import validate_api_key, sanitize_subject
+from validators import validate_api_key, sanitize_subject, sanitize_topic
 from bedrock_stream import stream_bedrock
 
 logging.basicConfig(level=logging.INFO)
@@ -41,12 +41,14 @@ def handler(path):
     level = body.get("level", "SPM")
     if level not in ("Form 4", "SPM", "STPM", "University"):
         level = "SPM"
+    topic = sanitize_topic(body.get("topic", ""), max_len=300)
 
-    logger.info("Chapter request subject=%s level=%s", subject, level)
+    logger.info("Chapter request subject=%s level=%s topic=%s", subject, level, topic)
 
+    topic_clause = f" focusing specifically on **{topic}**" if topic else ""
     prompt = (
         f"You are an expert {subject} educator teaching at the **{level}** level.\n\n"
-        f"Generate a comprehensive, structured Chapter Overview for {subject} at {level} level.\n\n"
+        f"Generate a comprehensive, structured Chapter Overview for {subject} at {level} level{topic_clause}.\n\n"
         "Include:\n"
         "- Main chapters/topics students cover at this level\n"
         "- Core concepts and key definitions for each chapter\n"

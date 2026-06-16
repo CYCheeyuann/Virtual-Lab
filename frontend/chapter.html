@@ -47,6 +47,10 @@
         <option value="University">University</option>
       </select>
 
+      <label for="chapterTopic">Topic / Chapter (optional — leave blank for full syllabus)</label>
+      <input id="chapterTopic" type="text" class="input"
+        placeholder="e.g. Cell Division, Organic Chemistry, Waves & Optics…" />
+
       <div class="btn-row" style="margin-top:18px">
         <button id="runBtn" class="btn btn-primary"></button>
         <button id="resetBtn" class="btn btn-ghost"></button>
@@ -98,7 +102,8 @@
       const btn = document.getElementById('runBtn');
       const subject = document.getElementById('subject').value;
       const level = document.getElementById('level').value;
-      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject, level }, 'out-chapter', btn, {
+      const topic = document.getElementById('chapterTopic').value.trim();
+      streamToPanel(window.STREAM_URLS.chapter_assistant, { subject, level, topic }, 'out-chapter', btn, {
         successToast: 'Chapter overview generated',
         onComplete: (fullText) => {
           chapterContext = fullText;
@@ -192,16 +197,6 @@
     document.getElementById('copilotSend').addEventListener('click', copilotSend);
     document.getElementById('copilotInput').addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); copilotSend(); }
-    });
-    });
-    document.getElementById('sendToAiBtn').addEventListener('click', () => {
-      const text = document.getElementById('out-chapter').innerText.trim();
-      if (!text || text.startsWith('Chapter overview')) {
-        showToast('Generate something first', 'warning');
-        return;
-      }
-      const subject = document.getElementById('subject').value;
-      window.GlobalChat && window.GlobalChat.injectContent(text, 'chapter', '📖 Chapter: ' + subject);
     });
   </script>
 </body>

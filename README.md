@@ -7,7 +7,7 @@ An AI-powered learning companion for Biology, Chemistry, and Physics — sliced 
 - **AWS Lambda** (Python 3.12, Flask, Lambda Web Adapter, response streaming)
 - **Amazon Bedrock**
   - Text: Claude Haiku 4.5 via the **global** inference profile
-    (`global.anthropic.claude-haiku-4-5-20250609-v1:0`), called from
+    (`global.anthropic.claude-haiku-4-5-20251001-v1:0`), called from
     `ap-southeast-1`.
   - Image: **Amazon Nova Canvas** (`amazon.nova-canvas-v1:0`), called from
     `ap-northeast-1` (Nova Canvas is not available in Singapore).
@@ -81,7 +81,7 @@ Lambda Function URLs (7 Flask apps; 6 RESPONSE_STREAM, 1 BUFFERED)
 
 1. **Enable Bedrock model access** — request access in **both** regions:
    - `ap-southeast-1` (Singapore): Claude Haiku 4.5 (request via the
-     `global.anthropic.claude-haiku-4-5-20250609-v1:0` global profile).
+     `global.anthropic.claude-haiku-4-5-20251001-v1:0` global profile).
    - `ap-northeast-1` (Tokyo): `amazon.nova-canvas-v1:0`.
 
 2. **Create an S3 bucket** for SAM deployment artifacts (any name, in `ap-southeast-1`).

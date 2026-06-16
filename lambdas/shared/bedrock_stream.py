@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger(__name__)
 
 REGION = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
-MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-haiku-4-5-20250609-v1:0")
+MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 _client = None
 

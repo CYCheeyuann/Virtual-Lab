@@ -54,7 +54,16 @@ jobs:
           echo "Using AllowedOrigin=$URL"
 
       - name: SAM Deploy
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          ALLOWED_ORIGIN: ${{ steps.origin.outputs.value }}
         run: |
+          # Build --parameter-overrides as a list. SAM rejects empty values
+          # like `ApiKey=`, so we only include it when the secret is set.
+          OVERRIDES="AllowedOrigin=$ALLOWED_ORIGIN"
+          if [ -n "$API_KEY" ]; then
+            OVERRIDES="$OVERRIDES ApiKey=$API_KEY"
+          fi
           sam deploy \
             --stack-name virtual-science-lab-assistant \
             --s3-bucket ${{ secrets.SAM_DEPLOY_BUCKET }} \
@@ -62,11 +71,11 @@ jobs:
             --region ap-southeast-1 \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --parameter-overrides \
-                AllowedOrigin='${{ steps.origin.outputs.value }}' \
-                ApiKey='${{ secrets.API_KEY }}'
+            --parameter-overrides $OVERRIDES
 
       - name: Inject Lambda URLs into frontend config
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           get_output() {
             aws cloudformation describe-stacks \
@@ -97,9 +106,10 @@ jobs:
           sed -i "s|__URL_IMAGE_GENERATOR__|$URL|g" frontend/config.js
 
           # Inject the API key (or empty string) so the frontend sends X-Api-Key
-          # on every fetch. Using a different sed delimiter to avoid clashing
-          # with characters that may appear in the secret.
-          sed -i "s#__API_KEY__#${{ secrets.API_KEY }}#g" frontend/config.js
+          # on every fetch. Reading via $API_KEY env var lets Actions log-scrub
+          # the value, and we use `#` as a delimiter to avoid clashing with `/`
+          # or `|` characters that may appear in the secret.
+          sed -i "s#__API_KEY__#${API_KEY}#g" frontend/config.js
 
       - name: Deploy frontend to S3
         run: |

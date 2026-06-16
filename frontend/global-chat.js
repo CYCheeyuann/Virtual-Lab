@@ -326,7 +326,26 @@
   }
 
   /* ── Init ─────────────────────────────────────────────────── */
-  function init() { buildDom(); }
+  function init() {
+    buildDom();
+    // Show a speech-bubble hint flying out of the FAB after 3s (only
+    // when the panel is closed and user hasn't interacted yet).
+    setTimeout(() => {
+      if (isOpen) return;
+      const hint = document.createElement('div');
+      hint.className = 'gc-bubble-hint';
+      hint.textContent = '👋 Need help? Ask me anything!';
+      hint.id = 'gc-bubble-hint';
+      document.body.appendChild(hint);
+      // Trigger show animation after DOM insertion
+      requestAnimationFrame(() => hint.classList.add('show'));
+      // Auto-hide after 5s or on first fab click
+      const hide = () => { hint.classList.remove('show'); setTimeout(() => hint.remove(), 400); };
+      setTimeout(hide, 5000);
+      const fab = document.getElementById('gc-fab');
+      if (fab) fab.addEventListener('click', hide, { once: true });
+    }, 3000);
+  }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

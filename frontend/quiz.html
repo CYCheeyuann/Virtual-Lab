@@ -8,6 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
+  <link rel="stylesheet" href="toolkit.css" />
 </head>
 <body>
 
@@ -126,6 +127,7 @@
   <script src="common.js"></script>
   <script src="vortex.js"></script>
   <script src="global-chat.js"></script>
+  <script src="toolkit.js"></script>
   <script>
     /* ════════════════════════════════════════════════════════════════════
      *  Quiz Generator — 4-phase workflow + history + chatbox lock
@@ -162,6 +164,8 @@
         fab.style.opacity = '0.45';
         fab.style.pointerEvents = 'none';
       }
+      // Navigation guard: warn user before leaving mid-quiz
+      window.addEventListener('beforeunload', navGuard);
     }
     function unlockChatbox() {
       quizActive = false;
@@ -171,7 +175,24 @@
         fab.style.opacity = '';
         fab.style.pointerEvents = '';
       }
+      window.removeEventListener('beforeunload', navGuard);
     }
+    function navGuard(e) {
+      e.preventDefault();
+      e.returnValue = 'You have an active quiz. Leaving now will end it as Incomplete.';
+      return e.returnValue;
+    }
+    // Also intercept nav links during quiz
+    document.querySelectorAll('a.nav-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        if (!quizActive) return;
+        e.preventDefault();
+        if (confirm('You have an active quiz. Leaving now will end it and record as Incomplete.\n\nLeave anyway?')) {
+          finishQuiz(false);
+          window.location.href = link.href;
+        }
+      });
+    });
     // Intercept GlobalChat.open to block during quiz
     const _origGCOpen = window.GlobalChat && window.GlobalChat.open;
     if (window.GlobalChat) {
@@ -451,9 +472,22 @@
           <button class="btn btn-ghost btn-sm" onclick="retakeQuiz('${h.id}')">
             ${iconHtml('refresh','btn-icon-rotate')}<span>Retake</span>
           </button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteQuiz('${h.id}')" title="Delete" style="color:var(--c-error-fg)">
+            ${iconHtml('trash','btn-icon-trash')}<span></span>
+          </button>
         </div>
       `).join('');
     }
+
+    window.deleteQuiz = function(id) {
+      if (!confirm('Delete this quiz from history?')) return;
+      if (!confirm('Are you sure? This cannot be undone.')) return;
+      let hist = loadHistory();
+      hist = hist.filter(h => h.id !== id);
+      try { localStorage.setItem(QUIZ_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
+      renderHistory();
+      showToast('Quiz deleted', 'success', 2000);
+    };
 
     window.retakeQuiz = function(id) {
       const hist = loadHistory();

@@ -3,8 +3,9 @@
 Step 1: Claude Haiku 4.5 (global inference profile, called from ap-southeast-1)
         expands the user's concept into a detailed English image prompt and a
         markdown scientific explanation.
-Step 2: Amazon Titan Image Generator v2 (us-east-1) renders that prompt as a
-        1024×1024 PNG returned as base64.
+Step 2: Amazon Nova Canvas (us-east-1) renders that prompt as a 1024×1024 PNG
+        returned as base64. Nova Canvas is the supported successor to the
+        legacy Titan Image Generator v2.
 
 Returns a single JSON document — text and image cannot share a stream.
 """
@@ -39,9 +40,11 @@ TEXT_REGION    = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
 TEXT_MODEL_ID  = os.environ.get("MODEL_ID",
                                 "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 
-# Titan Image Generator v2 — N. Virginia (us-east-1) is the primary region.
+# Nova Canvas (image) — N. Virginia (us-east-1). Titan v2 is end-of-life on
+# 2026-06-30; Nova Canvas is the actively-supported successor and ships the
+# same TEXT_IMAGE request shape with an extra `quality` knob.
 IMAGE_REGION   = os.environ.get("IMAGE_REGION",   "us-east-1")
-IMAGE_MODEL_ID = os.environ.get("IMAGE_MODEL_ID", "amazon.titan-image-generator-v2:0")
+IMAGE_MODEL_ID = os.environ.get("IMAGE_MODEL_ID", "amazon.nova-canvas-v1:0")
 
 VALID_STYLES = {
     "Scientific Diagram", "Textbook Illustration", "3D Render",
@@ -64,9 +67,9 @@ def _get_text_client():
 def _get_image_client():
     """bedrock-runtime client pinned to IMAGE_REGION (us-east-1).
 
-    Titan Image Generator v2 at 1024×1024 can exceed boto3's default 60 s
-    read timeout. AWS docs recommend ≥5 min. Lambda timeout is 300 s, match
-    it.
+    Nova Canvas at 1024×1024 / quality=premium can exceed boto3's default
+    60 s read timeout — AWS docs explicitly recommend 5 min. Lambda timeout
+    is 300 s, match it.
     """
     global _image_client
     if _image_client is None:
@@ -120,13 +123,13 @@ def handler(path):
             status=500,
         )
 
-    # Step 2 — Titan renders the expanded prompt into a 1024×1024 PNG.
+    # Step 2 — Nova Canvas renders the expanded prompt.
     try:
-        image_b64 = _titan_step(image_prompt)
+        image_b64 = _nova_step(image_prompt)
     except ClientError as e:
         return _bedrock_error(e, fallback_text=explanation, prompt_used=image_prompt)
     except Exception:                 # noqa: BLE001
-        logger.exception("Titan step failed")
+        logger.exception("Nova Canvas step failed")
         return _json_response(
             {
                 "error":       friendly_error("InternalServerException", ""),
@@ -229,31 +232,32 @@ def _fallback_prompt(concept, style, detail):
     )
 
 
-# ── Step 2: Titan Image Generator v2 (us-east-1) ────────────────────────────
-# Titan v2 accepts up to 1024 chars for `text` in TEXT_IMAGE mode.
-_TITAN_PROMPT_LIMIT = 1024
+# ── Step 2: Nova Canvas (us-east-1) ──────────────────────────────────────────
+# Nova Canvas accepts up to 1024 chars for `text` in TEXT_IMAGE mode.
+_NOVA_PROMPT_LIMIT = 1024
 
 
-def _titan_step(prompt):
+def _nova_step(prompt):
     client = _get_image_client()
     body = {
         "taskType": "TEXT_IMAGE",
-        "textToImageParams": {"text": prompt[:_TITAN_PROMPT_LIMIT]},
+        "textToImageParams": {"text": prompt[:_NOVA_PROMPT_LIMIT]},
         "imageGenerationConfig": {
             "numberOfImages": 1,
             "height":  1024,
             "width":   1024,
-            "cfgScale": 8.0,   # Titan v2 valid range: 1.1–10
-            "seed":     42,
+            "cfgScale": 6.5,   # Nova Canvas valid range: 1.1–10
+            "seed":     0,
+            "quality":  "standard",
         },
     }
     resp    = client.invoke_model(modelId=IMAGE_MODEL_ID, body=json.dumps(body))
     payload = json.loads(resp["body"].read())
     images  = payload.get("images") or []
     if not images:
-        # Titan returns `error` on safety/validation failures.
+        # Nova Canvas returns `error` on safety/validation failures.
         err = payload.get("error") or payload
-        raise RuntimeError(f"Titan returned no images: {err!r}")
+        raise RuntimeError(f"Nova Canvas returned no images: {err!r}")
     return images[0]
 
 

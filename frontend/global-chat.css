@@ -79,11 +79,11 @@
 .gc-panel {
   position: fixed;
   right: 22px;
-  bottom: 104px;
+  bottom: 180px;
   width: 420px;
   max-width: calc(100vw - 36px);
-  height: 580px;
-  max-height: calc(100vh - 180px);
+  height: 540px;
+  max-height: calc(100vh - 200px);
   background: var(--c-bg-glass-2);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);

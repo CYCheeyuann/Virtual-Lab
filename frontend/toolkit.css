@@ -22,6 +22,7 @@
   color: #fff;
   transition: transform 0.2s, opacity 0.3s, box-shadow 0.3s, width 0.3s, height 0.3s;
   user-select: none;
+  pointer-events: auto;
 }
 .tk-fab:hover {
   transform: scale(1.12);

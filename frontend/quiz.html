@@ -14,9 +14,9 @@
 
   <nav class="navbar">
     <div class="nav-inner">
-      <div class="brand">🔬 Virtual Science Lab</div>
+      <a class="brand" href="welcome.html">🔬 Virtual Science Lab</a>
       <div class="nav-links">
-        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link" href="index.html">Dashboard</a>
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
         <a class="nav-link" href="experiment.html">Experiment Guide</a>
         <a class="nav-link active" href="quiz.html">Quiz Generator</a>
@@ -137,6 +137,11 @@
     /* ════════════════════════════════════════════════════════════════════
      *  Quiz Generator — 4-phase workflow + history + chatbox lock
      * ════════════════════════════════════════════════════════════════════ */
+
+    /* ── Markdown-safe escape: escapeHtml then render **bold** ── */
+    function quizHtml(s) {
+      return escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }
 
     // ── Button icons ──
     document.getElementById('outlineBtn').innerHTML  = `${iconHtml('bolt')}<span>Generate Outline</span>`;
@@ -333,7 +338,7 @@
         card.className = 'quiz-question';
         card.dataset.qi = qi;
         card.innerHTML = `
-          <div class="quiz-q-title">Q${qi + 1}. ${escapeHtml(q.question_stem)}</div>
+          <div class="quiz-q-title">Q${qi + 1}. ${quizHtml(q.question_stem)}</div>
           <div class="quiz-options" data-qi="${qi}"></div>`;
         const optsHost = card.querySelector('.quiz-options');
         ['A','B','C','D'].forEach(letter => {
@@ -343,7 +348,7 @@
           btn.className = 'quiz-option';
           btn.dataset.letter = letter;
           btn.dataset.qi = qi;
-          btn.innerHTML = `<span class="opt-letter">${letter}</span><span>${escapeHtml(text)}</span>`;
+          btn.innerHTML = `<span class="opt-letter">${letter}</span><span>${quizHtml(text)}</span>`;
           btn.addEventListener('click', () => selectOption(qi, letter));
           optsHost.appendChild(btn);
         });
@@ -407,15 +412,15 @@
           if (letter === q.correct_answer) cls += ' correct';
           if (letter === picked && !isCorrect) cls += ' incorrect';
           if (letter === picked) cls += ' selected';
-          optsHtml += `<div class="${cls}"><span class="opt-letter">${letter}</span><span>${escapeHtml(text)}</span></div>`;
+          optsHtml += `<div class="${cls}"><span class="opt-letter">${letter}</span><span>${quizHtml(text)}</span></div>`;
         });
 
         card.innerHTML = `
-          <div class="quiz-q-title">Q${qi + 1}. ${escapeHtml(q.question_stem)}</div>
+          <div class="quiz-q-title">Q${qi + 1}. ${quizHtml(q.question_stem)}</div>
           <div class="quiz-options">${optsHtml}</div>
           <div class="quiz-explanation">
             <strong>${picked ? (isCorrect ? '✅ Correct' : `❌ Correct: ${q.correct_answer}`) : '⚪ Not answered'}</strong><br/>
-            ${escapeHtml(q.detailed_explanation || '')}
+            ${quizHtml(q.detailed_explanation || '')}
           </div>`;
         resultsContainer.appendChild(card);
       });

@@ -630,6 +630,16 @@ select option:hover {
   line-height: 1.6;
 }
 
+/* Quiz keyword highlighting — bold terms glow in accent color */
+.quiz-question strong,
+.quiz-explanation strong,
+.quiz-q-title strong,
+.quiz-option strong {
+  font-weight: 700;
+  color: var(--c-accent-2);
+  text-shadow: 0 0 6px var(--c-accent-glow);
+}
+
 /* Quiz progress bar */
 .quiz-progress-bar {
   position: relative;

@@ -375,16 +375,47 @@
     document.getElementById('previewTitle').textContent =
       `Preview: ${cards.length} cards for "${bab}"`;
 
-    previewList.innerHTML = cards.map((c, i) => `
-      <div class="preview-card">
-        <div class="preview-num">${i + 1}</div>
-        <div class="preview-content">
-          <div class="preview-front"><strong>Q:</strong> ${escHtml(c.front)}</div>
-          <div class="preview-back"><strong>A:</strong> ${escHtml(c.back)}</div>
-          ${c.hint ? `<div class="preview-hint">💡 ${escHtml(c.hint)}</div>` : ''}
-        </div>
+    // v2: render each card as a collapsed <details> element so each row shows
+    // only the question by default, with a chevron that rotates on toggle.
+    // Native <details> gives us free keyboard support and accessibility.
+    previewList.innerHTML = `
+      <div class="preview-bar">
+        <button class="preview-bulk" type="button" id="previewBulkToggle">Expand All</button>
       </div>
-    `).join('');
+      ${cards.map((c, i) => `
+        <details class="preview-card">
+          <summary class="preview-card-summary">
+            <span class="preview-num">${i + 1}</span>
+            <span class="preview-q-text"><strong>Q:</strong> ${escHtml(c.front)}</span>
+            <span class="preview-chevron" aria-hidden="true">▼</span>
+          </summary>
+          <div class="preview-card-body">
+            <div class="preview-back"><strong>A:</strong> ${richText(c.back)}</div>
+            ${c.hint ? `<div class="preview-hint">💡 ${escHtml(c.hint)}</div>` : ''}
+          </div>
+        </details>
+      `).join('')}
+    `;
+
+    // Bulk toggle
+    const bulkBtn = document.getElementById('previewBulkToggle');
+    bulkBtn?.addEventListener('click', () => {
+      const rows = previewList.querySelectorAll('details.preview-card');
+      const openCount = [...rows].filter(d => d.open).length;
+      // If most are closed, open all; otherwise close all.
+      const target = openCount < rows.length / 2;
+      rows.forEach(d => { d.open = target; });
+      bulkBtn.textContent = target ? 'Collapse All' : 'Expand All';
+    });
+    // Keep the bulk button label in sync when individual rows toggle
+    previewList.querySelectorAll('details.preview-card').forEach(d => {
+      d.addEventListener('toggle', () => {
+        const rows = previewList.querySelectorAll('details.preview-card');
+        const openCount = [...rows].filter(x => x.open).length;
+        if (openCount === rows.length) bulkBtn.textContent = 'Collapse All';
+        else if (openCount === 0)       bulkBtn.textContent = 'Expand All';
+      });
+    });
 
     // Wire confirm / back buttons
     const confirmBtn = document.getElementById('confirmFlashBtn');
@@ -454,6 +485,8 @@
     ui.overlayOpen = true;
     document.body.style.overflow = 'hidden';
     showCurrentCard();
+    // Focus the stage so Enter works without an extra click
+    setTimeout(() => document.getElementById('fcStage')?.focus(), 50);
   }
 
   function showCurrentCard() {
@@ -501,7 +534,8 @@
     }
     ui.flipped = false;
     stage.dataset.flipped = 'false';
-    actions.hidden = true;  // Always hidden until user flips to back
+    // v2: grading buttons are ALWAYS visible — no flip gate.
+    // hint row visibility depends only on whether the card has a hint to reveal.
     progress.textContent = `${ui.idx + 1} / ${ui.queue.length} · Box ${card.box}/5`;
   }
 
@@ -510,20 +544,16 @@
     // Toggle the flip — allows infinite front/back flipping
     ui.flipped = !ui.flipped;
     document.getElementById('fcStage').dataset.flipped = String(ui.flipped);
-    // Grading buttons only visible when showing the back
-    document.getElementById('fcActions').hidden = !ui.flipped;
-    if (!ui.flipped) {
-      // Going back to front — hide hint area too
-      document.getElementById('fcHintRow').hidden = false;
-    } else {
-      document.getElementById('fcHintRow').hidden = true;
-    }
+    // Hint row hides while showing the back (the answer is already revealed)
+    document.getElementById('fcHintRow').hidden = ui.flipped;
   }
 
   function grade(g) {
-    if (!ui.overlayOpen || !ui.flipped) return;
+    // v2: grading is always allowed — no flip gate.
+    if (!ui.overlayOpen) return;
     if (!['hard','okay','easy'].includes(g)) return;
     const card = ui.queue[ui.idx];
+    if (!card) return;
     const store = Store.load();
     const deck = store.decks.find(d => d.id === ui.deckId);
     if (!deck) { exitStudy(); return; }
@@ -549,43 +579,54 @@
     renderLibrary();
   }
 
-  // Keyboard
+  // Keyboard — v2 rules:
+  //   Enter (when stage focused) → flip
+  //   Space, Tab, arrows → ignored for flip (browser scroll/focus is preserved)
+  //   1 / 2 / 3 → grade anytime (no flip gate)
+  //   Escape → exit
   function onKey(e) {
     if (!ui.overlayOpen) return;
     if (e.key === 'Escape') { e.preventDefault(); exitStudy(); return; }
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      flipCard();  // toggles front/back
+    if (e.key === 'Enter') {
+      // Only flip when the stage is the focused element (or focus is inside it)
+      const stage = document.getElementById('fcStage');
+      if (stage && (document.activeElement === stage || stage.contains(document.activeElement))) {
+        e.preventDefault();
+        flipCard();
+      }
       return;
     }
-    if (!ui.flipped) return;  // grading only after flip to back
+    // Note: Spacebar intentionally has NO handler — it falls through to the
+    // browser so the page scrolls normally if the user wants to.
     if (e.key === '1') { e.preventDefault(); grade('hard'); }
     else if (e.key === '2') { e.preventDefault(); grade('okay'); }
     else if (e.key === '3') { e.preventDefault(); grade('easy'); }
   }
 
-  // Pointer / swipe
+  // Pointer events — kept only for swipe-grade on touch devices.
+  // Note: on desktop, click flips via the dedicated click listener (left-click only).
   function onPointerDown(e) {
     if (!ui.overlayOpen) return;
+    if (e.pointerType !== 'touch') return;   // desktop uses click handler instead
     ui.pointer.down = true;
     ui.pointer.x0 = e.clientX; ui.pointer.y0 = e.clientY; ui.pointer.t0 = Date.now();
   }
   function onPointerUp(e) {
     if (!ui.pointer.down) return;
     ui.pointer.down = false;
+    if (e.pointerType !== 'touch') return;
     const dx = e.clientX - ui.pointer.x0;
     const dy = e.clientY - ui.pointer.y0;
     const dt = Math.max(1, Date.now() - ui.pointer.t0);
     const horizontalish = Math.abs(dx) > Math.abs(dy) * 1.5;
     const v = Math.abs(dx) / dt;       // px/ms
     const big = Math.abs(dx) > 60 && v > 0.3;
-    // Tap (small movement) = toggle flip
+    // Tap (tiny movement) = flip on touch
     if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
       flipCard();
       return;
     }
-    // Swipe only counts when back is visible
-    if (!ui.flipped) return;
+    // Horizontal swipe = grade (touch shortcut, allowed regardless of flip state)
     if (horizontalish && big) {
       grade(dx < 0 ? 'hard' : 'easy');
     }
@@ -607,7 +648,15 @@
     // Wire study overlay events
     const stage = document.getElementById('fcStage');
     if (stage) {
-      stage.addEventListener('click', () => { if (!ui.flipped) flipCard(); });
+      // v2: left-click only — filter out middle/right clicks
+      stage.addEventListener('click', (e) => {
+        if (e.button !== 0) return;          // left-click only
+        if (e.detail > 1) return;            // ignore double-click second event
+        flipCard();
+      });
+      // Block the context menu (right-click) so it doesn't feel like an interaction
+      stage.addEventListener('contextmenu', (e) => e.preventDefault());
+      // Touch swipe support — desktop uses click handler above
       stage.addEventListener('pointerdown', onPointerDown);
       stage.addEventListener('pointerup', onPointerUp);
     }

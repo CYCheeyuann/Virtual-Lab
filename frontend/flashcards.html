@@ -106,44 +106,46 @@
 
   <!-- ═══ Distraction-free Study Overlay ═══ -->
   <div class="fc-overlay" id="fcOverlay" role="dialog" aria-label="Flashcard Study Mode">
-    <div class="fc-topbar">
-      <span class="fc-progress-text" id="fcProgress">0 / 0</span>
-      <button class="fc-exit-btn" id="fcExitBtn" type="button" aria-label="Exit study mode">✕ Exit</button>
-    </div>
+    <div class="fc-session" id="fcSession" tabindex="-1">
+      <div class="fc-session-bar">
+        <span class="fc-progress" id="fcProgress">0 / 0</span>
+        <button class="fc-exit-btn" id="fcExitBtn" type="button" aria-label="Exit study mode">✕ Exit</button>
+      </div>
 
-    <div class="fc-stage" id="fcStage" data-flipped="false">
-      <div class="fc-card">
-        <div class="fc-face fc-front">
-          <div class="fc-prompt" id="fcPrompt"></div>
-        </div>
-        <div class="fc-face fc-back">
-          <div class="fc-answer" id="fcAnswer"></div>
+      <div class="fc-stage" id="fcStage" data-flipped="false" tabindex="0">
+        <div class="fc-card">
+          <div class="fc-face fc-front">
+            <div class="fc-prompt" id="fcPrompt"></div>
+          </div>
+          <div class="fc-face fc-back">
+            <div class="fc-answer" id="fcAnswer"></div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="fc-hint-row" id="fcHintRow" hidden>
-      <button class="fc-hint-toggle" id="fcHintBtn" type="button">Reveal Hint</button>
-      <div class="fc-hint" id="fcHint" hidden></div>
-    </div>
+      <div class="fc-hint-row" id="fcHintRow" hidden>
+        <button class="fc-hint-toggle" id="fcHintBtn" type="button">Reveal Hint</button>
+        <div class="fc-hint" id="fcHint" hidden></div>
+      </div>
 
-    <div class="fc-actions" id="fcActions" hidden>
-      <button class="fc-grade fc-hard" data-grade="hard" type="button">
-        <span>🔴 Hard</span><span class="fc-shortcut">1</span>
-      </button>
-      <button class="fc-grade fc-okay" data-grade="okay" type="button">
-        <span>🟡 Okay</span><span class="fc-shortcut">2</span>
-      </button>
-      <button class="fc-grade fc-easy" data-grade="easy" type="button">
-        <span>🟢 Easy</span><span class="fc-shortcut">3</span>
-      </button>
-    </div>
+      <div class="fc-actions" id="fcActions">
+        <button class="fc-grade fc-hard" data-grade="hard" type="button">
+          <span>🔴 Hard</span><span class="fc-shortcut">1</span>
+        </button>
+        <button class="fc-grade fc-okay" data-grade="okay" type="button">
+          <span>🟡 Okay</span><span class="fc-shortcut">2</span>
+        </button>
+        <button class="fc-grade fc-easy" data-grade="easy" type="button">
+          <span>🟢 Easy</span><span class="fc-shortcut">3</span>
+        </button>
+      </div>
 
-    <div class="fc-shortcuts-hint">
-      Click card or press <strong>Space</strong> to flip · <strong>1 / 2 / 3</strong> to grade · <strong>Esc</strong> to exit · swipe ← Hard / → Easy on touch
-    </div>
+      <div class="fc-shortcuts-hint">
+        Left-click card or press <strong>Enter</strong> to flip · <strong>1 / 2 / 3</strong> grade anytime · <strong>Esc</strong> to exit
+      </div>
 
-    <div class="fc-summary" id="fcSummary" hidden></div>
+      <div class="fc-summary" id="fcSummary" hidden></div>
+    </div>
   </div>
 
   <script src="config.js"></script>

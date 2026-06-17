@@ -115,10 +115,7 @@
         }
       } else if (tile && live) {
         tile.classList.remove('tile-locked');
-        if (badge) {
-          badge.textContent = 'Beta';
-          badge.classList.remove('tile-badge-coming');
-        }
+        if (badge) badge.remove();   // delete the badge node entirely when backend is live
       }
 
       // Typewriter hover effect on tile descriptions

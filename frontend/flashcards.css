@@ -131,44 +131,58 @@
   display: none;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
   padding: 24px;
-  gap: 18px;
 }
 .fc-overlay.open { display: flex; }
 
-.fc-topbar {
-  position: absolute;
-  top: 18px;
-  left: 24px;
-  right: 24px;
+/* All session controls live inside .fc-session — flex column matches the card's
+   width so progress aligns to card-left and exit aligns to card-right at every
+   viewport size. No absolute positioning relative to the viewport. */
+.fc-session {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  width: min(640px, 92vw);
+  max-width: 100%;
+  outline: none;
+}
+
+.fc-session-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.85rem;
-  color: var(--c-muted);
+  padding: 0 4px;
 }
-.fc-progress-text {
+.fc-progress {
   font-weight: 600;
   color: var(--c-text-strong);
+  font-size: 0.85rem;
 }
 .fc-exit-btn {
   background: rgba(255,255,255,0.08);
   border: 1px solid var(--c-border);
   color: var(--c-text);
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: 999px;
   font-size: 0.82rem;
   cursor: pointer;
+  font-family: inherit;
   transition: background 0.2s, color 0.2s;
 }
 .fc-exit-btn:hover { background: var(--c-accent-soft); color: var(--c-accent); }
 
 .fc-stage {
   perspective: 1600px;
-  width: min(640px, 92vw);
+  width: 100%;
   height: min(420px, 60vh);
 }
+.fc-stage:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 6px;
+  border-radius: 22px;
+}
+.fc-stage:focus { outline: none; }
 .fc-card {
   position: relative;
   width: 100%;
@@ -339,39 +353,96 @@
   .fc-shortcut { display: none; }
 }
 
-/* ── Preview list ─────────────────────────────────────────────────────── */
+/* ── Preview list (collapsed accordion of cards) ─────────────────────── */
 .preview-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 50vh;
+  gap: 8px;
+  max-height: 60vh;
   overflow-y: auto;
 }
-.preview-card {
+.preview-bar {
   display: flex;
-  gap: 12px;
-  padding: 14px 16px;
+  justify-content: flex-end;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--c-border);
+  margin-bottom: 6px;
+}
+.preview-bulk {
+  background: transparent;
+  border: 1px solid var(--c-border-strong);
+  color: var(--c-accent-2);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.preview-bulk:hover {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  border-color: var(--c-accent);
+}
+.preview-card {
   background: var(--c-bg-glass-2);
   border: 1px solid var(--c-border);
   border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s;
 }
+.preview-card[open] {
+  border-color: rgba(var(--c-accent-rgb), 0.35);
+}
+/* Hide the default disclosure triangle on summary */
+.preview-card-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.9rem;
+  color: var(--c-text);
+}
+.preview-card-summary::-webkit-details-marker { display: none; }
+.preview-card-summary::marker { content: ''; }
+.preview-card-summary:hover { background: rgba(var(--c-accent-rgb), 0.05); }
 .preview-num {
   font-weight: 700;
   color: var(--c-accent);
-  font-size: 1.05rem;
-  min-width: 28px;
+  min-width: 24px;
   text-align: center;
 }
-.preview-content {
+.preview-q-text {
   flex: 1;
+  color: var(--c-text-strong);
+  line-height: 1.45;
+}
+.preview-q-text strong {
+  color: var(--c-accent);
+  margin-right: 4px;
+}
+.preview-chevron {
+  color: var(--c-muted);
+  font-size: 0.78rem;
+  transition: transform 0.2s ease;
+}
+.preview-card[open] .preview-chevron {
+  transform: rotate(180deg);
+  color: var(--c-accent);
+}
+.preview-card-body {
+  padding: 4px 18px 14px 50px;
+  border-top: 1px dashed var(--c-border);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 0.88rem;
+  gap: 6px;
 }
-.preview-front { color: var(--c-text-strong); }
-.preview-back  { color: var(--c-text); }
-.preview-hint  { color: var(--c-muted); font-size: 0.8rem; font-style: italic; }
+.preview-back  { color: var(--c-text); font-size: 0.88rem; line-height: 1.55; }
+.preview-back strong { color: var(--c-accent-2); }
+.preview-hint  { color: var(--c-muted); font-size: 0.82rem; font-style: italic; }
 
 /* ── Reduced motion: drop the 3D flip in favor of an opacity swap ────── */
 @media (prefers-reduced-motion: reduce) {

@@ -810,8 +810,8 @@ select option:hover {
   gap: 20px;
 }
 .tile-grid.tile-grid-row {
-  grid-template-columns: repeat(5, 1fr);
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
 }
 @media (max-width: 1100px) {
   .tile-grid.tile-grid-row { grid-template-columns: repeat(2, 1fr); }
@@ -823,13 +823,13 @@ select option:hover {
   background: var(--c-bg-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-radius: 20px;
-  padding: 48px 32px;
-  min-height: 300px;
+  border-radius: 22px;
+  padding: 36px 30px;
+  min-height: 260px;
   text-decoration: none;
   color: inherit;
   border: 1px solid var(--c-border);
-  box-shadow: 0 4px 20px var(--c-shadow);
+  box-shadow: 0 6px 24px var(--c-shadow);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -861,21 +861,21 @@ select option:hover {
 
 /* Icon container */
 .tile-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
   background: var(--c-accent-soft);
   color: var(--c-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.8rem;
-  margin-bottom: 14px;
+  font-size: 2.2rem;
+  margin-bottom: 18px;
   transition: transform 0.4s ease, color 0.3s, filter 0.3s ease, margin-bottom 0.4s ease;
 }
 .tile-icon svg {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.5;
@@ -891,21 +891,21 @@ select option:hover {
 
 /* Title — starts centered, shifts up on hover */
 .tile h3 {
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   color: var(--c-text-strong);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.015em;
   margin-bottom: 0;
   transition: transform 0.4s ease, margin-bottom 0.4s ease;
 }
 .tile:hover h3 {
   transform: translateY(-6px);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 /* Description — hidden by default, revealed on hover with typewriter effect */
 .tile p {
-  font-size: 0.86rem;
+  font-size: 0.95rem;
   color: var(--c-muted);
   line-height: 1.55;
   max-height: 0;
@@ -914,7 +914,7 @@ select option:hover {
   transition: max-height 0.4s ease, opacity 0.3s ease 0.1s;
 }
 .tile:hover p {
-  max-height: 80px;
+  max-height: 100px;
   opacity: 1;
 }
 /* Typewriter — applied via JS class */

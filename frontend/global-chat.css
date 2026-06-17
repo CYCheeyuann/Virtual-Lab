@@ -82,8 +82,8 @@
   bottom: 104px;
   width: 420px;
   max-width: calc(100vw - 36px);
-  height: 620px;
-  max-height: calc(100vh - 130px);
+  height: 580px;
+  max-height: calc(100vh - 180px);
   background: var(--c-bg-glass-2);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);

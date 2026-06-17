@@ -131,9 +131,9 @@ a:hover { color: var(--c-accent-2); }
   z-index: 100;
 }
 .nav-inner {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px 28px;
+  width: 100%;
+  max-width: 100%;
+  padding: 20px 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -183,9 +183,9 @@ a:hover { color: var(--c-accent-2); }
 
 /* ─── Page container & header ────────────────────────────────────────── */
 .page {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 36px 22px 60px;
+  padding: 36px 40px 60px;
   position: relative;
   z-index: 1;
 }
@@ -799,13 +799,23 @@ select option:hover {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
 }
+.tile-grid.tile-grid-row {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 18px;
+}
+@media (max-width: 1100px) {
+  .tile-grid.tile-grid-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .tile-grid.tile-grid-row { grid-template-columns: 1fr; }
+}
 .tile {
   background: var(--c-bg-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 20px;
-  padding: 36px 28px;
-  min-height: 220px;
+  padding: 48px 32px;
+  min-height: 300px;
   text-decoration: none;
   color: inherit;
   border: 1px solid var(--c-border);

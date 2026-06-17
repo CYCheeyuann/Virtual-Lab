@@ -114,19 +114,26 @@ const flashcardsLive = window.STREAM_URLS &&
   window.STREAM_URLS.flashcard_generator &&
   !window.STREAM_URLS.flashcard_generator.startsWith('__URL_');
 ```
-- If `flashcardsLive` is true → tile loses `.tile-locked`, becomes a real link to `flashcards.html`, badge text becomes empty (or "Beta" for first release).
+- If `flashcardsLive` is true → tile loses `.tile-locked`, becomes a real link to `flashcards.html`, AND the badge element is removed entirely from the DOM (v2 revision: there is no "Beta" adornment on the live tile — the tile is visually identical to its four sibling tool tiles).
 - If false → tile retains `.tile-locked`, badge reads "Coming Soon", click shows toast.
 
 **Markup:**
 ```html
 <a class="tile" href="flashcards.html" id="flashTile" data-desc="AI-generated spaced repetition decks to lock science concepts into your long-term memory.">
-  <span class="tile-badge" id="flashBadge">Beta</span>
+  <span class="tile-badge tile-badge-coming" id="flashBadge">Coming Soon</span>
   <div class="tile-icon">
     <!-- layered cards / brain SVG -->
   </div>
   <h3>Smart Flashcards</h3>
   <p></p>
 </a>
+```
+The `flashBadge` element is **removed** from the DOM by the dashboard's bootstrap script when `flashcardsLive === true`:
+```js
+if (live) {
+  tile.classList.remove('tile-locked');
+  badge?.remove();      // physically delete the node — not just hide
+}
 ```
 
 `.tile-badge` is a small absolutely-positioned pill in the top-right corner of the tile, with the same accent palette as the chosen subject theme:
@@ -155,17 +162,32 @@ const flashcardsLive = window.STREAM_URLS &&
   <span>🧠</span><span>Turn this Chapter into Flashcards</span>
 </button>
 ```
-Handler reads the rendered overview text from the same panel currently used for the Lambda response, then calls:
+Handler reads the rendered overview text from the same panel currently used for the Lambda response, calls `generateCards()` directly (NOT `createDeckFromText`, since the v2 preview step needs to gate the persistence), then routes to `flashcards.html?previewSeed=<base36-id>` — the seed key looks up the in-memory pending preview from a small `sessionStorage` cache (`vsl.flashcardsPreviewSeed`) so the page can hydrate the preview state on landing:
+
 ```js
-window.Flashcards.createDeckFromText({
-  subject: currentSubject,
-  chapter: currentChapter,        // the user's chapter input
-  topic: currentTopic || currentChapter,
-  source_text: panel.innerText,
-  num_cards: 12,
-}).then(deckId => location.href = `flashcards.html?deck=${deckId}&autostudy=1`);
+// chapter.html
+const cards = await window.Flashcards.generateCardsFromText({...});  // returns raw card array
+const seedId = uid();
+sessionStorage.setItem('vsl.flashcardsPreviewSeed', JSON.stringify({
+  id: seedId, subject, chapter, topic, cards, createdAt: Date.now()
+}));
+location.href = `flashcards.html?previewSeed=${seedId}`;
+
+// flashcards.js init
+const params = new URLSearchParams(location.search);
+const seedId = params.get('previewSeed');
+if (seedId) {
+  const raw = sessionStorage.getItem('vsl.flashcardsPreviewSeed');
+  if (raw) {
+    const seed = JSON.parse(raw);
+    if (seed.id === seedId && Date.now() - seed.createdAt < 5 * 60 * 1000) {
+      sessionStorage.removeItem('vsl.flashcardsPreviewSeed');  // one-shot
+      showPreview(seed);
+    }
+  }
+}
 ```
-Deep link `?deck=ID&autostudy=1` lets the Flashcards page open the new deck and immediately drop into study mode.
+Five-minute TTL so a stale seed in another tab can't auto-confirm a stranger deck. The seed is a one-shot — consumed on first read so a refresh doesn't re-pop the preview.
 
 **Quiz Generator.** In Phase 4 (Results), one new button:
 ```html
@@ -173,26 +195,9 @@ Deep link `?deck=ID&autostudy=1` lets the Flashcards page open the new deck and 
   <span>🧠</span><span>Save incorrect answers to Flashcards</span>
 </button>
 ```
-Disabled if there are no incorrect answers. Handler:
-```js
-const wrong = quizData
-  .map((q, i) => ({ q, i, picked: userAnswers[i] }))
-  .filter(x => !x.picked || x.picked !== x.q.correct_answer);
+Disabled if there are no incorrect answers OR the backend isn't deployed. Handler runs the `from_quiz` generation, writes the seed, and routes to `flashcards.html?previewSeed=…` — identical preview flow as the chapter hook.
 
-window.Flashcards.saveQuizMistakes({
-  subject: quizMeta.subject,
-  chapter: quizMeta.topic,         // quiz "topic" maps to chapter for tagging
-  topic: quizMeta.topic,
-  wrong_answers: wrong.map(({ q, picked }) => ({
-    question: q.question_stem,
-    correct: q.options[q.correct_answer],
-    picked: picked ? q.options[picked] : null,
-    explanation: q.detailed_explanation,
-  })),
-}).then(deckId => showToast(`Saved ${wrong.length} cards to deck`, 'success'));
-```
-
-The Lambda receives a different `mode: "from_quiz"` payload and is prompted to convert each wrong answer into a `{front: question, back: correct + brief reason, hint: short cue}` card. No user interaction needed beyond clicking the button.
+**Why route through the preview seed.** v1 had cross-module hooks call `createDeckFromText` / `saveQuizMistakes` which committed the deck immediately and dropped the user into study mode. v2 honours the "Confirm before commit" contract universally — no entry point to the flashcards system can persist a deck without the user passing through the Preview screen first.
 
 ### Part 3 — Deck Setup UI (Bab Input)
 
@@ -261,87 +266,201 @@ Decks render as glass-style cards in a responsive grid (`repeat(auto-fit, minmax
 
 ### Part 5 — Distraction-Free Study UI
 
-A full-viewport overlay with `position: fixed; inset: 0; backdrop-filter: blur(20px); background: rgba(20,13,38,0.85)` covers the dashboard, dimming the background.
+A full-viewport overlay with `position: fixed; inset: 0; backdrop-filter: blur(20px); background: rgba(20,13,38,0.85)` covers the dashboard, dimming the background. **Inside the overlay, all session-level controls are anchored to the central card container, not to the viewport corners** — so the user's eye doesn't have to travel to the screen edges to read the progress or hit Exit.
 
-**Card markup:**
+**Card markup (v2 — controls live INSIDE `.fc-stage`'s wrapper, not at overlay top):**
 ```html
-<div class="fc-stage" data-flipped="false">
-  <div class="fc-card">
-    <div class="fc-face fc-front">
-      <div class="fc-prompt"><!-- card.front --></div>
+<div class="fc-overlay">
+  <div class="fc-session" tabindex="-1">
+    <div class="fc-session-bar">
+      <span class="fc-progress" id="fcProgress">1 / 12 · Box 1/5</span>
+      <button class="fc-exit-btn" id="fcExitBtn" aria-label="Exit study">✕ Exit</button>
+    </div>
+
+    <div class="fc-stage" data-flipped="false" tabindex="0">
+      <div class="fc-card">
+        <div class="fc-face fc-front">
+          <div class="fc-prompt"><!-- card.front --></div>
+        </div>
+        <div class="fc-face fc-back">
+          <div class="fc-answer"><!-- card.back --></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fc-hint-row">
       <button class="fc-hint-toggle">Reveal Hint</button>
       <div class="fc-hint" hidden><!-- card.hint --></div>
     </div>
-    <div class="fc-face fc-back">
-      <div class="fc-answer"><!-- card.back --></div>
+
+    <div class="fc-actions">
+      <button class="fc-grade fc-hard" data-grade="hard">🔴 Hard</button>
+      <button class="fc-grade fc-okay" data-grade="okay">🟡 Okay</button>
+      <button class="fc-grade fc-easy" data-grade="easy">🟢 Easy</button>
     </div>
   </div>
 </div>
-<div class="fc-actions" hidden>
-  <button class="fc-grade fc-hard">🔴 Hard</button>
-  <button class="fc-grade fc-okay">🟡 Okay</button>
-  <button class="fc-grade fc-easy">🟢 Easy</button>
-</div>
-<div class="fc-progress">3 / 12 · Box avg 1.8</div>
 ```
 
-**3D flip CSS:**
+**Key layout decision.** `.fc-session` is the central anchor — a flex column with `width: min(640px, 92vw)` matching the card's width. The session bar (progress + exit) sits as a sibling at the top, the card stage in the middle, hint and grade buttons below. Because the bar shares the session's max-width, the progress always aligns with the card's left edge and Exit always aligns with the card's right edge. Resizing the viewport moves all four anchors as one rigid block.
+
+**Anchored controls CSS:**
 ```css
-.fc-stage { perspective: 1600px; }
+.fc-session {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  width: min(640px, 92vw);
+  max-width: 100%;
+  outline: none;          /* tabindex=-1, focus shouldn't show ring */
+}
+.fc-session-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--c-muted);
+  padding: 0 4px;          /* tiny inset so progress doesn't crowd corner */
+}
+.fc-progress {
+  font-weight: 600;
+  color: var(--c-text-strong);
+}
+.fc-exit-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--c-border);
+  color: var(--c-text);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.fc-exit-btn:hover { background: var(--c-accent-soft); color: var(--c-accent); }
+```
+Note the v1 spec used `position: absolute; top: 18px; left: 24px` style positioning that floated these controls to the viewport's edges. The v2 design eliminates absolute positioning entirely — flow layout inside `.fc-session` does the anchoring naturally.
+
+**3D flip CSS** (unchanged from v1):
+```css
+.fc-stage { perspective: 1600px; width: 100%; height: min(420px, 60vh); }
 .fc-card {
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
-  width: min(640px, 90vw);
-  height: min(420px, 60vh);
 }
 .fc-stage[data-flipped="true"] .fc-card { transform: rotateY(180deg); }
-.fc-face {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  /* ... glass card styles ... */
-}
+.fc-face { position: absolute; inset: 0; backface-visibility: hidden; }
 .fc-back { transform: rotateY(180deg); }
 ```
 
-**State machine** (controlled by `flashcards.js`):
+**Flip input rules (v2 — strictly two inputs):**
+
+| Input                                | Triggers flip? | Notes                                                |
+|--------------------------------------|----------------|------------------------------------------------------|
+| Left-click on `.fc-stage`            | Yes            | `mousedown.button === 0` filter; ignore others       |
+| Enter while `.fc-stage` has focus    | Yes            | Stage has `tabindex="0"` so it can hold focus        |
+| Spacebar                             | NO             | Reserved (was a flip key in v1)                      |
+| Tab / Shift-Tab                      | NO             | Pure focus movement                                  |
+| Arrow keys                           | NO             | Reserved for future "skip" gestures                  |
+| Right-click / middle-click           | NO             | Filtered by button check                             |
+| Double-click                         | NO             | Browser's `dblclick` is a no-op for the stage        |
+| Hover                                | NO             | No `:hover` flip — would be too sensitive            |
+| Touch tap (≤ 8 px movement)          | Yes            | Treated as a left-click via pointer events           |
+| Horizontal swipe ≥ 60 px             | NO (flips)     | Triggers grade only when card is currently on back   |
+
+**Why so restrictive?** v1 testing surfaced two failure modes:
+- Users trying to scroll the page tapped the card by accident and it flipped.
+- Pressing Space to scroll the page (default browser behaviour) flipped the card unexpectedly because the stage held focus.
+
+The v2 input model deliberately mirrors a desktop "open / activate" convention (click or Enter) and aligns with WCAG button-activation conventions; everything else is treated as navigation, not interaction.
+
+**Click handler implementation:**
+```js
+stage.addEventListener('click', (e) => {
+  if (e.button !== 0) return;          // left-click only
+  if (e.detail > 1) return;            // ignore double-click second event
+  flipCard();
+});
+stage.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    flipCard();
+  }
+  // No Space handler — let the browser scroll if it wants to
+});
 ```
-queued → showing(front) → [click/Space/tap] → showing(back, actions visible)
-   ↑                                                │
-   │                                       [Hard/Okay/Easy/1/2/3/swipe]
-   │                                                │
-   └────────────── applyGrade → next card ──────────┘
+
+**flipCard() bidirectional toggle:**
+```js
+function flipCard() {
+  if (!ui.overlayOpen) return;
+  ui.flipped = !ui.flipped;
+  document.getElementById('fcStage').dataset.flipped = String(ui.flipped);
+  // Hint row visibility tracks the front/back state
+  document.getElementById('fcHintRow').hidden = ui.flipped;
+}
+```
+There is no one-way gate — the card can flip back to front and forward to back unlimited times during the same study card.
+
+**State machine:**
+```
+queued → showing(front) ─┬─ [click / Enter] ─→ showing(back) ─┬─ [click / Enter] ─→ showing(front) → ...
+                         │                                      │
+                         ├──── grade button / 1/2/3 ────────────┤   (always-on, see Part 6)
+                         │                                      │
+                         └─→ next card                          └─→ next card
 ```
 
-When the queue empties, the overlay swaps to a "Session complete" panel showing: cards reviewed, breakdown by grade, suggested next session date (= earliest `nextReviewDate` across deck).
+When the queue empties, the overlay swaps to a "Session complete" panel showing: cards reviewed, breakdown by grade, suggested next session date (= earliest `nextReviewDate` across deck). The session-bar (progress + exit) remains anchored above the summary panel.
 
-### Part 6 — Keyboard & Touch
+### Part 6 — Always-On Grading & Touch Gestures
 
-**Keyboard handler** (only active while overlay is open):
+**v2 inversion.** Grading is now decoupled from flip state. The three grade buttons (and keyboard shortcuts 1/2/3) are visible AND enabled at all times during a study session, independent of whether the current card is showing front or back. Pressing any grade input applies the grade to the current card and advances — no flip required, no flip implied.
+
+**Grade handler (v2):**
+```js
+function grade(g) {
+  if (!ui.overlayOpen) return;
+  if (!['hard','okay','easy'].includes(g)) return;
+  const card = ui.queue[ui.idx];
+  if (!card) return;
+  const store = Store.load();
+  const deck = store.decks.find(d => d.id === ui.deckId);
+  if (!deck) { exitStudy(); return; }
+  const liveCard = deck.cards.find(c => c.id === card.id);
+  if (!liveCard) { ui.idx++; showCurrentCard(); return; }
+  applyGrade(liveCard, g);            // identical Leitner semantics whether flipped or not
+  if (!card.lastReviewedAt) deck.newServedToday = (deck.newServedToday || 0) + 1;
+  deck.updatedAt = Date.now();
+  Store.save(store);
+  ui.breakdown[g]++;
+  ui.idx++;
+  showCurrentCard();
+}
+```
+Note the absence of any `if (!ui.flipped) return;` guard. The v1 design's "grading gate" is gone.
+
+**Keyboard handler (v2):**
 ```js
 function onKey(e) {
   if (!ui.overlayOpen) return;
-  if (e.key === ' ' || e.key === 'Enter') {
-    e.preventDefault();
-    if (!ui.flipped) ui.flip();
-    return;
-  }
-  if (!ui.flipped) return;        // grading only allowed after flip
-  if (e.key === '1') ui.grade('hard');
-  else if (e.key === '2') ui.grade('okay');
-  else if (e.key === '3') ui.grade('easy');
-  else if (e.key === 'Escape') ui.exitStudy();
+  if (e.key === 'Escape') { e.preventDefault(); exitStudy(); return; }
+  // Note: Space is intentionally NOT handled — see flip rules table above.
+  if (e.key === '1') { e.preventDefault(); grade('hard'); }
+  else if (e.key === '2') { e.preventDefault(); grade('okay'); }
+  else if (e.key === '3') { e.preventDefault(); grade('easy'); }
 }
-document.addEventListener('keydown', onKey);
 ```
 
-**Swipe gestures** use raw `pointerdown`/`pointermove`/`pointerup` on `.fc-stage` (no library):
-- Threshold: 60 px horizontal AND velocity > 0.3 px/ms
-- Left swipe → `grade('hard')`; right swipe → `grade('easy')`
-- Below threshold → animate card snap-back, no grade applied
-- Disabled until the card is flipped (consistent with keyboard rule)
+**Touch swipe (v2 — gating preserved for swipe-only).** Touch taps still flip (because tap-on-card is the natural mobile equivalent of click), so swipe-grade remains gated to "card already on back" to avoid ambiguity:
+- Tap (small movement) on front → flip to back
+- Tap on back → flip to front
+- Swipe left ≥ 60 px while on **back** → grade Hard
+- Swipe right ≥ 60 px while on **back** → grade Easy
+- Swipe while on **front** → ignored (user might be trying to flip-and-grade in one gesture; we require the explicit flip first to disambiguate)
+
+This is the only place where a flip-state check influences behaviour, and it's a touch ergonomics rule, not a Leitner rule. Button clicks and 1/2/3 keys remain unconditional.
 
 ### Part 7 — Leitner Engine
 
@@ -420,6 +539,114 @@ type Card = {
 **Quota guards:** total store size capped at ~3 MB. On write, if `JSON.stringify(store).length > 3_000_000`, oldest 10% of cards in the largest deck are dropped (with a toast). This matches the same pattern used by `global-chat.js` for chat history.
 
 **Schema versioning:** `version: 1`. On load, if missing or different, the store is migrated by a switch on `version` (today: just initialize fresh).
+
+### Part 8b — Preview State (Ephemeral, In-Memory Only)
+
+The Preview screen does **not** persist to `localStorage`. Generated cards live only on a transient page-scoped JS variable, and are committed to the store only when the user clicks "Confirm & Start Studying":
+
+```js
+// inside flashcards.js
+let pendingPreview = null;   // { subject, bab, topic, cards } or null
+
+function showPreview({ subject, bab, topic, cards }) {
+  pendingPreview = { subject, bab, topic, cards };
+  // ... render the accordion list ...
+}
+
+function confirmPreview() {
+  if (!pendingPreview) return;
+  const { subject, bab, topic, cards } = pendingPreview;
+  const deck = makeDeck({ subject, bab, topic });
+  const id = persistNewDeck(deck, cards);     // single localStorage write
+  pendingPreview = null;
+  // ... clear form, render library, start study ...
+}
+
+function discardPreview() {
+  pendingPreview = null;                       // truly nothing to clean up
+  // ... show form again with original values intact ...
+}
+```
+
+Discarding the preview is just a variable assignment — no storage write, no `setItem` to undo. This satisfies Requirement 9.5 (navigating away during preview = nothing committed) for free, since closing the page or browsing away naturally discards `pendingPreview`.
+
+### Part 10 — Preview Accordion (Collapsed-by-Default Card Rows)
+
+Each card row in the preview list is rendered as an HTML `<details>` element so the open/close behaviour is native, accessible, and animation-friendly without state-management code:
+
+```html
+<div class="preview-list">
+  <div class="preview-summary-row">
+    <span class="preview-count">Preview: 12 cards for "Bab 3: Keturunan"</span>
+    <button class="preview-bulk-toggle" id="previewBulkToggle">Expand All</button>
+  </div>
+
+  <details class="preview-card" data-idx="0">
+    <summary class="preview-card-summary">
+      <span class="preview-num">1</span>
+      <span class="preview-q-text">What is centripetal acceleration?</span>
+      <span class="preview-chevron">▼</span>
+    </summary>
+    <div class="preview-card-body">
+      <div class="preview-back"><strong>A:</strong> The inward acceleration of an object moving in a circular path, given by **a = v²/r**.</div>
+      <div class="preview-hint">💡 Think v squared over r.</div>
+    </div>
+  </details>
+  <!-- repeated for each card -->
+</div>
+```
+
+**Default state.** The `<details>` element starts without an `open` attribute, so only the `<summary>` (number + question + chevron) is visible. The `.preview-card-body` is hidden by the browser's built-in details/summary styling.
+
+**Click target.** The entire `<summary>` is clickable. Clicking it (or pressing Enter/Space when focused) toggles `open` natively. No JavaScript click handler is needed for the accordion mechanic itself — only for the chevron icon's rotation, which uses a `[open]` selector:
+
+```css
+.preview-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+  color: var(--c-muted);
+}
+details[open] > summary .preview-chevron {
+  transform: rotate(180deg);
+}
+.preview-card-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;            /* hide default disclosure triangle */
+}
+.preview-card-summary::-webkit-details-marker { display: none; }
+```
+
+**Bulk Expand / Collapse All.** A single button in the preview header iterates every `<details>` and toggles `open`:
+
+```js
+function applyBulkPreviewToggle() {
+  const list = document.querySelectorAll('.preview-card');
+  // Are most rows currently open?
+  const openCount = [...list].filter(d => d.open).length;
+  const targetState = openCount < list.length / 2;     // open all if most are closed
+  list.forEach(d => { d.open = targetState; });
+  document.getElementById('previewBulkToggle').textContent =
+    targetState ? 'Collapse All' : 'Expand All';
+}
+```
+The button label flips based on the current dominant state of the list, so the action is always meaningful regardless of how the user has manually expanded individual rows.
+
+**Why `<details>` over a custom div?** Three wins:
+- Built-in keyboard support (Enter/Space when focused) without any JS.
+- Built-in screen-reader semantics (announced as a disclosure widget).
+- Independent open state per row out of the box — exactly the "all rows can be open simultaneously" model Requirement 10.5 mandates.
+
+### Part 11 — Anchored Session Controls (Implementation)
+
+Detailed in Part 5's "Anchored controls CSS" block. The key invariant is that the `.fc-session` element is the single layout root for every control in the active study session — progress bar, exit button, card stage, hint row, and grade buttons are all flex children of the same element. There is **no** absolute positioning relative to the viewport in the v2 design.
+
+**Resize correctness.** Because `.fc-session` has `width: min(640px, 92vw)`, the entire control cluster scales with the viewport in lock-step. The exit button on a 1920 px monitor and on a 360 px phone both sit exactly at the right edge of the card; the progress label both sit exactly at the left.
+
+**Session-complete swap.** When the queue empties, `.fc-stage` is hidden and `.fc-summary` is shown in its place — but `.fc-session-bar` (progress + exit) stays mounted at the top. Progress reads "12 / 12 done" and the Exit button continues to work.
 
 ### Part 9 — Backend (`flashcard_generator` Lambda)
 
@@ -553,15 +780,15 @@ A card appears in `buildDueQueue(deck)` if and only if `card.nextReviewDate <= D
 
 The number of cards with `lastReviewedAt === null` returned by `buildDueQueue(deck)` in a single local-day session is at most `deck.dailyNewCap`.
 
-### Property 6: Study UI grading gate
-**Validates: Requirements 5.3, 6.1**
+### Property 6: Bidirectional flip toggle
+**Validates: Requirements 5.3, 5.4**
 
-Grade buttons (and keyboard shortcuts 1/2/3, and swipe gestures) are no-ops until the current card has been flipped (`stage[data-flipped="true"]`). The first user input always either flips the card or is ignored — never grades.
+The card responds only to two flip inputs: a left-click on `.fc-stage` (button === 0) and Enter while `.fc-stage` has keyboard focus. Each invocation toggles `ui.flipped` (front ↔ back), so an unbounded sequence of valid inputs produces an alternating front/back sequence. Spacebar, double-click, right/middle clicks, hover, and Tab key changes never trigger a flip.
 
-### Property 7: Single source of truth for grading
-**Validates: Requirements 7.2, 7.3**
+### Property 7: Always-on grading
+**Validates: Requirements 6.1, 6.2, 6.3**
 
-All three grading inputs (button click, keyboard shortcut, swipe) call exactly the same `ui.grade(grade)` function. There is no duplicated grading logic.
+The three grade buttons (and keyboard 1/2/3) are visible and enabled for every card during a study session, regardless of `ui.flipped`. Invoking a grade applies it via `applyGrade()` and advances `ui.idx`, with no flip-state guard. The persisted Leitner box update is identical whether the card was flipped before grading or not.
 
 ### Property 8: Storage atomicity
 **Validates: Requirements 7.6**
@@ -578,30 +805,58 @@ Every write to `localStorage` serializes the entire `Store` object in a single `
 
 The `flashcard_generator` Lambda has no DynamoDB / S3 / RDS dependency. Its only AWS call is `bedrock:InvokeModel`. Decks and progress are server-invisible.
 
-### Property 11: Locked tile vs live tile
-**Validates: Requirements 1.2**
+### Property 11: Locked tile, live tile, no Beta badge
+**Validates: Requirements 1.2, 1.3**
 
-The dashboard 5th tile is rendered with `.tile-locked` and a "Coming Soon" badge if and only if `STREAM_URLS.flashcard_generator` is missing or starts with `__URL_`. After a successful deploy that replaces the placeholder, a hard reload yields a clickable Smart Flashcards tile with a "Beta" badge.
+The dashboard 5th tile is rendered with `.tile-locked` and a "Coming Soon" badge if and only if `STREAM_URLS.flashcard_generator` is missing or starts with `__URL_`. After a successful deploy that replaces the placeholder, a hard reload yields a clickable Smart Flashcards tile with NO badge — the `flashBadge` element is removed from the DOM (not just hidden) when the tile is live.
 
 ### Property 12: Keyboard scope
 **Validates: Requirements 6.1**
 
 The flashcards keyboard handler is only active when the study overlay is mounted. Closing the overlay (Escape, exit button, or session-complete) removes the listener. Other pages' keyboard shortcuts (`Ctrl+Enter` from `common.js`, etc.) continue to work unaffected.
 
+### Property 13: Preview never persists
+**Validates: Requirements 9.1, 9.3, 9.5**
+
+A deck is committed to `localStorage` if and only if the user clicks "Confirm & Start Studying" on the Preview screen. Generated cards held in `pendingPreview` are never written to storage, never visible in the deck library, and never participate in `buildDueQueue`. Closing the page, navigating away, or clicking "Back to Setup" discards them with no cleanup logic required.
+
+### Property 14: Accordion independence
+**Validates: Requirements 10.1, 10.5**
+
+Each preview card row's open/closed state is independent: opening or closing one row does not change any other row's state. The bulk Expand-All / Collapse-All toggle is the only operation that affects multiple rows, and it sets every row to the same target state in one operation.
+
+### Property 15: Anchored controls move with the card
+**Validates: Requirements 11.1, 11.2, 11.3**
+
+The progress indicator and Exit button are flex children of `.fc-session` (the same container that holds `.fc-stage`). They have zero `position: absolute / fixed` declarations relative to the viewport. At every viewport width and at every responsive breakpoint, the progress label aligns to the card's left edge and the Exit button aligns to the card's right edge — they cannot drift to the screen corners under any layout.
+
+### Property 16: Cross-module hooks honour preview
+**Validates: Requirements 2.1, 2.2, 9.1**
+
+When a user invokes "Turn this Chapter into Flashcards" or "Save incorrect answers to Flashcards", no deck is added to `localStorage` until they pass through the Preview screen on `flashcards.html` and click Confirm. The seed mechanism (`vsl.flashcardsPreviewSeed`) holds generated cards in `sessionStorage` for at most 5 minutes and is consumed exactly once on first read.
+
 ## Testing Strategy
 
-Manual smoke-tests, mirroring the project's existing approach:
+Manual smoke-tests for the v2 revision:
 
 1. **Header** — every page now shows a "Flashcards" link between Quiz Generator and Lab Tools; clicking lands on `flashcards.html`. Active state highlights only on `flashcards.html`.
-2. **Dashboard tile** — pre-deploy: shows "Coming Soon" badge, click → toast. Post-deploy: shows "Beta" badge, click → flashcards page.
-3. **New deck (manual)** — fill subject + bab + topic + paste source notes + select 12 cards → click Generate → spinner → 12 cards appear in the deck library with correct subject icon and bab label.
-4. **New deck — Bab empty** — submit with empty bab → toast "Chapter Name / Bab is required", no network call.
-5. **Cross-module: Chapter** — open Chapter Assistant, generate overview for "Circular Motion" → click "Turn this Chapter into Flashcards" → lands on `flashcards.html?deck=…&autostudy=1`, study mode opens immediately with new deck.
-6. **Cross-module: Quiz** — complete a quiz with at least one wrong answer → click "Save incorrect answers to Flashcards" → new deck appears named after the quiz topic with one card per wrong answer.
-7. **Study flip** — click card → flips with rotateY(180deg). Press Space again → no double-flip. Press 1/2/3 → grades and advances. Escape → exits cleanly.
-8. **Leitner progression** — grade a card Easy three times → box: 1→2→3 with nextReviewDates 1d/3d/7d ahead. Grade Hard once → box drops to 1 with nextReviewDate 1d ahead.
-9. **Due counter** — manually edit `vsl.flashcards` in DevTools to set a card's `nextReviewDate` to 0 → reload library → "Due today" counter increments.
-10. **Daily cap** — generate a 50-card deck, set `dailyNewCap = 5`, study → only 5 new cards appear interleaved among due reviews.
-11. **Mobile swipe** — on a phone (or Chrome devtools touch mode), tap to flip, swipe left → marked Hard, swipe right → marked Easy. Below-threshold swipe → snap back.
-12. **Backend down** — block the Function URL in DevTools → click Generate → toast surfaces error, no deck created, library remains intact.
-13. **localStorage full** — manually fill `localStorage` to ~5 MB → generate one more deck → toast "Older cards trimmed", store size stays under cap.
+2. **Dashboard tile** — pre-deploy: shows "Coming Soon" badge, click → toast. Post-deploy: NO badge, click → flashcards page. Confirm the badge node is genuinely removed from the DOM (Inspect Element shows no `#flashBadge`).
+3. **New deck (manual)** — fill subject + bab + topic + paste source notes + select 12 cards → click Generate → spinner → **Preview screen appears** with 12 collapsed accordion rows. Click each chevron → row expands/collapses independently. Click "Expand All" → all 12 open. Click "Collapse All" → all 12 close.
+4. **Preview discard** — click "Back to Setup" → form re-shown with all entered values intact, deck library is unchanged.
+5. **Preview confirm** — click "Confirm & Start Studying" → deck appears in library, study overlay opens immediately.
+6. **New deck — Bab empty** — submit with empty bab → toast "Chapter Name / Bab is required", no network call, no preview.
+7. **Cross-module: Chapter** — open Chapter Assistant, generate overview for "Circular Motion" → click "Turn this Chapter into Flashcards" → lands on `flashcards.html?previewSeed=…`, Preview screen pops up. Click "Back to Setup" → form is shown empty, NO deck saved (verify deck library is unchanged).
+8. **Cross-module: Quiz** — complete a quiz with wrong answers → "Save incorrect answers to Flashcards" → Preview screen appears with one card per wrong answer.
+9. **Flip — left-click** — click center of card → flip front→back. Click again → back→front. Click again → front→back. (Unbounded toggle.)
+10. **Flip — Enter** — Tab into the page until `.fc-stage` is focused → press Enter → flips. Press Enter again → flips back.
+11. **Flip — non-triggers** — press Space → no flip (page may scroll). Right-click → no flip (context menu may show). Double-click → no flip on the second click. Hover → no flip.
+12. **Always-on grading — pre-flip** — without flipping, click 🟢 Easy → card advances, Leitner box increments to 2. Repeat across cards mixing pre-flip and post-flip grades; both produce identical box updates.
+13. **Always-on grading — keyboard pre-flip** — without flipping, press 1 → grades Hard and advances.
+14. **Anchored controls** — open the study overlay on a 1920 px monitor: progress sits just above the card's left edge, Exit just above the card's right edge. Resize to 800 px wide: both controls stay glued to the card edges.
+15. **Anchored controls — session complete** — finish a session → progress reads "12 / 12 done", Exit still works, both still anchored to the summary panel.
+16. **Leitner progression** — grade a card Easy three times → box: 1→2→3 with nextReviewDates 1d/3d/7d ahead. Grade Hard once → box drops to 1 with nextReviewDate 1d ahead.
+17. **Mobile swipe** — on a phone (or Chrome devtools touch mode), tap card on front → flips to back. Swipe left on back → marked Hard. Swipe on front → no grade (must flip first on touch).
+18. **Due counter** — manually edit `vsl.flashcards` in DevTools to set a card's `nextReviewDate` to 0 → reload library → "Due today" counter increments.
+19. **Daily cap** — generate a 50-card deck, set `dailyNewCap = 5`, study → only 5 new cards appear interleaved among due reviews.
+20. **Backend down** — block the Function URL in DevTools → click Generate → toast surfaces error, no preview shown, library remains intact.
+21. **localStorage full** — manually fill `localStorage` to ~5 MB → generate one more deck → toast "Older cards trimmed", store size stays under cap.

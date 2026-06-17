@@ -181,6 +181,22 @@ DOMContentLoaded
 ```
 Mobile collapses to two then one column instead of horizontal scroll, which keeps the dashboard usable without introducing a new carousel widget.
 
+**Tile dimensions and scaling (v2 polish).** The original dimensions felt cramped on widescreen monitors; a follow-up revision enlarges them and scales internal typography proportionally so the dashboard fills the central viewport area:
+
+| Selector              | v1 value          | v2 value          | Reason                              |
+|-----------------------|-------------------|-------------------|-------------------------------------|
+| `.tile` `min-height`  | 220 px            | 300 px            | Larger click target, taller portrait card feel |
+| `.tile` `padding`     | 36px 28px         | 48px 32px         | Restores breathing room around scaled-up content |
+| `.tile-icon` `width/height` | 56 px       | 72 px             | Matches the new card scale         |
+| `.tile-icon` `font-size`    | 1.8 rem    | 2.2 rem           | Scaled with card                    |
+| `.tile h3` `font-size`     | 1.1 rem     | 1.25 rem          | Scaled with card                    |
+| `.page` `max-width`        | 1100 px     | 1400 px           | Lets the row of 5 cards stretch wider on big monitors |
+| `.page` `padding`          | 36px 22px 60px | 36px 40px 60px | Symmetric inset on the wider container |
+
+Equal spacing between cards is preserved by keeping `gap: 18px` constant and letting the grid distribute the extra width evenly. On a 1400 px viewport this lands around 230 px per card — a comfortable size that's much more "feature card" and less "icon button". Below 1100 px the grid collapses to 2 columns where the bigger dimensions still feel intentional rather than oversized.
+
+The icon and title remain centered both vertically and horizontally inside the now-larger card via the existing `display: flex; flex-direction: column; align-items: center; justify-content: center;` rules — no new alignment work is needed; those rules just have more room to breathe.
+
 **5th card — "Coming Soon".**
 ```html
 <a class="tile tile-locked" href="#"

@@ -27,6 +27,7 @@
     Biology:   { baseHue: 110, rangeHue: 50 },   // green ↔ teal
     Chemistry: { baseHue: 260, rangeHue: 60 },   // violet ↔ magenta
     Physics:   { baseHue: 200, rangeHue: 50 },   // sky ↔ deep blue
+    Science:   { baseHue: 30,  rangeHue: 60 },   // warm amber ↔ orange (blended)
   };
 
   /* ── 3D simplex noise (Stefan Gustavson reference, condensed) ───── */

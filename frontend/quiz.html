@@ -40,7 +40,7 @@
         <option value="Biology">Biology</option>
         <option value="Chemistry">Chemistry</option>
         <option value="Physics">Physics</option>
-        <option value="Science">Science (General)</option>
+      <option value="Science">General Science</option>
       </select>
 
       <label for="topic">Chapter / Topic</label>
@@ -83,7 +83,11 @@
       <p style="color:var(--c-muted);font-size:0.88rem;margin-bottom:12px">
         Edit the knowledge points below. Add or remove lines freely, then confirm to generate your quiz.
       </p>
-      <textarea id="outlineText" class="input" rows="12" placeholder="Loading outline…"></textarea>
+      <div class="outline-header" id="outline-header">
+        <span class="outline-icon">📌</span>
+        <span class="outline-title" id="outline-title">Quiz Outline</span>
+      </div>
+      <textarea id="outlineText" class="input outline-text" rows="12" placeholder="Loading outline…"></textarea>
 
       <div class="btn-row" style="margin-top:14px">
         <button id="generateBtn" class="btn btn-primary"></button>
@@ -250,13 +254,19 @@
           if (done) break;
           full += dec.decode(value, { stream: true });
         }
-        document.getElementById('outlineText').value = full;
-        // Style the header line if present
+        // Strip the markdown title (## Quiz Outline — TOPIC) into the
+        // styled banner; keep the body editable in the textarea.
         const lines = full.split('\n');
-        if (lines[0] && lines[0].startsWith('##')) {
-          const styled = '📋 ' + lines[0].replace(/^#+\s*/, '') + '\n' + '─'.repeat(50) + '\n' + lines.slice(1).join('\n');
-          document.getElementById('outlineText').value = styled;
+        let title = `Quiz Outline — ${topic}`;
+        const titleIdx = lines.findIndex(l => /^##\s+/.test(l));
+        if (titleIdx >= 0) {
+          title = lines[titleIdx].replace(/^##\s+/, '').trim();
+          lines.splice(titleIdx, 1);
+          // Drop any leading blank lines after removing title
+          while (lines.length && !lines[0].trim()) lines.shift();
         }
+        document.getElementById('outline-title').textContent = title;
+        document.getElementById('outlineText').value = lines.join('\n');
         showPhase('phase-outline');
         showToast('Outline ready — review and edit, then generate', 'success');
       } catch (err) {

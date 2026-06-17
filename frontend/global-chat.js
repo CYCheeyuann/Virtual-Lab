@@ -328,32 +328,33 @@
   /* ── Init ─────────────────────────────────────────────────── */
   function init() {
     buildDom();
-    // Show a speech-bubble hint flying out of the FAB after 3s (only
-    // when the panel is closed and user hasn't interacted yet).
+
+    // Context-aware greeting based on current page
+    const PAGE_GREETINGS = {
+      'index.html':       '👋 Welcome to the Dashboard! Pick a tool to start.',
+      'welcome.html':     '🔬 Welcome! I\'m your Lab Assistant — open the Dashboard to begin.',
+      'chapter.html':     '📖 Need help with chapters? Click any card or ask me anything.',
+      'experiment.html':  '🧪 Setting up an experiment? I can help with safety and procedures.',
+      'quiz.html':        '📝 Ready to test your knowledge? I\'m here if you need a hint.',
+      'lab-tools.html':   '🧰 Exploring Lab Tools? Ask me about safety, images, or what-if scenarios.',
+      'tutor.html':       '🤖 Welcome to Science Tutor! Ask me anything.',
+    };
+    const path = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    const greeting = PAGE_GREETINGS[path] || '👋 Need help? Ask me anything!';
+
     setTimeout(() => {
       if (isOpen) return;
       const hint = document.createElement('div');
       hint.className = 'gc-bubble-hint';
-      const PAGE_GREETINGS = {
-        'chapter': '📖 Welcome to Chapter Assistant! Need help exploring a topic?',
-        'experiment': '🧪 Ready to set up an experiment? I can help with safety tips!',
-        'quiz': '📝 Quiz time! I\'ll be here after you finish if you need explanations.',
-        'lab-tools': '🧰 Lab Tools ready! Try the image generator or safety checker.',
-        'index': '👋 Welcome back! Pick a tool to get started.',
-      };
-      const page = location.pathname.split('/').pop().replace('.html','') || 'index';
-      const greeting = PAGE_GREETINGS[page] || '👋 Need help? Ask me anything!';
       hint.textContent = greeting;
       hint.id = 'gc-bubble-hint';
       document.body.appendChild(hint);
-      // Trigger show animation after DOM insertion
       requestAnimationFrame(() => hint.classList.add('show'));
-      // Auto-hide after 5s or on first fab click
       const hide = () => { hint.classList.remove('show'); setTimeout(() => hint.remove(), 400); };
-      setTimeout(hide, 5000);
+      setTimeout(hide, 6000);
       const fab = document.getElementById('gc-fab');
       if (fab) fab.addEventListener('click', hide, { once: true });
-    }, 3000);
+    }, 1200);
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

@@ -59,7 +59,7 @@ function escapeHtml(s) {
  *  SUBJECT THEME
  * ============================================================ */
 function setSubjectTheme(subject) {
-  if (!['Biology', 'Chemistry', 'Physics'].includes(subject)) subject = 'Biology';
+  if (!['Biology', 'Chemistry', 'Physics', 'Science'].includes(subject)) subject = 'Biology';
   document.documentElement.setAttribute('data-subject', subject);
   try { localStorage.setItem('selectedSubject', subject); } catch (e) {}
   updateFloatingIcons(subject);
@@ -74,6 +74,7 @@ const SUBJECT_ICONS = {
   Biology:   ['🧬', '🌿', '🍃', '🦠', '🧪', '🌱'],
   Chemistry: ['⚗️', '🧪', '🔬', '🧫', '⚛️', '💊'],
   Physics:   ['🔭', '⚛️', '🌌', '🪐', '🛰️', '⚡'],
+  Science:   ['🔬', '⚗️', '🧬', '🌍', '⚛️', '🧪'],
 };
 
 function updateFloatingIcons(subject) {

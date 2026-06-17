@@ -28,6 +28,14 @@
   --c-accent-glow:   rgba(96, 165, 250, 0.55);
 }
 
+[data-subject="Science"] {
+  --c-accent:        #fbbf24;
+  --c-accent-2:      #fcd34d;
+  --c-accent-rgb:    251, 191, 36;
+  --c-accent-soft:   rgba(251, 191, 36, 0.10);
+  --c-accent-glow:   rgba(251, 191, 36, 0.55);
+}
+
 /* Universal dark surfaces. */
 :root {
   --c-bg-page:        #14101e;
@@ -121,31 +129,37 @@ a:hover { color: var(--c-accent-2); }
   position: sticky;
   top: 0;
   z-index: 100;
-  min-height: 64px;
 }
 .nav-inner {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 16px 24px;
+  padding: 20px 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 .brand {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   color: var(--c-text-strong);
   letter-spacing: 0.02em;
-  cursor: pointer;
   text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s, transform 0.2s;
 }
-.brand:hover { color: var(--c-accent); text-decoration: none; }
+.brand:hover {
+  color: var(--c-accent);
+  text-decoration: none;
+  transform: scale(1.03);
+}
 .nav-links {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
   align-items: center;
+  margin-left: auto;
 }
 .nav-link {
   padding: 8px 14px;
@@ -782,11 +796,9 @@ select option:hover {
 /* ─── Landing-page tile grid (FeatureCard pattern) ──────────────────── */
 .tile-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
-  overflow-x: auto;
 }
-@media (max-width: 900px) { .tile-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
 .tile {
   background: var(--c-bg-glass);
   backdrop-filter: blur(12px);
@@ -1407,26 +1419,104 @@ select option:hover {
   .chapter-modal { padding: 22px 18px; border-radius: 16px; }
 }
 
-/* ─── Coming Soon tile ───────────────────────────────────────────────── */
-.tile-coming-soon {
-  opacity: 0.5;
-  border-style: dashed;
-  cursor: default;
-  pointer-events: none;
+/* ─── Homepage 5-card horizontal row ──────────────────────────────────── */
+.tile-grid-row {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
 }
-.tile-coming-soon:hover { transform: none; box-shadow: 0 4px 20px var(--c-shadow); }
+@media (max-width: 1100px) {
+  .tile-grid-row { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+  .tile-grid-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 460px) {
+  .tile-grid-row { grid-template-columns: 1fr; }
+}
 
-/* Quiz outline textarea — rich header styling */
-#outlineText {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.88rem;
-  line-height: 1.7;
-  padding: 18px;
-  border: 2px solid var(--c-border);
-  border-radius: 14px;
-  background: rgba(255,255,255,0.03);
+/* Coming-soon / locked tile */
+.tile-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
 }
-#outlineText:focus {
-  border-color: var(--c-accent);
-  box-shadow: 0 0 0 4px var(--c-accent-soft);
+.tile-locked:hover {
+  opacity: 0.7;
+  transform: none;
+  border-color: var(--c-border);
+  background: var(--c-bg-glass);
+  box-shadow: 0 4px 20px var(--c-shadow);
+}
+.tile-locked:hover .tile-icon { transform: none; filter: none; color: var(--c-muted); }
+.tile-locked .tile-icon { background: rgba(255,255,255,0.05); color: var(--c-muted); }
+
+/* Typewriter caret on tile description */
+.tile p.typing::after {
+  content: '▍';
+  color: var(--c-accent);
+  animation: typeCursor 0.7s steps(1) infinite;
+  margin-left: 1px;
+}
+@keyframes typeCursor {
+  50% { opacity: 0; }
+}
+
+/* ─── Welcome page hero ──────────────────────────────────────────────── */
+.welcome-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 90px);
+  text-align: center;
+}
+.welcome-content {
+  max-width: 720px;
+  padding: 40px 28px;
+}
+.welcome-icon {
+  font-size: 4.5rem;
+  margin-bottom: 18px;
+  animation: floatY 3s ease-in-out infinite;
+}
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+.welcome-content h1 {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--c-text-strong);
+  margin-bottom: 14px;
+  letter-spacing: 0.01em;
+}
+.welcome-tagline {
+  font-size: 1.05rem;
+  color: var(--c-muted);
+  margin-bottom: 30px;
+  line-height: 1.7;
+}
+.welcome-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 36px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.welcome-feature {
+  background: var(--c-bg-glass);
+  border: 1px solid var(--c-border);
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  color: var(--c-text);
+  text-align: left;
+}
+.welcome-cta {
+  font-size: 1rem;
+  padding: 14px 32px;
+}
+@media (max-width: 600px) {
+  .welcome-content h1 { font-size: 1.7rem; }
 }

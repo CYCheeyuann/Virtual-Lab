@@ -336,6 +336,7 @@
       'chapter.html':     '📖 Need help with chapters? Click any card or ask me anything.',
       'experiment.html':  '🧪 Setting up an experiment? I can help with safety and procedures.',
       'quiz.html':        '📝 Ready to test your knowledge? I\'m here if you need a hint.',
+      'flashcards.html':  '🧠 Cramming smart? Generate a deck or study what\'s due today.',
       'lab-tools.html':   '🧰 Exploring Lab Tools? Ask me about safety, images, or what-if scenarios.',
       'tutor.html':       '🤖 Welcome to Science Tutor! Ask me anything.',
     };

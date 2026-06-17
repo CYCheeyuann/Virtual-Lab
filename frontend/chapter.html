@@ -20,6 +20,7 @@
         <a class="nav-link active" href="chapter.html">Chapter Assistant</a>
         <a class="nav-link" href="experiment.html">Experiment Guide</a>
         <a class="nav-link" href="quiz.html">Quiz Generator</a>
+        <a class="nav-link" href="flashcards.html">Flashcards</a>
         <a class="nav-link" href="lab-tools.html">Lab Tools</a>
       </div>
     </div>
@@ -95,6 +96,7 @@
   <script src="vortex.js"></script>
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
+  <script src="flashcards.js"></script>
   <script>
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Reset</span>`;
@@ -219,7 +221,47 @@
         ${d.subtopics ? `<h3>📋 Subtopics</h3><ul>${d.subtopics.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
         ${d.learningObjectives ? `<h3>🎯 Learning Objectives</h3><ul>${d.learningObjectives.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
         ${d.keyConcepts ? `<h3>🧠 Key Concepts</h3><ul>${d.keyConcepts.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
-        ${d.keyTerms ? `<h3>📖 Key Terms</h3><dl>${d.keyTerms.map(t=>'<dt>'+escapeHtml(t.term)+'</dt><dd>'+escapeHtml(t.definition)+'</dd>').join('')}</dl>` : ''}`;
+        ${d.keyTerms ? `<h3>📖 Key Terms</h3><dl>${d.keyTerms.map(t=>'<dt>'+escapeHtml(t.term)+'</dt><dd>'+escapeHtml(t.definition)+'</dd>').join('')}</dl>` : ''}
+        <div class="btn-row" style="margin-top:18px">
+          <button id="chapterToFlashBtn" class="btn btn-primary">
+            <span>🧠</span><span>Turn this Chapter into Flashcards</span>
+          </button>
+        </div>`;
+
+      const flashBtn = content.querySelector('#chapterToFlashBtn');
+      if (flashBtn) {
+        if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
+          flashBtn.disabled = true;
+          flashBtn.title = 'Flashcards backend not yet deployed';
+        }
+        flashBtn.addEventListener('click', async () => {
+          setButtonLoading(flashBtn, true, 'Generating deck…');
+          try {
+            // Compose plain-text source from the rendered detail
+            const parts = [];
+            parts.push(`Chapter: ${d.title || ch.title}`);
+            if (d.subtopics) parts.push('Subtopics: ' + d.subtopics.join('; '));
+            if (d.learningObjectives) parts.push('Learning Objectives: ' + d.learningObjectives.join('; '));
+            if (d.keyConcepts) parts.push('Key Concepts: ' + d.keyConcepts.join('; '));
+            if (d.keyTerms) parts.push('Key Terms: ' + d.keyTerms.map(t => `${t.term} — ${t.definition}`).join(' | '));
+            const sourceText = parts.join('\n');
+
+            const id = await window.Flashcards.createDeckFromText({
+              subject: document.getElementById('subject').value,
+              chapter: d.title || ch.title,
+              topic: ch.title,
+              source_text: sourceText,
+              num_cards: 12,
+            });
+            showToast('Deck created — opening study mode', 'success');
+            location.href = `flashcards.html?deck=${id}&autostudy=1`;
+          } catch (err) {
+            showToast('Flashcard generation failed: ' + err.message, 'error');
+          } finally {
+            setButtonLoading(flashBtn, false);
+          }
+        });
+      }
     }
 
     document.getElementById('modal-close').addEventListener('click', closeDetail);

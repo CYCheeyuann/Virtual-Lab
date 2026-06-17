@@ -126,6 +126,28 @@ Resources:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
 
+  # ─── Flashcard Generator Lambda ─────────────────────────────────────────────
+  # Stateless AI card generation: from_text / from_quiz / from_topic.
+  # Buffered (non-streaming) — frontend wants the whole deck JSON in one shot.
+  FlashcardGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambdas/flashcard_generator/
+      Handler: run.sh
+      MemorySize: 512
+      Role: !GetAtt AppBedrockRole.Arn
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: buffered
+          PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+
   # ─── Science Tutor Lambda ──────────────────────────────────────────────────
   ScienceTutorFunction:
     Type: AWS::Serverless::Function
@@ -247,6 +269,8 @@ Outputs:
     Value: !GetAtt ScienceQuizFunctionUrl.FunctionUrl
   ScienceTutorUrl:
     Value: !GetAtt ScienceTutorFunctionUrl.FunctionUrl
+  FlashcardGeneratorUrl:
+    Value: !GetAtt FlashcardGeneratorFunctionUrl.FunctionUrl
   SafetyAssistantUrl:
     Value: !GetAtt SafetyAssistantFunctionUrl.FunctionUrl
   WhatHappensIfUrl:

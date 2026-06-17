@@ -30,7 +30,8 @@ jobs:
       - name: Copy shared module into each Lambda for packaging
         run: |
           for fn in chapter_assistant experiment_guide science_quiz science_tutor \
-                    safety_assistant what_happens_if image_generator; do
+                    safety_assistant what_happens_if image_generator \
+                    flashcard_generator; do
             cp lambdas/shared/*.py "lambdas/${fn}/"
           done
 
@@ -104,6 +105,9 @@ jobs:
 
           URL=$(get_output ImageGeneratorUrl)
           sed -i "s|__URL_IMAGE_GENERATOR__|$URL|g" frontend/config.js
+
+          URL=$(get_output FlashcardGeneratorUrl)
+          sed -i "s|__URL_FLASHCARD_GENERATOR__|$URL|g" frontend/config.js
 
           # Inject the API key (or empty string) so the frontend sends X-Api-Key
           # on every fetch. Reading via $API_KEY env var lets Actions log-scrub

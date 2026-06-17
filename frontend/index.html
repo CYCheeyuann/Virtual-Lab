@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="flashcards.css" />
 </head>
 <body>
 
@@ -20,6 +21,7 @@
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
         <a class="nav-link" href="experiment.html">Experiment Guide</a>
         <a class="nav-link" href="quiz.html">Quiz Generator</a>
+        <a class="nav-link" href="flashcards.html">Flashcards</a>
         <a class="nav-link" href="lab-tools.html">Lab Tools</a>
       </div>
     </div>
@@ -66,11 +68,12 @@
         <p></p>
       </a>
 
-      <a class="tile tile-locked" href="#" onclick="event.preventDefault(); showToast('Coming soon!', 'info')" data-desc="More AI-powered learning tools are on the way. Stay tuned for the next release.">
+      <a class="tile" href="flashcards.html" id="flashTile" data-desc="AI-generated spaced repetition decks to lock science concepts into your long-term memory.">
+        <span class="tile-badge tile-badge-coming" id="flashBadge">Coming Soon</span>
         <div class="tile-icon">
-          <svg viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-2-2H6.5L4 3.5A1 1 0 0 0 3 3a1 1 0 0 0-1 1v15a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2z"/><path d="M14 12h-4"/><path d="M12 10v4"/></svg>
         </div>
-        <h3>Coming Soon</h3>
+        <h3>Smart Flashcards</h3>
         <p></p>
       </a>
     </div>
@@ -93,6 +96,30 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       renderProgressDashboard('progressDashboard');
+
+      // Toggle the Smart Flashcards tile based on backend deployment status
+      const tile = document.getElementById('flashTile');
+      const badge = document.getElementById('flashBadge');
+      const live = window.STREAM_URLS && window.STREAM_URLS.flashcard_generator
+                && !window.STREAM_URLS.flashcard_generator.startsWith('__URL_');
+      if (tile && !live) {
+        tile.classList.add('tile-locked');
+        tile.setAttribute('href', '#');
+        tile.addEventListener('click', (e) => {
+          e.preventDefault();
+          showToast('Flashcards backend not yet deployed', 'info');
+        });
+        if (badge) {
+          badge.textContent = 'Coming Soon';
+          badge.classList.add('tile-badge-coming');
+        }
+      } else if (tile && live) {
+        tile.classList.remove('tile-locked');
+        if (badge) {
+          badge.textContent = 'Beta';
+          badge.classList.remove('tile-badge-coming');
+        }
+      }
 
       // Typewriter hover effect on tile descriptions
       document.querySelectorAll('.tile').forEach(tile => {

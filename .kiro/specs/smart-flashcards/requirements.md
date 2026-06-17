@@ -2,136 +2,116 @@
 
 ## Introduction
 
-The Virtual Science Lab needs a spaced-repetition flashcard system so students can lock concepts into long-term memory after they've encountered them in the Chapter Assistant or tested them in the Quiz Generator. The feature lives at every layer of the app: a top-bar nav link, a promoted dashboard tile, a dedicated page for deck management and study, hooks inside Chapter Assistant and Quiz Generator that turn existing AI output into decks with one click, and a backend Lambda that converts free-form text into strict-JSON cards.
+Smart Flashcards adds a spaced-repetition study system to the Virtual Science Lab. The feature is a first-class peer to Chapter Assistant, Experiment Guide, Quiz Generator, and Lab Tools — surfaced in the global header and the dashboard, hosted on its own page, and powered by a new AI-generation Lambda. It earns its place by closing the loop between content and retention: students can convert a chapter overview or their wrong quiz answers into a deck in one click, then review that deck on a Leitner schedule that paces itself automatically.
 
-The system uses a Leitner-style five-box scheduler running entirely in the user's browser via `localStorage` — no accounts, no server-side state. Every deck is mandatorily tagged with a Bab (chapter name) plus subject so the user's library never devolves into one undifferentiated pile.
+Decks and progress live entirely in the user's `localStorage` so the feature works without accounts, sync, or server-side state. The backend is stateless and only does AI card generation.
 
 ## Glossary
 
-- **Deck:** A named collection of flashcards belonging to one Subject + Bab.
-- **Bab:** Malay/local term for "chapter"; the user-supplied label that organizes decks into folders (e.g. "Bab 3: Keturunan", "Circular Motion").
-- **Card:** A single flashcard with a `front` (prompt), `back` (answer), optional `hint`, and Leitner box state.
-- **Box:** One of five Leitner buckets (1–5) controlling how often a card resurfaces.
-- **Due card:** A card whose `nextReviewDate` is at or before the current moment.
-- **Study session:** A run through the due-card queue inside the full-screen study overlay.
-- **Library:** The deck-management view on `flashcards.html` showing all of the user's decks.
-- **Cross-module hook:** A button outside `flashcards.html` (currently in Chapter Assistant and Quiz Generator) that creates a deck from existing context.
-- **Daily new-card cap:** Maximum number of fresh (never-reviewed) cards introduced into a single day's session, regardless of how many were generated at once.
+- **Deck** — a collection of related flashcards, tagged with a Subject and a Bab (chapter).
+- **Card** — a single flashcard with a `front` (prompt), `back` (answer), and optional `hint`.
+- **Bab** — Malay for "chapter"; the user-typed folder/topic label that organizes cards.
+- **Box** — a Leitner box numbered 1 through 5; defines the review interval for cards in that box.
+- **Due** — a card whose `nextReviewDate` is on or before "now"; eligible for the current study session.
+- **Study mode** — the full-screen, distraction-free overlay where cards are flipped and graded.
+- **Grade** — the user's self-assessment of a flipped card (Hard / Okay / Easy).
 
 ## Requirements
 
 ### Requirement 1: Global Navigation & Dashboard Entry Point
 
-**User Story:** As a user, I want Smart Flashcards to be reachable from anywhere in the app, so I never have to dig through a tool to get to my study decks.
+**User Story:** As a user, I want Flashcards to appear as a peer feature in the global header and on the dashboard, so I can find it as easily as Chapter Assistant or Quiz Generator.
 
 #### Acceptance Criteria
 
-1. WHEN any page loads THEN the top-right navigation bar SHALL include a "Flashcards" link positioned between "Quiz Generator" and "Lab Tools".
-2. WHEN the dashboard loads AND the flashcard backend has not been deployed THEN the 5th tile SHALL display as a "Smart Flashcards" tile with a "Coming Soon" badge in a locked visual state, AND clicking it SHALL show a non-blocking notice rather than navigating.
-3. WHEN the dashboard loads AND the flashcard backend has been deployed THEN the 5th tile SHALL display as a "Smart Flashcards" tile with a "Beta" badge, AND clicking it SHALL navigate to `flashcards.html`.
-4. WHEN the user is on `flashcards.html` THEN the "Flashcards" nav link SHALL render with the active-state styling.
-5. WHEN the user clicks the brand logo on `flashcards.html` THEN it SHALL behave the same as on every other page (route to the welcome page), preserving Requirement 3 from the prior 7-part enhancement.
+1. WHEN any page renders THEN the top navigation bar SHALL include a "Flashcards" link positioned between "Quiz Generator" and "Lab Tools".
+2. WHEN the Flashcards backend has not been deployed yet (placeholder URL still present) THEN the dashboard's 5th tile SHALL render as a "Smart Flashcards" tile with a visible "Coming Soon" badge AND clicking it SHALL show a non-blocking notice rather than navigate.
+3. WHEN the Flashcards backend has been deployed THEN the dashboard's 5th tile SHALL render as an active "Smart Flashcards" link to `flashcards.html`, with a "Beta" badge.
+4. WHEN the user clicks the active Smart Flashcards tile THEN the browser SHALL navigate to `flashcards.html`.
+5. WHEN the Flashcards page is the current page THEN the header's "Flashcards" link SHALL display in its active state.
 
-### Requirement 2: Cross-Module AI Generation
+### Requirement 2: Cross-Module Generation Hooks
 
-**User Story:** As a learner who just finished reading a chapter overview or taking a quiz, I want to convert that context directly into a flashcard deck, so I can lock in what I just learned without retyping anything.
-
-#### Acceptance Criteria
-
-1. WHEN the user has generated a Chapter Assistant overview THEN a "Turn this Chapter into Flashcards" button SHALL appear under the rendered overview, AND clicking it SHALL create a new deck (subject + chapter pre-filled from the Chapter Assistant context) and navigate to the flashcards page with the new deck open in study mode.
-2. WHEN the user has finished a quiz with at least one incorrect answer THEN a "Save incorrect answers to Flashcards" button SHALL be visible and enabled in the Results phase, AND clicking it SHALL create a new deck containing one card per wrong answer (front=question, back=correct answer, hint=AI-generated cue).
-3. WHEN the user has finished a quiz with zero incorrect answers THEN the "Save incorrect answers to Flashcards" button SHALL be visible but disabled, with a tooltip explaining there is nothing to save.
-4. WHEN a cross-module hook fails (network error, malformed JSON, etc.) THEN the user SHALL see a non-blocking error toast and remain on the original page (no deck partially created, no navigation).
-
-### Requirement 3: Deck Setup with Mandatory Bab Field
-
-**User Story:** As a user creating a deck manually, I want every deck tagged with a Subject and a Bab so my library stays organized into clear folders.
+**User Story:** As a learner, I want to turn a chapter overview I just generated, or my wrong quiz answers, into flashcards in one click, so the feature feels integrated rather than bolted on.
 
 #### Acceptance Criteria
 
-1. WHEN the user opens the "Create a New Deck" form on `flashcards.html` THEN the form SHALL include a Subject dropdown (Biology, Chemistry, Physics, Science), a required Bab/Chapter Name input, an optional Topic input, an optional Source Notes textarea, and a Card Count selector.
-2. WHEN the user submits the form with an empty Bab field THEN the system SHALL block submission, highlight the Bab field with a validation state, and show a toast "Chapter Name / Bab is required".
-3. WHEN the user submits a valid form THEN the system SHALL call the `flashcard_generator` Lambda, persist the returned cards as a new deck in `localStorage` with `subject`, `bab`, and `topic` fields populated, and redirect/refresh into the deck library showing the new deck.
-4. WHEN the form is submitted THEN the deck's persisted display label SHALL be the concatenation `"<Subject> · <Bab>"`.
+1. WHEN a chapter overview has finished rendering in Chapter Assistant THEN a "Turn this Chapter into Flashcards" button SHALL be visible AND clicking it SHALL create a new deck pre-tagged with the current Subject and Chapter and route the user into study mode for that deck.
+2. WHEN a quiz has been graded and at least one answer was wrong THEN a "Save incorrect answers to Flashcards" button SHALL be visible AND clicking it SHALL create a new deck containing one card per wrong answer (front = question, back = correct answer with the key term emphasized).
+3. WHEN a quiz has been graded with zero wrong answers THEN the "Save incorrect answers to Flashcards" button SHALL be disabled or hidden.
+4. WHEN flashcards are created via either cross-module hook THEN the resulting deck SHALL be persisted in `localStorage` and immediately visible on the deck library.
 
-### Requirement 4: Backend Generation (Stateless Lambda)
+### Requirement 3: Manual Deck Setup with Bab Input
 
-**User Story:** As a user, I want flashcard generation to feel as fast and reliable as the existing quiz/outline generators.
-
-#### Acceptance Criteria
-
-1. WHEN the system needs to generate cards THEN it SHALL call a new Lambda Function URL (`flashcard_generator`) with no server-side persistence (no database, no cross-request memory).
-2. WHEN the Lambda is invoked THEN it SHALL accept JSON containing `mode` ("from_text" | "from_quiz" | "from_topic"), `subject`, `chapter`, `topic`, `num_cards`, and a mode-specific source field (`source_text` or `wrong_answers`).
-3. WHEN generation succeeds THEN the Lambda SHALL return HTTP 200 with `{"cards": [...]}` where every card has `front`, `back`, `hint`, and `tags` keys; no markdown fences, no extra prose.
-4. WHEN generation fails to produce parseable JSON THEN the Lambda SHALL return HTTP 200 with `{"error": "...", "raw": "..."}` so the frontend can surface a friendly retry option without bubbling a 5xx.
-5. WHEN the Lambda is invoked AND an `X-Api-Key` is configured THEN authentication SHALL behave identically to the other Lambdas.
-6. WHEN the SAM stack deploys THEN the Function URL SHALL be exported as `FlashcardGeneratorUrl` AND the deploy workflow SHALL sed-replace `__URL_FLASHCARD_GENERATOR__` in `frontend/config.js`.
-
-### Requirement 5: Distraction-Free Study Mode (3D Flip)
-
-**User Story:** As a user studying a deck, I want a focused, immersive study experience so nothing on the page distracts me from the card in front of me.
+**User Story:** As a user creating flashcards from my own notes, I want to be required to label every deck with a Subject and a Bab (chapter), so my study library never devolves into one giant unsorted pile.
 
 #### Acceptance Criteria
 
-1. WHEN the user clicks "Study Now" on a deck THEN the system SHALL mount a full-viewport overlay that dims the rest of the page and centers a single card.
-2. WHEN the card is showing THEN the front SHALL display the prompt, AND a "Reveal Hint" toggle SHALL be visible underneath, AND the back SHALL be hidden.
-3. WHEN the user clicks the card OR presses the Spacebar OR taps the card on touch THEN the card SHALL flip via a smooth `rotateY(180deg)` 3D animation revealing the back, AND the three grading buttons SHALL become visible.
-4. WHEN the user clicks "Reveal Hint" before flipping THEN the hint text SHALL fade in below the prompt without flipping the card or revealing the answer.
-5. WHEN the user finishes the queue OR presses Escape OR clicks an explicit Exit control THEN the overlay SHALL close cleanly with no scroll-lock or focus left behind.
-6. WHEN the queue is empty after grading THEN the overlay SHALL display a session-summary panel showing cards reviewed, grade breakdown, and the next earliest review date for the deck.
+1. WHEN the user opens the deck library THEN a "Create New Deck" form SHALL be available with fields for Subject (dropdown), Bab/Chapter (text input), Topic (optional text input), Source Notes (optional textarea), and Number of Cards (numeric).
+2. WHEN the Subject dropdown is rendered THEN it SHALL include exactly Biology, Chemistry, Physics, and Science (matching the rest of the app).
+3. WHEN the user submits the form with an empty Bab field THEN the system SHALL reject the submission with an inline validation error and SHALL NOT make a network call.
+4. WHEN the user submits a valid form THEN the system SHALL call the `flashcard_generator` Lambda, create a deck tagged with the chosen Subject and Bab, and append it to the deck library.
+5. WHEN a deck is created THEN every card in that deck SHALL inherit the deck's Subject and Bab tags.
 
-### Requirement 6: Self-Grading Inputs (Buttons, Keyboard, Swipe)
+### Requirement 4: Deck Library
 
-**User Story:** As a power user, I want to grade cards by mouse, keyboard, or swipe so I can study quickly on any device.
-
-#### Acceptance Criteria
-
-1. WHEN the card has been flipped THEN three color-coded grade buttons SHALL be enabled: 🔴 Hard, 🟡 Okay, 🟢 Easy.
-2. WHEN the card has not been flipped THEN the grade buttons SHALL be hidden or disabled, AND keyboard 1/2/3 and swipe gestures SHALL not register a grade.
-3. WHEN the user presses keyboard 1, 2, or 3 after flipping THEN the system SHALL apply Hard, Okay, or Easy grading respectively.
-4. WHEN the user swipes left on touch THEN it SHALL register as Hard; WHEN the user swipes right THEN it SHALL register as Easy; below-threshold swipes SHALL animate back to center with no grade applied.
-5. WHEN any grading input fires THEN it SHALL call the same single grading function with the same effect on the card and queue.
-
-### Requirement 7: Leitner Spaced Repetition Engine
-
-**User Story:** As a user, I want the system to schedule my reviews automatically using a proven spaced-repetition algorithm so I see harder cards more often and easier cards less often.
+**User Story:** As a returning user, I want to see all my decks at a glance with a clear "due today" count for each, so I know exactly what to study and what's already mastered.
 
 #### Acceptance Criteria
 
-1. WHEN a card is created THEN it SHALL start in Box 1 with `nextReviewDate` set to its creation timestamp.
-2. WHEN a card is graded Easy THEN it SHALL move from Box `n` to Box `min(5, n+1)`, AND its `nextReviewDate` SHALL be set to `now + interval[newBox] * 1 day`, where intervals are {1: 1d, 2: 3d, 3: 7d, 4: 14d, 5: 30d}.
-3. WHEN a card is graded Hard THEN it SHALL drop to Box 1 regardless of prior box, AND its `nextReviewDate` SHALL be set to `now + 1 day`.
-4. WHEN a card is graded Okay THEN it SHALL stay in its current box, AND its `nextReviewDate` SHALL be set to `now + interval[currentBox] * 1 day`.
-5. WHEN a study session starts THEN at most `dailyNewCap` brand-new (never-reviewed) cards SHALL be introduced that day, while due reviews of previously-seen cards SHALL not be capped.
-6. WHEN any grading occurs THEN the entire `vsl.flashcards` store SHALL be persisted in a single atomic `localStorage.setItem` call.
+1. WHEN the user lands on `flashcards.html` THEN the page SHALL render a "Deck Library" view listing every deck currently in `localStorage`, including each deck's Subject icon, Bab label, total card count, and "Due today" count.
+2. WHEN a deck has zero cards due today THEN the deck card SHALL display an "All caught up" indicator instead of a numeric due count.
+3. WHEN a deck card is rendered THEN it SHALL provide actions for "Study Now" (enabled only if cards exist), "Manage" (rename Bab, reset progress, delete), and a context menu for advanced actions.
+4. WHEN the user deletes a deck THEN the system SHALL require a double confirmation (consistent with the Quiz history delete flow).
+5. WHEN no decks exist THEN the library SHALL display an empty-state placeholder pointing the user to the "Create New Deck" form or the cross-module hooks.
 
-### Requirement 8: Deck Library Management
+### Requirement 5: Distraction-Free Study UI with 3D Flip
 
-**User Story:** As a user with multiple decks, I want a clear library view showing what's due, so I always know where to focus my next study session.
-
-#### Acceptance Criteria
-
-1. WHEN the user lands on `flashcards.html` AND has at least one saved deck THEN each deck SHALL render as a glass-style card showing subject icon, "Subject · Bab" label, total card count, and "Due today" counter.
-2. WHEN a deck has zero due cards today THEN its card SHALL display a "✓ All caught up" affordance instead of (or alongside) a zero counter.
-3. WHEN the user clicks a deck's "Manage" or overflow control THEN the user SHALL be able to: rename the Bab, reset deck progress (all cards back to Box 1), and delete the deck (with double-confirmation).
-4. WHEN the user deletes a deck THEN the deck SHALL be removed from `localStorage` and the library view SHALL re-render without it; no orphan card data SHALL remain in storage.
-
-### Requirement 9: Storage & Quota Safety
-
-**User Story:** As a user who may generate many decks, I want the app to gracefully handle storage limits so I don't lose data unexpectedly.
+**User Story:** As a student studying, I want a focused full-screen view where I see one card at a time, can reveal a hint, and flip the card with a smooth animation, so I'm fully engaged in recall rather than juggling layout.
 
 #### Acceptance Criteria
 
-1. WHEN the app saves the flashcard store THEN it SHALL serialize the entire object under a single key `vsl.flashcards`.
-2. WHEN a save would push the serialized store past a 3 MB soft cap THEN the app SHALL evict the oldest 10 % of cards in the largest deck, retry the save, and surface a toast informing the user.
-3. WHEN the store cannot be parsed on load (corruption / unknown version) THEN the app SHALL fall back to an empty store and show a one-time toast explaining the reset, without crashing the page.
-4. WHEN the store schema changes in a future version THEN a `version` field SHALL allow forward-compatible migration without losing existing decks.
+1. WHEN the user clicks "Study Now" on a deck (or arrives via the autostudy deep link) THEN the system SHALL open a full-viewport overlay that dims the underlying page and shows exactly one card at a time.
+2. WHEN a card's front is shown THEN the system SHALL also show a "Reveal Hint" toggle that displays the card's hint inline without revealing the back.
+3. WHEN the user clicks anywhere on the visible card OR presses Space/Enter THEN the card SHALL animate via a 3D `rotateY(180deg)` flip to show the back.
+4. WHEN the card is showing the back THEN the three grading buttons (Hard, Okay, Easy) SHALL become visible.
+5. WHEN the study queue empties THEN the overlay SHALL replace the card with a "Session complete" panel summarizing cards reviewed and grade breakdown.
+6. WHEN the user presses Escape OR clicks an explicit Exit control THEN the overlay SHALL close and return the user to the deck library.
 
-### Requirement 10: Contextual Lab Assistant Greeting
+### Requirement 6: Keyboard & Mobile Gesture Controls
 
-**User Story:** As a user arriving on the flashcards page, I want the Lab Assistant to greet me with a flashcard-specific message, consistent with the rest of the app.
+**User Story:** As a power user studying many cards, I want to grade cards with the keyboard or with mobile swipe gestures, so I can run through a deck rapidly without breaking focus.
 
 #### Acceptance Criteria
 
-1. WHEN the user loads `flashcards.html` THEN the Lab Assistant FAB SHALL show a context-specific greeting bubble shortly after page load, consistent with the existing greeting pattern (auto-dismiss after a few seconds, dismissed instantly on FAB click, suppressed if the chat panel is already open).
-2. WHEN no flashcards-specific greeting is configured THEN the system SHALL fall back to the default greeting rather than crash or render nothing.
+1. WHEN the study overlay is open AND the current card has been flipped THEN pressing `1`, `2`, or `3` SHALL grade the card as Hard, Okay, or Easy respectively.
+2. WHEN the study overlay is open AND the current card has NOT been flipped THEN pressing `1`, `2`, or `3` SHALL be a no-op (the user must flip first).
+3. WHEN the user is on a touch device AND the current card has been flipped THEN swiping the card left past a threshold SHALL grade Hard AND swiping right past the threshold SHALL grade Easy.
+4. WHEN a swipe falls below the distance/velocity threshold THEN the card SHALL animate back to its resting position with no grade applied.
+5. WHEN the study overlay is closed THEN the keyboard shortcuts SHALL no longer fire (other pages' shortcuts continue to work as before).
+
+### Requirement 7: Leitner Spaced-Repetition Engine
+
+**User Story:** As a learner, I want the system to schedule each card for me automatically based on how well I knew it, so I review difficult cards more often and stop wasting time on cards I've mastered.
+
+#### Acceptance Criteria
+
+1. WHEN a card is created THEN it SHALL start in Box 1 with `nextReviewDate` set to "now".
+2. WHEN a card is graded Easy THEN its box SHALL increase by 1 (capped at Box 5) AND `nextReviewDate` SHALL be set to `now + interval(newBox)` where the intervals are Box 1 = 1 day, Box 2 = 3 days, Box 3 = 7 days, Box 4 = 14 days, Box 5 = 30 days.
+3. WHEN a card is graded Hard THEN its box SHALL be reset to Box 1 AND `nextReviewDate` SHALL be set to `now + 1 day`.
+4. WHEN a card is graded Okay THEN its box SHALL remain unchanged AND `nextReviewDate` SHALL be set to `now + interval(currentBox)`.
+5. WHEN building a study session for a deck THEN the system SHALL include only cards whose `nextReviewDate <= now`, AND SHALL cap the number of fresh (never-reviewed) cards in that session to the deck's `dailyNewCap` (default 20).
+6. WHEN any card grading occurs THEN the entire flashcards store SHALL be persisted back to `localStorage` atomically in a single write.
+
+### Requirement 8: Backend Generation Lambda
+
+**User Story:** As the platform operator, I want a stateless backend Lambda that generates flashcards from a topic, source text, or quiz mistakes, so the frontend has a single endpoint to call regardless of which entry point the user came from.
+
+#### Acceptance Criteria
+
+1. WHEN the system needs to generate cards THEN the frontend SHALL POST to a single new Lambda Function URL (`flashcard_generator`) with a JSON body containing `mode`, `subject`, `chapter`, optional `topic`, `num_cards`, and either `source_text` or `wrong_answers`.
+2. WHEN the Lambda receives a valid request THEN it SHALL return a JSON object `{ "cards": [...] }` where each card has `front`, `back`, `hint`, and `tags` fields.
+3. WHEN the Lambda receives `mode: "from_quiz"` THEN each generated card SHALL be derived from one entry in `wrong_answers`: `front` is the question, `back` is the correct answer restated as a sentence with the key term emphasized.
+4. WHEN the Lambda's underlying model returns malformed JSON THEN the Lambda SHALL respond with HTTP 200 and a `{ "error": "...", "raw": "..." }` body so the frontend can show a retry-able error rather than a 5xx.
+5. WHEN the Lambda is deployed THEN it SHALL reuse the existing `AppBedrockRole` IAM role and the existing Claude Haiku 4.5 model — no new IAM, no new model permissions.
+6. WHEN the deploy workflow runs THEN it SHALL replace `__URL_FLASHCARD_GENERATOR__` in `frontend/config.js` with the new Function URL output by CloudFormation.

@@ -20,6 +20,7 @@
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
         <a class="nav-link" href="experiment.html">Experiment Guide</a>
         <a class="nav-link active" href="quiz.html">Quiz Generator</a>
+        <a class="nav-link" href="flashcards.html">Flashcards</a>
         <a class="nav-link" href="lab-tools.html">Lab Tools</a>
       </div>
     </div>
@@ -113,6 +114,7 @@
       <div class="btn-row" style="margin-top:18px">
         <button id="retryBtn" class="btn btn-ghost"></button>
         <button id="newQuizBtn" class="btn btn-ghost"></button>
+        <button id="saveWrongToFlashBtn" class="btn btn-primary"></button>
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
       </div>
     </section>
@@ -133,6 +135,7 @@
   <script src="vortex.js"></script>
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
+  <script src="flashcards.js"></script>
   <script>
     /* ════════════════════════════════════════════════════════════════════
      *  Quiz Generator — 4-phase workflow + history + chatbox lock
@@ -151,6 +154,7 @@
     document.getElementById('submitBtn').innerHTML   = `${iconHtml('eye')}<span>Submit &amp; Show Results</span>`;
     document.getElementById('retryBtn').innerHTML    = `${iconHtml('refresh','btn-icon-rotate')}<span>Retake This Quiz</span>`;
     document.getElementById('newQuizBtn').innerHTML  = `${iconHtml('bolt')}<span>New Quiz</span>`;
+    document.getElementById('saveWrongToFlashBtn').innerHTML = `<span>🧠</span><span>Save incorrect answers to Flashcards</span>`;
     document.getElementById('exportBtn').innerHTML   = `${iconHtml('download')}<span>Export PDF</span>`;
     document.getElementById('historyBackBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Back</span>`;
 
@@ -454,6 +458,22 @@
       // Save to history (localStorage)
       saveToHistory({ ...quizMeta, correct, total, pct, status, questions: quizData, answers: userAnswers, ts: Date.now() });
 
+      // Update the "Save incorrect to Flashcards" button state
+      const flashBtn = document.getElementById('saveWrongToFlashBtn');
+      if (flashBtn) {
+        const wrongCount = total - correct;
+        if (wrongCount === 0) {
+          flashBtn.disabled = true;
+          flashBtn.title = 'Nothing to save — perfect score!';
+        } else if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
+          flashBtn.disabled = true;
+          flashBtn.title = 'Flashcards backend not yet deployed';
+        } else {
+          flashBtn.disabled = false;
+          flashBtn.title = `Convert ${wrongCount} wrong answer${wrongCount === 1 ? '' : 's'} into flashcards`;
+        }
+      }
+
       showPhase('phase-results');
       showToast(
         isComplete ? `Completed: ${correct}/${total} (${pct}%)` : `Incomplete — ${correct}/${total}`,
@@ -550,6 +570,46 @@
     });
     document.getElementById('exportBtn').addEventListener('click', () => {
       exportToPDF('results-container', 'Quiz Results');
+    });
+
+    document.getElementById('saveWrongToFlashBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('saveWrongToFlashBtn');
+      if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
+        showToast('Flashcards backend not yet deployed', 'error');
+        return;
+      }
+      // Build the wrong-answer list from current quiz state
+      const wrong = quizData
+        .map((q, i) => ({ q, picked: userAnswers[i] }))
+        .filter(x => !x.picked || x.picked !== x.q.correct_answer)
+        .map(({ q, picked }) => ({
+          question: q.question_stem,
+          correct: (q.options && q.options[q.correct_answer]) || q.correct_answer,
+          picked: picked ? ((q.options && q.options[picked]) || picked) : null,
+          explanation: q.detailed_explanation || '',
+        }));
+      if (!wrong.length) {
+        showToast('Nothing to save — perfect score!', 'info');
+        return;
+      }
+      setButtonLoading(btn, true, 'Saving to Flashcards…');
+      try {
+        const id = await window.Flashcards.saveQuizMistakes({
+          subject: quizMeta.subject,
+          chapter: quizMeta.topic || quizMeta.subject,
+          topic: quizMeta.topic,
+          wrong_answers: wrong,
+        });
+        showToast(`Saved ${wrong.length} card${wrong.length === 1 ? '' : 's'} to Flashcards`, 'success');
+        // Soft prompt to study now
+        if (confirm(`Saved ${wrong.length} flashcard${wrong.length === 1 ? '' : 's'}. Study them now?`)) {
+          location.href = `flashcards.html?deck=${id}&autostudy=1`;
+        }
+      } catch (err) {
+        showToast('Save failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
     });
   </script>
 </body>

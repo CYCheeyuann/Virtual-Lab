@@ -319,7 +319,7 @@
   // ── Generate-deck form ──
   async function onGenerateClick() {
     const btn = document.getElementById('generateDeckBtn');
-    const subject = document.getElementById('newSubject').value;
+    const subject = document.getElementById('subject').value;
     const babEl   = document.getElementById('newBab');
     const bab     = babEl.value.trim();
     const topic   = document.getElementById('newTopic').value.trim();
@@ -539,12 +539,8 @@
   function init() {
     if (!isFlashcardsPage()) return;
 
-    // Pre-fill subject from saved theme
-    const subjEl = document.getElementById('newSubject');
-    if (subjEl && typeof window.getSavedSubject === 'function') {
-      const saved = window.getSavedSubject();
-      if ([...subjEl.options].some(o => o.value === saved)) subjEl.value = saved;
-    }
+    // common.js's bindSubjectSelect already populates the <select id="subject">
+    // and applies the theme, so we don't need to manually pre-fill it here.
     document.getElementById('generateDeckBtn')?.addEventListener('click', onGenerateClick);
     document.getElementById('newBab')?.addEventListener('input', (e) => {
       e.target.classList.remove('invalid');

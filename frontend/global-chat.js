@@ -334,7 +334,16 @@
       if (isOpen) return;
       const hint = document.createElement('div');
       hint.className = 'gc-bubble-hint';
-      hint.textContent = '👋 Need help? Ask me anything!';
+      const PAGE_GREETINGS = {
+        'chapter': '📖 Welcome to Chapter Assistant! Need help exploring a topic?',
+        'experiment': '🧪 Ready to set up an experiment? I can help with safety tips!',
+        'quiz': '📝 Quiz time! I\'ll be here after you finish if you need explanations.',
+        'lab-tools': '🧰 Lab Tools ready! Try the image generator or safety checker.',
+        'index': '👋 Welcome back! Pick a tool to get started.',
+      };
+      const page = location.pathname.split('/').pop().replace('.html','') || 'index';
+      const greeting = PAGE_GREETINGS[page] || '👋 Need help? Ask me anything!';
+      hint.textContent = greeting;
       hint.id = 'gc-bubble-hint';
       document.body.appendChild(hint);
       // Trigger show animation after DOM insertion

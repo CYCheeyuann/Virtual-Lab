@@ -3,8 +3,8 @@
 /* FAB */
 .tk-fab {
   position: fixed;
-  left: 16px;
-  top: 55vh;
+  right: 22px;
+  bottom: 100px;
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -41,26 +41,7 @@
 
 /* Tooltip */
 .tk-fab::after {
-  content: 'Quick Toolkit';
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%) scale(0.9);
-  background: var(--c-bg-glass-2);
-  border: 1px solid var(--c-border);
-  color: var(--c-text);
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 8px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s, transform 0.2s;
-}
-.tk-fab:hover::after {
-  opacity: 1;
-  transform: translateY(-50%) scale(1);
+  display: none;
 }
 
 /* Backdrop */
@@ -81,8 +62,8 @@
 /* Panel */
 .tk-panel {
   position: fixed;
-  left: 80px;
-  top: 12vh;
+  right: 22px;
+  bottom: 180px;
   width: 480px;
   max-width: calc(100vw - 100px);
   max-height: 75vh;
@@ -97,7 +78,7 @@
   flex-direction: column;
   overflow: hidden;
   transform: scale(0);
-  transform-origin: 40px 55vh;
+  transform-origin: bottom right;
   opacity: 0;
   pointer-events: none;
   transition: transform 0.3s ease-out, opacity 0.25s;
@@ -234,7 +215,7 @@
 
 /* Mobile */
 @media (max-width: 600px) {
-  .tk-fab { left: 12px; top: auto; bottom: 80px; width: 48px; height: 48px; font-size: 1.3rem; }
+  .tk-fab { right: 14px; bottom: 92px; width: 48px; height: 48px; font-size: 1.3rem; }
   .tk-fab::after { display: none; }
   .tk-panel {
     left: 0; top: auto; bottom: 0; width: 100%; max-width: 100%;

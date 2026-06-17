@@ -6,7 +6,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-VALID_SUBJECTS = {"Biology", "Chemistry", "Physics"}
+VALID_SUBJECTS = {"Biology", "Chemistry", "Physics", "Science"}
 VALID_DIFFICULTIES = {"Beginner", "Standard", "Expert", "Master"}
 MAX_TOPIC_LENGTH = 200
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB after base64 decode

@@ -65,6 +65,14 @@
         <h3>Lab Tools</h3>
         <p>Three tools in one: Safety Assistant, AI Image Generator, and "What Happens If" scenario simulator.</p>
       </a>
+
+      <div class="tile tile-coming-soon">
+        <div class="tile-icon" style="opacity:0.5">
+          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>Coming Soon</h3>
+        <p>New feature in development. Stay tuned!</p>
+      </div>
     </div>
 
     <p class="footer-hint">
@@ -87,6 +95,27 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       renderProgressDashboard('progressDashboard');
+
+      // Typewriter effect on tile hover
+      document.querySelectorAll('.tile').forEach(tile => {
+        const p = tile.querySelector('p');
+        if (!p) return;
+        const fullText = p.textContent;
+        p.textContent = '';
+        let timer = null;
+        tile.addEventListener('mouseenter', () => {
+          p.textContent = '';
+          let i = 0;
+          timer = setInterval(() => {
+            if (i < fullText.length) { p.textContent += fullText[i]; i++; }
+            else clearInterval(timer);
+          }, 18);
+        });
+        tile.addEventListener('mouseleave', () => {
+          clearInterval(timer);
+          p.textContent = '';
+        });
+      });
     });
   </script>
 </body>

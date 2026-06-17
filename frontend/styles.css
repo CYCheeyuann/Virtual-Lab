@@ -121,23 +121,26 @@ a:hover { color: var(--c-accent-2); }
   position: sticky;
   top: 0;
   z-index: 100;
+  min-height: 64px;
 }
 .nav-inner {
-  max-width: 1300px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 14px 22px;
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
+  gap: 20px;
 }
 .brand {
   font-weight: 700;
   font-size: 1.05rem;
   color: var(--c-text-strong);
   letter-spacing: 0.02em;
+  cursor: pointer;
+  text-decoration: none;
 }
+.brand:hover { color: var(--c-accent); text-decoration: none; }
 .nav-links {
   display: flex;
   gap: 4px;
@@ -779,22 +782,27 @@ select option:hover {
 /* ─── Landing-page tile grid (FeatureCard pattern) ──────────────────── */
 .tile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  overflow-x: auto;
 }
+@media (max-width: 900px) { .tile-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
 .tile {
   background: var(--c-bg-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-radius: 18px;
-  padding: 26px;
+  border-radius: 20px;
+  padding: 36px 28px;
+  min-height: 220px;
   text-decoration: none;
   color: inherit;
   border: 1px solid var(--c-border);
   box-shadow: 0 4px 20px var(--c-shadow);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   cursor: pointer;
   transition: border-color 0.3s, background 0.3s, transform 0.3s, box-shadow 0.3s;
   position: relative;
@@ -811,7 +819,7 @@ select option:hover {
   pointer-events: none;
 }
 .tile:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: rgba(var(--c-accent-rgb), 0.35);
   background: var(--c-bg-glass-2);
   box-shadow: 0 14px 40px var(--c-shadow-strong);
@@ -819,22 +827,23 @@ select option:hover {
 }
 .tile:hover::after { opacity: 1; }
 
+/* Icon container */
 .tile-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
   background: var(--c-accent-soft);
   color: var(--c-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.7rem;
+  font-size: 1.8rem;
   margin-bottom: 14px;
-  transition: transform 0.3s ease, color 0.3s, filter 0.3s ease;
+  transition: transform 0.4s ease, color 0.3s, filter 0.3s ease, margin-bottom 0.4s ease;
 }
 .tile-icon svg {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.5;
@@ -842,21 +851,48 @@ select option:hover {
   stroke-linejoin: round;
 }
 .tile:hover .tile-icon {
-  transform: scale(1.1);
+  transform: scale(1.1) translateY(-4px);
   color: var(--c-accent-2);
   filter: drop-shadow(0 0 14px var(--c-accent-glow));
+  margin-bottom: 10px;
 }
+
+/* Title — starts centered, shifts up on hover */
 .tile h3 {
-  font-size: 1.08rem;
+  font-size: 1.1rem;
   color: var(--c-text-strong);
   font-weight: 600;
   letter-spacing: 0.015em;
-  margin-bottom: 4px;
+  margin-bottom: 0;
+  transition: transform 0.4s ease, margin-bottom 0.4s ease;
 }
+.tile:hover h3 {
+  transform: translateY(-6px);
+  margin-bottom: 10px;
+}
+
+/* Description — hidden by default, revealed on hover with typewriter effect */
 .tile p {
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   color: var(--c-muted);
   line-height: 1.55;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease 0.1s;
+}
+.tile:hover p {
+  max-height: 80px;
+  opacity: 1;
+}
+/* Typewriter — applied via JS class */
+.tile p .typewriter {
+  display: inline;
+  border-right: 2px solid var(--c-accent);
+  animation: typeCursor 0.7s steps(1) infinite;
+}
+@keyframes typeCursor {
+  50% { border-color: transparent; }
 }
 
 .footer {
@@ -1369,4 +1405,28 @@ select option:hover {
 @media (max-width: 600px) {
   .chapter-grid { grid-template-columns: 1fr; }
   .chapter-modal { padding: 22px 18px; border-radius: 16px; }
+}
+
+/* ─── Coming Soon tile ───────────────────────────────────────────────── */
+.tile-coming-soon {
+  opacity: 0.5;
+  border-style: dashed;
+  cursor: default;
+  pointer-events: none;
+}
+.tile-coming-soon:hover { transform: none; box-shadow: 0 4px 20px var(--c-shadow); }
+
+/* Quiz outline textarea — rich header styling */
+#outlineText {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  padding: 18px;
+  border: 2px solid var(--c-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+}
+#outlineText:focus {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 4px var(--c-accent-soft);
 }

@@ -40,6 +40,7 @@
         <option value="Biology">Biology</option>
         <option value="Chemistry">Chemistry</option>
         <option value="Physics">Physics</option>
+        <option value="Science">Science (General)</option>
       </select>
 
       <label for="topic">Chapter / Topic</label>
@@ -250,6 +251,12 @@
           full += dec.decode(value, { stream: true });
         }
         document.getElementById('outlineText').value = full;
+        // Style the header line if present
+        const lines = full.split('\n');
+        if (lines[0] && lines[0].startsWith('##')) {
+          const styled = '📋 ' + lines[0].replace(/^#+\s*/, '') + '\n' + '─'.repeat(50) + '\n' + lines.slice(1).join('\n');
+          document.getElementById('outlineText').value = styled;
+        }
         showPhase('phase-outline');
         showToast('Outline ready — review and edit, then generate', 'success');
       } catch (err) {

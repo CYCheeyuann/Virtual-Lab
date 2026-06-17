@@ -259,13 +259,21 @@
           if (done) break;
           full += dec.decode(value, { stream: true });
         }
-        // Strip the markdown title (## Quiz Outline — TOPIC) into the
-        // styled banner; keep the body editable in the textarea.
+        // Parse the title from the new ALL CAPS || format
         const lines = full.split('\n');
         let title = `Quiz Outline — ${topic}`;
-        const titleIdx = lines.findIndex(l => /^##\s+/.test(l));
+        // First non-empty line is the ALL CAPS title line
+        const titleIdx = lines.findIndex(l => l.trim().length > 0);
         if (titleIdx >= 0) {
-          title = lines[titleIdx].replace(/^##\s+/, '').trim();
+          const titleLine = lines[titleIdx].trim();
+          // Check for the || pattern (new format) or ## pattern (legacy)
+          if (titleLine.includes('||')) {
+            title = titleLine.split('||')[0].trim();
+          } else if (/^##\s+/.test(titleLine)) {
+            title = titleLine.replace(/^##\s+/, '').trim();
+          } else {
+            title = titleLine;
+          }
           lines.splice(titleIdx, 1);
           // Drop any leading blank lines after removing title
           while (lines.length && !lines[0].trim()) lines.shift();

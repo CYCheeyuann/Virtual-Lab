@@ -88,18 +88,17 @@ Topic/Chapter: {topic or "(general)"}
 Difficulty level: {difficulty}
 
 Generate a structured outline of 8–15 key learning objectives or knowledge
-points that a quiz at this level should cover. Use this markdown format:
+points that a quiz at this level should cover.
 
-## Quiz Outline — {topic or subject}
-
-1. [Knowledge point one]
-2. [Knowledge point two]
-...
+STRICT FORMATTING RULE (you must follow this exactly):
+- Do NOT use any markdown formatting (no ##, no **, no bold, no headers).
+- The very first line must be the outline title written in ALL CAPS, followed by two pipe characters, then a brief subtitle in normal case.
+  Example: QUIZ OUTLINE — CIRCULAR MOTION || Key concepts for SPM-level assessment
+- Each numbered point must follow this format: write the core topic keyword in ALL CAPS, then two pipe characters ( || ), then the explanation in normal sentence case.
+  Example: 1. CENTRIPETAL FORCE || The inward force required to keep an object moving in a circular path.
 
 After the list, add:
-
-### Suggested focus
-A brief (2-sentence) recommendation on what to emphasize.
+SUGGESTED FOCUS || A brief (2-sentence) recommendation on what to emphasize.
 
 Be specific and educational. Use terminology appropriate for {difficulty} level."""
 

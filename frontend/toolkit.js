@@ -14,19 +14,31 @@
   // FORMULA DATABASE
   // ══════════════════════════════════════════════════════════════════════
   const FORMULAS = {
-    '📐 General Math': [
-      { name: 'Quadratic Formula', latex: 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}', vars: 'a, b, c = coefficients' },
-      { name: 'Pythagorean Theorem', latex: 'a^2 + b^2 = c^2', vars: 'a, b = legs, c = hypotenuse' },
-      { name: 'Area of Circle', latex: 'A = \\pi r^2', vars: 'r = radius' },
-      { name: 'Circumference', latex: 'C = 2\\pi r', vars: 'r = radius' },
-      { name: 'Volume of Sphere', latex: 'V = \\frac{4}{3}\\pi r^3', vars: 'r = radius' },
-      { name: 'Logarithm Base Change', latex: '\\log_a b = \\frac{\\ln b}{\\ln a}', vars: 'a = base, b = argument' },
+    '🔬 General Science': [
+      { name: 'Scientific Method Steps', latex: '\\text{Observe} \\to \\text{Hypothesize} \\to \\text{Experiment} \\to \\text{Analyze} \\to \\text{Conclude}', vars: 'The universal scientific process' },
+      { name: 'Density', latex: '\\rho = \\frac{m}{V}', vars: 'ρ = density, m = mass, V = volume' },
+      { name: 'Speed', latex: 'v = \\frac{d}{t}', vars: 'v = speed, d = distance, t = time' },
+      { name: 'Efficiency', latex: '\\eta = \\frac{\\text{useful output}}{\\text{total input}} \\times 100\\%', vars: 'η = efficiency' },
+      { name: 'Pressure', latex: 'P = \\frac{F}{A}', vars: 'P = pressure, F = force, A = area' },
+      { name: 'Ideal Gas Law', latex: 'PV = nRT', vars: 'P = pressure, V = volume, n = moles, T = temp' },
+      { name: 'Wave Speed', latex: 'v = f\\lambda', vars: 'v = speed, f = frequency, λ = wavelength' },
+      { name: 'Energy Conservation', latex: 'E_{\\text{total}} = E_k + E_p = \\text{constant}', vars: 'Ek = kinetic, Ep = potential' },
+    ],
+    '🧬 Biology': [
+      { name: 'Magnification', latex: 'M = \\frac{\\text{Image size}}{\\text{Actual size}}', vars: 'M = magnification factor' },
+      { name: 'BMI', latex: '\\text{BMI} = \\frac{\\text{mass (kg)}}{\\text{height (m)}^2}', vars: 'Body Mass Index' },
+      { name: 'Cardiac Output', latex: 'CO = HR \\times SV', vars: 'CO = cardiac output, HR = heart rate, SV = stroke volume' },
+      { name: 'Hardy-Weinberg', latex: 'p^2 + 2pq + q^2 = 1', vars: 'p = dominant freq, q = recessive freq' },
+      { name: 'Population Growth', latex: 'N_t = N_0 e^{rt}', vars: 'N = population, r = growth rate, t = time' },
+      { name: 'Simpson Diversity Index', latex: 'D = 1 - \\sum \\left(\\frac{n}{N}\\right)^2', vars: 'n = individuals per species, N = total' },
+      { name: '── Essential Math for Biology ──', latex: '', vars: '' },
+      { name: 'Percentage Change', latex: '\\%\\Delta = \\frac{\\text{new} - \\text{old}}{\\text{old}} \\times 100', vars: 'Useful for growth rates, osmosis data' },
+      { name: 'Mean (Average)', latex: '\\bar{x} = \\frac{\\sum x_i}{n}', vars: 'x̄ = mean, n = sample size' },
+      { name: 'Standard Deviation', latex: 's = \\sqrt{\\frac{\\sum(x_i - \\bar{x})^2}{n-1}}', vars: 's = std dev, x̄ = mean' },
+      { name: 'Chi-Squared Test', latex: '\\chi^2 = \\sum \\frac{(O-E)^2}{E}', vars: 'O = observed, E = expected' },
+      { name: 'Probability (Punnett)', latex: 'P(A) = \\frac{\\text{favourable outcomes}}{\\text{total outcomes}}', vars: 'Basic genetic probability' },
       { name: 'Permutation', latex: 'P(n,r) = \\frac{n!}{(n-r)!}', vars: 'n = total, r = selected' },
       { name: 'Combination', latex: 'C(n,r) = \\frac{n!}{r!(n-r)!}', vars: 'n = total, r = selected' },
-      { name: 'Arithmetic Series', latex: 'S_n = \\frac{n(a_1 + a_n)}{2}', vars: 'n = terms, a₁ = first, aₙ = last' },
-      { name: 'Geometric Series', latex: 'S_n = a_1 \\cdot \\frac{1-r^n}{1-r}', vars: 'a₁ = first, r = ratio, n = terms' },
-      { name: 'Law of Cosines', latex: 'c^2 = a^2 + b^2 - 2ab\\cos C', vars: 'a,b,c = sides, C = opposite angle' },
-      { name: "Heron's Formula", latex: 'A = \\sqrt{s(s-a)(s-b)(s-c)}', vars: 's = semi-perimeter' },
     ],
     '⚛️ Physics': [
       { name: "Newton's Second Law", latex: 'F = ma', vars: 'F = force, m = mass, a = acceleration' },
@@ -41,7 +53,16 @@
       { name: 'Wave Speed', latex: 'v = f\\lambda', vars: 'v = speed, f = frequency, λ = wavelength' },
       { name: 'Mass-Energy', latex: 'E = mc^2', vars: 'E = energy, m = mass, c = speed of light' },
       { name: "Hooke's Law", latex: 'F = -kx', vars: 'k = spring constant, x = displacement' },
-      { name: 'Ideal Gas Law', latex: 'PV = nRT', vars: 'P = pressure, V = volume, n = moles, T = temp' },
+      { name: '── Essential Math for Physics ──', latex: '', vars: '' },
+      { name: 'Pythagorean Theorem', latex: 'a^2 + b^2 = c^2', vars: 'a, b = legs, c = hypotenuse (vectors)' },
+      { name: 'Trigonometry (SOH CAH TOA)', latex: '\\sin\\theta = \\frac{O}{H},\\; \\cos\\theta = \\frac{A}{H},\\; \\tan\\theta = \\frac{O}{A}', vars: 'O = opposite, A = adjacent, H = hypotenuse' },
+      { name: 'Law of Cosines', latex: 'c^2 = a^2 + b^2 - 2ab\\cos C', vars: 'Used for non-right-angle vector addition' },
+      { name: 'Quadratic Formula', latex: 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}', vars: 'Solving kinematics / projectile equations' },
+      { name: 'Area of Circle', latex: 'A = \\pi r^2', vars: 'r = radius (circular motion, orbits)' },
+      { name: 'Circumference', latex: 'C = 2\\pi r', vars: 'r = radius (circular path length)' },
+      { name: 'Volume of Sphere', latex: 'V = \\frac{4}{3}\\pi r^3', vars: 'r = radius (gravitational fields)' },
+      { name: 'Arithmetic Series', latex: 'S_n = \\frac{n(a_1 + a_n)}{2}', vars: 'Summing equal intervals in experiments' },
+      { name: 'Geometric Series', latex: 'S_n = a_1 \\cdot \\frac{1-r^n}{1-r}', vars: 'Decay / half-life series' },
     ],
     '🧪 Chemistry': [
       { name: 'Moles', latex: 'n = \\frac{m}{M}', vars: 'n = moles, m = mass, M = molar mass' },
@@ -53,6 +74,11 @@
       { name: 'Equilibrium Constant', latex: 'K_{eq} = \\frac{[C]^c[D]^d}{[A]^a[B]^b}', vars: 'products / reactants' },
       { name: 'Gibbs Free Energy', latex: '\\Delta G = \\Delta H - T\\Delta S', vars: 'ΔH = enthalpy, T = temp, ΔS = entropy' },
       { name: 'Nernst Equation', latex: 'E = E^\\circ - \\frac{RT}{nF}\\ln Q', vars: 'E° = std potential, F = Faraday' },
+      { name: '── Essential Math for Chemistry ──', latex: '', vars: '' },
+      { name: 'Logarithm Base Change', latex: '\\log_a b = \\frac{\\ln b}{\\ln a}', vars: 'Used in pH / pKa calculations' },
+      { name: 'Natural Logarithm', latex: '\\ln(ab) = \\ln a + \\ln b', vars: 'Simplifying rate law expressions' },
+      { name: 'Scientific Notation', latex: 'a \\times 10^n,\\; 1 \\leq a < 10', vars: 'Expressing very large/small quantities' },
+      { name: "Heron's Formula", latex: 'A = \\sqrt{s(s-a)(s-b)(s-c)}', vars: 's = semi-perimeter (titration curves)' },
     ],
   };
 
@@ -235,7 +261,7 @@
   function renderFormulas(body) {
     body.innerHTML = `
       <div class="tk-search-wrap" id="tk-search-wrap">
-        <input class="tk-search" id="tk-search" type="text" placeholder="🔍 Search formula (e.g. Kinetic Energy, E=mc²)…" />
+        <input class="tk-search" id="tk-search" type="text" placeholder="🔍 Search science formulas (e.g. Photosynthesis, Velocity, pH)…" />
         <button class="tk-search-clear" id="tk-search-clear">✕</button>
       </div>
       <div id="tk-formula-list"></div>`;

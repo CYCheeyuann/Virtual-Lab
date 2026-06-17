@@ -4,12 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🧪 Experiment Guide</title>
-  <meta name="description" content="AI-generated interactive experiment guide rendered as a node-map with safety briefing." />
+  <meta name="description" content="AI-generated complete lab guide with safety briefing. Supports document upload for context analysis." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
-  <link rel="stylesheet" href="experiment.css" />
 </head>
 <body>
 
@@ -30,19 +29,18 @@
   <main class="page">
     <div class="page-header">
       <h1>🧪 Experiment Guide</h1>
-      <p>Generate a complete lab guide. Pick a topic, optionally upload a document, and explore the experiment as an interactive node map.</p>
+      <p>Generate a complete lab guide with safety briefing. Optionally upload a science document for context.</p>
     </div>
 
-    <!-- ═══ PHASE 1: Setup ═══ -->
-    <section class="card" id="phase-setup">
-      <h2>1 · Setup</h2>
+    <section class="card">
+      <h2>Setup</h2>
 
       <label for="subject">Subject</label>
       <select id="subject" class="input">
         <option value="Biology">Biology</option>
         <option value="Chemistry">Chemistry</option>
         <option value="Physics">Physics</option>
-        <option value="Science">General Science</option>
+      <option value="Science">General Science</option>
       </select>
 
       <label for="topic">Experiment Topic</label>
@@ -71,60 +69,17 @@
       </div>
     </section>
 
-    <!-- ═══ PHASE 2: Validation (intermediate confirmation) ═══ -->
-    <section class="card" id="phase-validation" style="display:none">
-      <h2>2 · Validating Inputs</h2>
-      <div class="exp-validation" id="validationCard">
-        <div class="exp-step" id="step-topic"><span class="exp-check">1</span><span id="step-topic-text"></span></div>
-        <div class="exp-step" id="step-subject"><span class="exp-check">2</span><span id="step-subject-text"></span></div>
-        <div class="exp-step" id="step-doc"><span class="exp-check">3</span><span id="step-doc-text"></span></div>
-        <div class="exp-intent" id="exp-intent">Preparing to generate…</div>
+    <section class="card">
+      <h2>🔬 Experiment Guide</h2>
+      <div class="output-panel text-panel" id="out-experiment">
+        <div class="placeholder">Your experiment guide will appear here…</div>
       </div>
-      <div class="btn-row" style="margin-top:14px">
-        <button id="proceedBtn" class="btn btn-primary" style="display:none">
-          <span>✅</span><span>Proceed</span>
-        </button>
-        <button id="cancelValBtn" class="btn btn-ghost">
-          <span>←</span><span>Cancel</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- ═══ PHASE 3: Node Map Output ═══ -->
-    <section class="card" id="phase-map" style="display:none">
-      <h2 id="mapHeader">3 · Experiment Map</h2>
-      <p style="color:var(--c-muted);font-size:0.88rem;margin-bottom:6px">
-        Click any branch to open its details. The map stays visible while you read.
-      </p>
-      <div class="exp-map-wrap">
-        <svg class="exp-svg" id="expSvg" preserveAspectRatio="none"></svg>
-        <div class="exp-map" id="expMap">
-          <div class="exp-node-main" id="expMainNode">
-            <span id="expMainTitle">Topic</span>
-            <span class="exp-node-sub" id="expMainSub">Experiment</span>
-          </div>
-          <!-- 8 child nodes injected by JS -->
-        </div>
-      </div>
-      <div class="btn-row" style="margin-top:18px">
-        <button id="newExpBtn" class="btn btn-ghost">
-          <span>🔄</span><span>New Experiment</span>
-        </button>
+      <div class="btn-row" style="margin-top:12px">
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
         <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
   </main>
-
-  <!-- ═══ Side detail drawer ═══ -->
-  <div class="exp-backdrop" id="expBackdrop"></div>
-  <aside class="exp-drawer" id="expDrawer" role="dialog" aria-label="Experiment Section Detail">
-    <div class="exp-drawer-head">
-      <div class="exp-drawer-title" id="drawerTitle">Section</div>
-      <button class="exp-drawer-close" id="drawerCloseBtn" aria-label="Close">✕</button>
-    </div>
-    <div class="exp-drawer-body" id="drawerBody"></div>
-  </aside>
 
   <script src="config.js"></script>
   <script src="progress.js"></script>
@@ -133,20 +88,7 @@
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
   <script>
-    /* ═══════════ Experiment Guide — staged flow + node-map ═══════════ */
-
-    // The 8 sections, in display order. Keep keys in sync with the Lambda.
-    const SECTIONS = [
-      { key: 'objective',        icon: '🎯', label: 'Objective' },
-      { key: 'materials',        icon: '🧰', label: 'Materials' },
-      { key: 'safety',           icon: '⚠️', label: 'Safety Briefing' },
-      { key: 'procedure',        icon: '🔬', label: 'Procedure' },
-      { key: 'expected_results', icon: '📊', label: 'Expected Results' },
-      { key: 'explanation',      icon: '🧠', label: 'Scientific Explanation' },
-      { key: 'applications',     icon: '🌍', label: 'Real-Life Applications' },
-      { key: 'summary',          icon: '📝', label: 'Summary' },
-    ];
-
+    // Inject SVG icon buttons
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Experiment</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
     document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
@@ -155,305 +97,50 @@
     let uploadedFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
 
-    // In-memory + sessionStorage cache for cross-page persistence
-    const STATE_KEY = 'vsl.experimentState';
-    let guide = null;
-    let mapBuilt = false;
-
-    function saveState() {
-      try {
-        sessionStorage.setItem(STATE_KEY, JSON.stringify({
-          subject: document.getElementById('subject').value,
-          topic:   document.getElementById('topic').value,
-          difficulty: document.getElementById('difficulty').value,
-          guide,
-        }));
-      } catch (e) {}
-    }
-    function restoreState() {
-      try {
-        const raw = sessionStorage.getItem(STATE_KEY);
-        if (!raw) return;
-        const s = JSON.parse(raw);
-        if (!s) return;
-        if (s.subject) {
-          const sel = document.getElementById('subject');
-          if (sel && [...sel.options].some(o => o.value === s.subject)) sel.value = s.subject;
-          setSubjectTheme(s.subject);
-        }
-        if (s.topic) document.getElementById('topic').value = s.topic;
-        if (s.difficulty) document.getElementById('difficulty').value = s.difficulty;
-        if (s.guide && s.guide.sections) {
-          guide = s.guide;
-          renderMap(guide);
-          showPhase('phase-map');
-        }
-      } catch (e) {}
-    }
-
-    function showPhase(id) {
-      ['phase-setup','phase-validation','phase-map'].forEach(p => {
-        document.getElementById(p).style.display = p === id ? '' : 'none';
-      });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    /* ─── Phase 1 → Phase 2: validate ──────────────────────────────── */
     document.getElementById('runBtn').addEventListener('click', () => {
-      const topic = document.getElementById('topic').value.trim();
+      const btn = document.getElementById('runBtn');
+      const subject    = document.getElementById('subject').value;
+      const topic      = document.getElementById('topic').value.trim();
+      const difficulty = document.getElementById('difficulty').value;
+      const out = document.getElementById('out-experiment');
       if (!topic) {
+        out.innerHTML = '<div class="error-msg">⚠️ Please enter an experiment topic first.</div>';
         showToast('Please enter an experiment topic', 'warning');
         return;
       }
-      runValidation();
-    });
-    document.getElementById('cancelValBtn').addEventListener('click', () => {
-      showPhase('phase-setup');
-    });
-
-    function runValidation() {
-      showPhase('phase-validation');
-      const topic    = document.getElementById('topic').value.trim();
-      const subject  = document.getElementById('subject').value;
-      const hasFile  = !!uploadedFile.data;
-      const stTopic   = document.getElementById('step-topic');
-      const stSubject = document.getElementById('step-subject');
-      const stDoc     = document.getElementById('step-doc');
-
-      // Reset
-      [stTopic, stSubject, stDoc].forEach(el => {
-        el.classList.remove('done'); el.classList.add('pending');
-      });
-      document.getElementById('step-topic-text').textContent   = `Topic: "${topic}"`;
-      document.getElementById('step-subject-text').textContent = `Subject: ${subject}`;
-      document.getElementById('step-doc-text').textContent =
-        hasFile ? `Document detected: ${uploadedFile.name}` : 'No document attached';
-      document.getElementById('exp-intent').textContent =
-        `Proceeding to generate an interactive ${subject.toLowerCase()} experiment guide on "${topic}".`;
-      document.getElementById('proceedBtn').style.display = 'none';
-
-      // Animate the steps in sequence
-      const stepDelay = 350;
-      setTimeout(() => { stTopic.classList.remove('pending'); stTopic.classList.add('done'); }, stepDelay);
-      setTimeout(() => { stSubject.classList.remove('pending'); stSubject.classList.add('done'); }, stepDelay * 2);
-      setTimeout(() => { stDoc.classList.remove('pending');   stDoc.classList.add('done'); }, stepDelay * 3);
-
-      // Auto-advance unless a file is attached (user should confirm parse)
-      const totalDelay = stepDelay * 3 + 600;
-      if (hasFile) {
-        // Manual confirmation when document attached
-        setTimeout(() => {
-          document.getElementById('proceedBtn').style.display = '';
-        }, totalDelay);
-      } else {
-        // Auto-advance
-        setTimeout(generateGuide, totalDelay);
-      }
-    }
-
-    document.getElementById('proceedBtn').addEventListener('click', generateGuide);
-
-    /* ─── Phase 2 → Phase 3: generate JSON guide ───────────────────── */
-    async function generateGuide() {
-      const topic    = document.getElementById('topic').value.trim();
-      const subject  = document.getElementById('subject').value;
-      const difficulty = document.getElementById('difficulty').value;
-      const url = window.STREAM_URLS && window.STREAM_URLS.experiment_guide;
-      if (!url || url.startsWith('__URL_')) { showToast('URL not configured','error'); return; }
-
-      const intent = document.getElementById('exp-intent');
-      intent.textContent = '🧪 Generating experiment guide…';
-
       const body = { subject, topic, difficulty };
       if (uploadedFile.data) {
         body.file_data = uploadedFile.data;
         body.file_mime = uploadedFile.mime;
         body.file_name = uploadedFile.name;
       }
-
-      try {
-        const resp = await fetch(url, {
-          method:'POST', headers: apiHeaders(), body: JSON.stringify(body),
-        });
-        const json = await resp.json();
-        if (json.error && !json.sections) throw new Error(json.error);
-        if (!json.sections) throw new Error('Malformed response');
-        guide = json;
-        renderMap(guide);
-        showPhase('phase-map');
-        recordActivity(subject);
-        saveState();
-        showToast('Experiment guide ready — click any branch to expand', 'success');
-      } catch (err) {
-        intent.textContent = '⚠️ ' + (err.message || 'Generation failed');
-        showToast('Failed: ' + err.message, 'error');
-      }
-    }
-
-    /* ─── Phase 3: render node map ─────────────────────────────────── */
-    function renderMap(g) {
-      document.getElementById('expMainTitle').textContent = g.topic;
-      document.getElementById('expMainSub').textContent =
-        `${g.subject} · ${g.difficulty}`;
-      document.getElementById('mapHeader').textContent =
-        `3 · ${g.topic} — Experiment Map`;
-
-      const grid = document.getElementById('expMap');
-      // Keep main node, remove old children
-      grid.querySelectorAll('.exp-node').forEach(n => n.remove());
-      SECTIONS.forEach((s, i) => {
-        const node = document.createElement('button');
-        node.type = 'button';
-        node.className = 'exp-node';
-        node.dataset.key = s.key;
-        node.innerHTML = `
-          <span class="exp-node-icon">${s.icon}</span>
-          <span class="exp-node-title">${s.label}</span>`;
-        node.addEventListener('click', () => openSection(s.key));
-        grid.appendChild(node);
+      streamToPanel(window.STREAM_URLS.experiment_guide, body, 'out-experiment', btn, {
+        successToast: 'Experiment guide generated',
+        onComplete: () => recordActivity(subject)
       });
-      mapBuilt = true;
-      // Draw connectors after layout settles
-      requestAnimationFrame(() => requestAnimationFrame(drawConnectors));
-    }
-
-    function drawConnectors() {
-      const svg = document.getElementById('expSvg');
-      const wrap = document.querySelector('.exp-map-wrap');
-      const main = document.getElementById('expMainNode');
-      if (!svg || !wrap || !main) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      svg.setAttribute('viewBox', `0 0 ${wrapRect.width} ${wrapRect.height}`);
-      svg.innerHTML = '';
-      const mainRect = main.getBoundingClientRect();
-      const mx = mainRect.left + mainRect.width / 2 - wrapRect.left;
-      const my = mainRect.bottom - wrapRect.top;
-      document.querySelectorAll('.exp-node').forEach((node, i) => {
-        const r = node.getBoundingClientRect();
-        const cx = r.left + r.width / 2 - wrapRect.left;
-        const cy = r.top  - wrapRect.top + 8;
-        // Bezier curve from main bottom to child top
-        const dx = cx - mx;
-        const c1x = mx;
-        const c1y = my + 60;
-        const c2x = cx - dx * 0.2;
-        const c2y = cy - 60;
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', `M ${mx} ${my} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${cx} ${cy}`);
-        path.classList.add('connector-anim');
-        path.style.animationDelay = (i * 80) + 'ms';
-        svg.appendChild(path);
-      });
-    }
-    window.addEventListener('resize', () => { if (mapBuilt) drawConnectors(); });
-
-    /* ─── Side drawer ──────────────────────────────────────────────── */
-    function richMd(s) {
-      // Escape, then render **bold**, simple bullet/number lists, and line breaks
-      let html = escapeHtml(s);
-      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      // Convert leading "- " / "* " bullets
-      const lines = html.split('\n');
-      let inUl = false, inOl = false, out = [];
-      for (const raw of lines) {
-        const line = raw.trim();
-        if (/^[-*]\s+/.test(line)) {
-          if (!inUl) { if (inOl) { out.push('</ol>'); inOl = false; } out.push('<ul>'); inUl = true; }
-          out.push('<li>' + line.replace(/^[-*]\s+/, '') + '</li>');
-        } else if (/^\d+\.\s+/.test(line)) {
-          if (!inOl) { if (inUl) { out.push('</ul>'); inUl = false; } out.push('<ol>'); inOl = true; }
-          out.push('<li>' + line.replace(/^\d+\.\s+/, '') + '</li>');
-        } else {
-          if (inUl) { out.push('</ul>'); inUl = false; }
-          if (inOl) { out.push('</ol>'); inOl = false; }
-          if (line) out.push('<p>' + line + '</p>');
-        }
-      }
-      if (inUl) out.push('</ul>');
-      if (inOl) out.push('</ol>');
-      return out.join('');
-    }
-
-    function openSection(key) {
-      if (!guide) return;
-      const meta = SECTIONS.find(s => s.key === key);
-      if (!meta) return;
-      document.getElementById('drawerTitle').innerHTML = `${meta.icon} ${meta.label}`;
-      const body = guide.sections[key] || '*No content for this section.*';
-      document.getElementById('drawerBody').innerHTML = richMd(body);
-      document.getElementById('expDrawer').classList.add('open');
-      document.getElementById('expBackdrop').classList.add('show');
-      // Mark active node
-      document.querySelectorAll('.exp-node').forEach(n => {
-        n.classList.toggle('active', n.dataset.key === key);
-      });
-    }
-    function closeDrawer() {
-      document.getElementById('expDrawer').classList.remove('open');
-      document.getElementById('expBackdrop').classList.remove('show');
-      document.querySelectorAll('.exp-node').forEach(n => n.classList.remove('active'));
-    }
-    document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
-    document.getElementById('expBackdrop').addEventListener('click', closeDrawer);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && document.getElementById('expDrawer').classList.contains('open')) {
-        closeDrawer();
-      }
     });
 
-    /* ─── Reset / new ──────────────────────────────────────────────── */
     document.getElementById('resetBtn').addEventListener('click', () => {
+      // Note: subject is intentionally NOT reset — the user picked it on purpose.
       document.getElementById('topic').value = '';
       document.getElementById('difficulty').value = 'Standard';
       document.getElementById('file-info').textContent = '';
       uploadedFile = { data: null, mime: null, name: null };
-      try { sessionStorage.removeItem(STATE_KEY); } catch(e){}
-      guide = null;
-    });
-    document.getElementById('newExpBtn').addEventListener('click', () => {
-      try { sessionStorage.removeItem(STATE_KEY); } catch(e){}
-      guide = null;
-      showPhase('phase-setup');
+      clearPanel('out-experiment', 'Your experiment guide will appear here…');
     });
 
-    /* ─── Export / Send to AI ──────────────────────────────────────── */
     document.getElementById('exportBtn').addEventListener('click', () => {
-      // Build a temp container with all sections expanded for printing
-      if (!guide) { showToast('Generate something first', 'warning'); return; }
-      const printable = document.createElement('div');
-      printable.id = 'expPrintable';
-      printable.style.padding = '0';
-      printable.innerHTML = `
-        <h1>${escapeHtml(guide.topic)}</h1>
-        <p><em>${escapeHtml(guide.subject)} · ${escapeHtml(guide.difficulty)}</em></p>
-        ${SECTIONS.map(s => `
-          <h2>${s.icon} ${s.label}</h2>
-          ${richMd(guide.sections[s.key] || '')}
-        `).join('')}`;
-      document.body.appendChild(printable);
-      const old = document.title;
-      document.title = `Experiment — ${guide.topic}`;
-      setTimeout(() => {
-        window.print();
-        document.title = old;
-        printable.remove();
-      }, 80);
+      exportToPDF('out-experiment', 'Experiment Guide');
     });
-
     document.getElementById('sendToAiBtn').addEventListener('click', () => {
-      if (!guide) { showToast('Generate something first', 'warning'); return; }
-      const flat = SECTIONS
-        .map(s => `## ${s.icon} ${s.label}\n${guide.sections[s.key] || ''}`)
-        .join('\n\n');
-      window.GlobalChat && window.GlobalChat.injectContent(
-        `# ${guide.topic}\n_${guide.subject} · ${guide.difficulty}_\n\n${flat}`,
-        'experiment',
-        '🧪 Experiment: ' + guide.topic
-      );
+      const text = document.getElementById('out-experiment').innerText.trim();
+      if (!text || text.startsWith('Your experiment guide')) {
+        showToast('Generate something first', 'warning');
+        return;
+      }
+      const topic = document.getElementById('topic').value.trim() || 'experiment';
+      window.GlobalChat && window.GlobalChat.injectContent(text, 'experiment', '🧪 Experiment: ' + topic);
     });
-
-    /* ─── Boot ─────────────────────────────────────────────────────── */
-    restoreState();
   </script>
 </body>
 </html>

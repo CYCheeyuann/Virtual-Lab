@@ -69,6 +69,7 @@
       </a>
 
       <a class="tile" href="flashcards.html" id="flashTile" data-desc="AI-generated spaced repetition decks to lock science concepts into your long-term memory.">
+        <span class="tile-badge tile-badge-coming" id="flashBadge">Coming Soon</span>
         <div class="tile-icon">
           <svg viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-2-2H6.5L4 3.5A1 1 0 0 0 3 3a1 1 0 0 0-1 1v15a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2z"/><path d="M14 12h-4"/><path d="M12 10v4"/></svg>
         </div>
@@ -98,6 +99,7 @@
 
       // Toggle the Smart Flashcards tile based on backend deployment status
       const tile = document.getElementById('flashTile');
+      const badge = document.getElementById('flashBadge');
       const live = window.STREAM_URLS && window.STREAM_URLS.flashcard_generator
                 && !window.STREAM_URLS.flashcard_generator.startsWith('__URL_');
       if (tile && !live) {
@@ -107,8 +109,16 @@
           e.preventDefault();
           showToast('Flashcards backend not yet deployed', 'info');
         });
+        if (badge) {
+          badge.textContent = 'Coming Soon';
+          badge.classList.add('tile-badge-coming');
+        }
       } else if (tile && live) {
         tile.classList.remove('tile-locked');
+        if (badge) {
+          badge.textContent = 'Beta';
+          badge.classList.remove('tile-badge-coming');
+        }
       }
 
       // Typewriter hover effect on tile descriptions

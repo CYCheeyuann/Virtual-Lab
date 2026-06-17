@@ -29,18 +29,19 @@
   <main class="page">
     <div class="page-header">
       <h1>🧪 Experiment Guide</h1>
-      <p>Generate a complete lab guide with safety briefing. Optionally upload a science document for context.</p>
+      <p>Generate a complete interactive experiment guide. We'll preview what the AI plans to produce before generating the full set of 8 sections.</p>
     </div>
 
-    <section class="card">
-      <h2>Setup</h2>
+    <!-- ═══ Phase 1: Setup ═══ -->
+    <section class="card" id="phase-setup">
+      <h2>1 · Setup</h2>
 
       <label for="subject">Subject</label>
       <select id="subject" class="input">
         <option value="Biology">Biology</option>
         <option value="Chemistry">Chemistry</option>
         <option value="Physics">Physics</option>
-      <option value="Science">General Science</option>
+        <option value="Science">General Science</option>
       </select>
 
       <label for="topic">Experiment Topic</label>
@@ -69,17 +70,89 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>🔬 Experiment Guide</h2>
-      <div class="output-panel text-panel" id="out-experiment">
-        <div class="placeholder">Your experiment guide will appear here…</div>
+    <!-- ═══ Phase 2: Confirmation ═══ -->
+    <section class="card" id="phase-confirm" style="display:none">
+      <h2>2 · Confirm Generation</h2>
+      <div class="confirm-summary" id="confirmSummary"></div>
+      <div class="confirm-error" id="confirmError" hidden></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="continueBtn" class="btn btn-primary">
+          <span>🚀</span><span>Continue &amp; Generate Guide</span>
+        </button>
+        <button id="confirmBackBtn" class="btn btn-ghost">
+          <span>←</span><span>Back to Setup</span>
+        </button>
       </div>
-      <div class="btn-row" style="margin-top:12px">
+    </section>
+
+    <!-- ═══ Phase 3: Node-Map Output ═══ -->
+    <section class="card" id="phase-nodemap" style="display:none">
+      <div class="node-map" id="nodeMap">
+        <div class="main-topic-node">
+          <span class="topic-icon">🧪</span>
+          <h2 class="topic-title" id="mainTopicTitle">Experiment</h2>
+          <div class="topic-meta" id="mainTopicMeta"></div>
+        </div>
+
+        <svg class="node-connectors" id="nodeConnectors" aria-hidden="true"></svg>
+
+        <div class="node-grid">
+          <button class="node-box" data-section="objective" type="button">
+            <span class="node-icon">🎯</span>
+            <span class="node-title">Objective</span>
+          </button>
+          <button class="node-box" data-section="materials" type="button">
+            <span class="node-icon">🧰</span>
+            <span class="node-title">Materials</span>
+          </button>
+          <button class="node-box" data-section="safety" type="button">
+            <span class="node-icon">⚠️</span>
+            <span class="node-title">Safety Briefing</span>
+          </button>
+          <button class="node-box" data-section="procedure" type="button">
+            <span class="node-icon">🔬</span>
+            <span class="node-title">Procedure</span>
+          </button>
+          <button class="node-box" data-section="expected_results" type="button">
+            <span class="node-icon">📊</span>
+            <span class="node-title">Expected Results</span>
+          </button>
+          <button class="node-box" data-section="scientific_explanation" type="button">
+            <span class="node-icon">🧠</span>
+            <span class="node-title">Scientific Explanation</span>
+          </button>
+          <button class="node-box" data-section="real_life_applications" type="button">
+            <span class="node-icon">🌍</span>
+            <span class="node-title">Real-Life Applications</span>
+          </button>
+          <button class="node-box" data-section="summary" type="button">
+            <span class="node-icon">📝</span>
+            <span class="node-title">Summary</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:24px">
+        <button id="newExperimentBtn" class="btn btn-ghost">
+          <span>↻</span><span>New Experiment</span>
+        </button>
         <button id="exportBtn" class="btn btn-ghost btn-export"></button>
         <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
   </main>
+
+  <!-- Detail panel — opens when a node-box is clicked -->
+  <div class="node-detail-backdrop" id="nodeDetailBackdrop" hidden>
+    <div class="node-detail-panel" role="dialog" aria-labelledby="nodeDetailTitle">
+      <button class="node-detail-close" id="nodeDetailClose" type="button" aria-label="Close">✕</button>
+      <h2 id="nodeDetailTitle">
+        <span id="nodeDetailIcon"></span>
+        <span id="nodeDetailTitleText"></span>
+      </h2>
+      <div class="node-detail-body" id="nodeDetailBody"></div>
+    </div>
+  </div>
 
   <script src="config.js"></script>
   <script src="progress.js"></script>
@@ -88,7 +161,7 @@
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
   <script>
-    // Inject SVG icon buttons
+    // Inject button labels
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Experiment</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
     document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
@@ -97,50 +170,341 @@
     let uploadedFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
 
-    document.getElementById('runBtn').addEventListener('click', () => {
+    /* ─── State ─── */
+    const SESSION_KEY = 'vsl.experimentGuide';
+    let sessionCache = null;     // { topicTitle, subject, topic, difficulty, sections }
+    let activeAbort = null;
+
+    const SECTION_ICONS = {
+      objective: '🎯', materials: '🧰', safety: '⚠️',
+      procedure: '🔬', expected_results: '📊',
+      scientific_explanation: '🧠', real_life_applications: '🌍',
+      summary: '📝',
+    };
+    const SECTION_TITLES = {
+      objective: 'Objective', materials: 'Materials',
+      safety: 'Safety Briefing', procedure: 'Procedure',
+      expected_results: 'Expected Results',
+      scientific_explanation: 'Scientific Explanation',
+      real_life_applications: 'Real-Life Applications',
+      summary: 'Summary',
+    };
+
+    /* ─── Phase switcher ─── */
+    function showPhase(id) {
+      ['phase-setup', 'phase-confirm', 'phase-nodemap'].forEach(p => {
+        document.getElementById(p).style.display = p === id ? '' : 'none';
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /* ─── Phase 1 → Phase 2: validate first ─── */
+    document.getElementById('runBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBtn');
       const subject    = document.getElementById('subject').value;
       const topic      = document.getElementById('topic').value.trim();
       const difficulty = document.getElementById('difficulty').value;
-      const out = document.getElementById('out-experiment');
       if (!topic) {
-        out.innerHTML = '<div class="error-msg">⚠️ Please enter an experiment topic first.</div>';
         showToast('Please enter an experiment topic', 'warning');
         return;
       }
-      const body = { subject, topic, difficulty };
+      const url = window.STREAM_URLS && window.STREAM_URLS.experiment_guide;
+      if (!url || url.startsWith('__URL_')) {
+        showToast('URL not configured', 'error');
+        return;
+      }
+
+      const body = { mode: 'validate', subject, topic, difficulty };
       if (uploadedFile.data) {
         body.file_data = uploadedFile.data;
         body.file_mime = uploadedFile.mime;
         body.file_name = uploadedFile.name;
       }
-      streamToPanel(window.STREAM_URLS.experiment_guide, body, 'out-experiment', btn, {
-        successToast: 'Experiment guide generated',
-        onComplete: () => recordActivity(subject)
-      });
+
+      setButtonLoading(btn, true, 'Validating…');
+      try {
+        const resp = await fetch(url, {
+          method: 'POST', headers: apiHeaders(), body: JSON.stringify(body),
+        });
+        const json = await resp.json();
+        renderConfirm(json, { subject, topic, difficulty });
+      } catch (err) {
+        showToast('Validation failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
     });
 
+    function renderConfirm(json, meta) {
+      const summaryEl = document.getElementById('confirmSummary');
+      const errorEl   = document.getElementById('confirmError');
+      const continueBtn = document.getElementById('continueBtn');
+      if (json && json.valid) {
+        summaryEl.innerHTML = `
+          <div class="confirm-line">${escapeHtml(json.summary || '')}</div>
+          <div class="confirm-meta">
+            <span><strong>Subject:</strong> ${escapeHtml(meta.subject)}</span>
+            <span><strong>Topic:</strong> ${escapeHtml(meta.topic)}</span>
+            <span><strong>Difficulty:</strong> ${escapeHtml(meta.difficulty)}</span>
+            ${uploadedFile.name ? `<span><strong>Document:</strong> ${escapeHtml(uploadedFile.name)}</span>` : ''}
+          </div>`;
+        errorEl.hidden = true;
+        continueBtn.disabled = false;
+      } else {
+        summaryEl.innerHTML = '';
+        errorEl.innerHTML = `❌ ${escapeHtml((json && json.error) || 'Validation failed')}`;
+        errorEl.hidden = false;
+        continueBtn.disabled = true;
+      }
+      showPhase('phase-confirm');
+    }
+
+    document.getElementById('confirmBackBtn').addEventListener('click', () => {
+      showPhase('phase-setup');
+    });
+
+    /* ─── Phase 2 → Phase 3: full generation ─── */
+    document.getElementById('continueBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('continueBtn');
+      const subject    = document.getElementById('subject').value;
+      const topic      = document.getElementById('topic').value.trim();
+      const difficulty = document.getElementById('difficulty').value;
+      const url = window.STREAM_URLS.experiment_guide;
+
+      const body = { mode: 'node_map', subject, topic, difficulty };
+      if (uploadedFile.data) {
+        body.file_data = uploadedFile.data;
+        body.file_mime = uploadedFile.mime;
+        body.file_name = uploadedFile.name;
+      }
+
+      // Abort any in-flight previous generation
+      if (activeAbort) { try { activeAbort.abort(); } catch(_){} }
+      activeAbort = new AbortController();
+
+      setButtonLoading(btn, true, 'Generating 8 sections…');
+      try {
+        const resp = await fetch(url, {
+          method: 'POST', headers: apiHeaders(),
+          body: JSON.stringify(body),
+          signal: activeAbort.signal,
+        });
+        const json = await resp.json();
+        if (json.error && !json.sections) throw new Error(json.error);
+        sessionCache = {
+          topicTitle: json.topic_title || `${topic} Experiment`,
+          subject, topic, difficulty,
+          sections: json.sections || {},
+        };
+        saveCache();
+        renderNodeMap();
+        recordActivity(subject);
+        showToast('Experiment guide ready — click any node', 'success');
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        showToast('Generation failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+        activeAbort = null;
+      }
+    });
+
+    /* ─── Reset ─── */
     document.getElementById('resetBtn').addEventListener('click', () => {
-      // Note: subject is intentionally NOT reset — the user picked it on purpose.
       document.getElementById('topic').value = '';
       document.getElementById('difficulty').value = 'Standard';
       document.getElementById('file-info').textContent = '';
       uploadedFile = { data: null, mime: null, name: null };
-      clearPanel('out-experiment', 'Your experiment guide will appear here…');
+    });
+    document.getElementById('newExperimentBtn').addEventListener('click', () => {
+      sessionCache = null;
+      try { sessionStorage.removeItem(SESSION_KEY); } catch(_){}
+      // Clear viewed markers
+      document.querySelectorAll('.node-box.viewed').forEach(b => b.classList.remove('viewed'));
+      showPhase('phase-setup');
     });
 
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      exportToPDF('out-experiment', 'Experiment Guide');
-    });
-    document.getElementById('sendToAiBtn').addEventListener('click', () => {
-      const text = document.getElementById('out-experiment').innerText.trim();
-      if (!text || text.startsWith('Your experiment guide')) {
-        showToast('Generate something first', 'warning');
+    /* ─── Node map render ─── */
+    function renderNodeMap() {
+      if (!sessionCache) return;
+      document.getElementById('mainTopicTitle').textContent = sessionCache.topicTitle;
+      document.getElementById('mainTopicMeta').textContent =
+        `${sessionCache.subject} · ${sessionCache.difficulty}`;
+      // Reset viewed markers
+      document.querySelectorAll('.node-box.viewed').forEach(b => b.classList.remove('viewed'));
+      showPhase('phase-nodemap');
+      // Draw connectors after layout settles
+      requestAnimationFrame(() => {
+        drawConnectors();
+        // Re-draw on resize
+        if (!window._expConnHooked) {
+          window._expConnHooked = true;
+          let t;
+          window.addEventListener('resize', () => {
+            clearTimeout(t);
+            t = setTimeout(drawConnectors, 120);
+          });
+        }
+      });
+    }
+
+    function drawConnectors() {
+      const svg = document.getElementById('nodeConnectors');
+      const main = document.querySelector('.main-topic-node');
+      const map = document.getElementById('nodeMap');
+      const boxes = document.querySelectorAll('.node-box');
+      if (!svg || !main || !map) return;
+      // Skip on narrow viewports — layout switches to stack and connectors look noisy
+      if (window.innerWidth < 900) {
+        svg.innerHTML = '';
         return;
       }
-      const topic = document.getElementById('topic').value.trim() || 'experiment';
-      window.GlobalChat && window.GlobalChat.injectContent(text, 'experiment', '🧪 Experiment: ' + topic);
+      const mapRect = map.getBoundingClientRect();
+      const mainRect = main.getBoundingClientRect();
+      const sx = mainRect.left + mainRect.width / 2 - mapRect.left;
+      const sy = mainRect.bottom - mapRect.top;
+      let paths = '';
+      boxes.forEach(box => {
+        const r = box.getBoundingClientRect();
+        const tx = r.left + r.width / 2 - mapRect.left;
+        const ty = r.top - mapRect.top;
+        const cy = (sy + ty) / 2;
+        paths += `<path d="M ${sx} ${sy} C ${sx} ${cy}, ${tx} ${cy}, ${tx} ${ty}" />`;
+      });
+      svg.innerHTML = paths;
+      svg.setAttribute('viewBox', `0 0 ${mapRect.width} ${mapRect.height}`);
+      svg.setAttribute('width', mapRect.width);
+      svg.setAttribute('height', mapRect.height);
+    }
+
+    /* ─── Detail panel (modal) ─── */
+    function openDetail(sectionKey) {
+      if (!sessionCache || !sessionCache.sections) return;
+      const body = sessionCache.sections[sectionKey] || '';
+      document.getElementById('nodeDetailIcon').textContent = SECTION_ICONS[sectionKey] || '';
+      document.getElementById('nodeDetailTitleText').textContent = SECTION_TITLES[sectionKey] || sectionKey;
+      document.getElementById('nodeDetailBody').innerHTML = renderSectionMarkdown(body);
+      document.getElementById('nodeDetailBackdrop').hidden = false;
+      // Mark the box as viewed
+      document.querySelector(`.node-box[data-section="${sectionKey}"]`)?.classList.add('viewed');
+    }
+    function closeDetail() {
+      document.getElementById('nodeDetailBackdrop').hidden = true;
+    }
+    document.querySelectorAll('.node-box').forEach(box => {
+      box.addEventListener('click', () => openDetail(box.dataset.section));
     });
+    document.getElementById('nodeDetailClose').addEventListener('click', closeDetail);
+    document.getElementById('nodeDetailBackdrop').addEventListener('click', (e) => {
+      // Click on the backdrop (outside the panel) closes
+      if (e.target === e.currentTarget) closeDetail();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !document.getElementById('nodeDetailBackdrop').hidden) {
+        closeDetail();
+      }
+    });
+
+    /* ─── Tiny markdown renderer for section bodies ─── */
+    function renderSectionMarkdown(s) {
+      if (!s) return '<p style="color:var(--c-muted);font-style:italic">(content unavailable — try regenerating)</p>';
+      const lines = String(s).split('\n');
+      const out = [];
+      let inUL = false, inOL = false;
+      const closeLists = () => {
+        if (inUL) { out.push('</ul>'); inUL = false; }
+        if (inOL) { out.push('</ol>'); inOL = false; }
+      };
+      for (const raw of lines) {
+        const line = raw.trimEnd();
+        if (!line.trim()) { closeLists(); continue; }
+        const inline = escapeHtml(line)
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>');
+        if (/^\s*[-*]\s+/.test(line)) {
+          if (!inUL) { closeLists(); out.push('<ul>'); inUL = true; }
+          out.push(`<li>${inline.replace(/^\s*[-*]\s+/, '')}</li>`);
+        } else if (/^\s*\d+\.\s+/.test(line)) {
+          if (!inOL) { closeLists(); out.push('<ol>'); inOL = true; }
+          out.push(`<li>${inline.replace(/^\s*\d+\.\s+/, '')}</li>`);
+        } else {
+          closeLists();
+          out.push(`<p>${inline}</p>`);
+        }
+      }
+      closeLists();
+      return out.join('');
+    }
+
+    /* ─── Cache persistence ─── */
+    function saveCache() {
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionCache)); } catch(_){}
+    }
+    function loadCache() {
+      try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || !obj.sections) return null;
+        return obj;
+      } catch(_) { return null; }
+    }
+
+    /* ─── Export / Send to AI ─── */
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      // Open all sections inline for printing
+      if (!sessionCache) { showToast('Nothing to export', 'warning'); return; }
+      // Build a print-friendly buffer in a hidden node, then trigger print.
+      let printBuf = `<h1 style="color:#000">${escapeHtml(sessionCache.topicTitle)}</h1>`;
+      for (const k of ['objective','materials','safety','procedure','expected_results','scientific_explanation','real_life_applications','summary']) {
+        printBuf += `<h2 style="color:#000;margin-top:16px">${SECTION_ICONS[k]} ${SECTION_TITLES[k]}</h2>`;
+        printBuf += renderSectionMarkdown(sessionCache.sections[k] || '');
+      }
+      let host = document.getElementById('print-buffer');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'print-buffer';
+        host.style.cssText = 'display:none';
+        document.body.appendChild(host);
+      }
+      host.innerHTML = printBuf;
+      const oldTitle = document.title;
+      document.title = sessionCache.topicTitle;
+      const styleEl = document.createElement('style');
+      styleEl.id = 'print-buffer-style';
+      styleEl.textContent = `@media print { body > *:not(#print-buffer) { display:none !important; } #print-buffer { display:block !important; color:#000; } #print-buffer * { color:#000 !important; } }`;
+      document.head.appendChild(styleEl);
+      setTimeout(() => {
+        window.print();
+        document.title = oldTitle;
+        styleEl.remove();
+      }, 80);
+    });
+
+    document.getElementById('sendToAiBtn').addEventListener('click', () => {
+      if (!sessionCache) { showToast('Generate something first', 'warning'); return; }
+      const lines = [`Experiment: ${sessionCache.topicTitle}`];
+      for (const k of ['objective','materials','safety','procedure','expected_results','scientific_explanation','real_life_applications','summary']) {
+        lines.push(`\n### ${SECTION_TITLES[k]}\n${sessionCache.sections[k] || ''}`);
+      }
+      window.GlobalChat && window.GlobalChat.injectContent(
+        lines.join('\n'), 'experiment', '🧪 Experiment: ' + sessionCache.topicTitle
+      );
+    });
+
+    /* ─── Restore cache on page load ─── */
+    (function restoreOnLoad() {
+      const cached = loadCache();
+      if (cached && cached.sections && Object.keys(cached.sections).length === 8) {
+        sessionCache = cached;
+        // Pre-fill setup form so "New Experiment" + edits feel coherent
+        const subjEl = document.getElementById('subject');
+        if ([...subjEl.options].some(o => o.value === cached.subject)) subjEl.value = cached.subject;
+        document.getElementById('topic').value = cached.topic || '';
+        document.getElementById('difficulty').value = cached.difficulty || 'Standard';
+        renderNodeMap();
+      }
+    })();
   </script>
 </body>
 </html>

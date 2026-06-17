@@ -72,6 +72,23 @@
       </div>
     </section>
 
+    <!-- ─── Preview Step (before confirming deck) ─── -->
+    <section class="card" id="previewSection" style="display:none">
+      <h2 id="previewTitle">Preview: Cards</h2>
+      <p style="color:var(--c-muted);font-size:0.88rem;margin-bottom:12px">
+        Review the generated flashcards below. Once confirmed, they'll be saved and the study session begins.
+      </p>
+      <div id="previewList" class="preview-list"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="confirmFlashBtn" class="btn btn-primary">
+          <span>✅</span><span>Confirm &amp; Start Studying</span>
+        </button>
+        <button id="previewBackBtn" class="btn btn-ghost">
+          <span>←</span><span>Back to Setup</span>
+        </button>
+      </div>
+    </section>
+
     <!-- ─── Deck Library ─── -->
     <section class="card">
       <h2>📚 Your Deck Library</h2>

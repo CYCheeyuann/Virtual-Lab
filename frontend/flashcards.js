@@ -345,19 +345,15 @@
 
     if (typeof window.setButtonLoading === 'function') window.setButtonLoading(btn, true, 'Generating…');
     try {
-      const id = await createDeckFromText({
-        subject, chapter: bab, topic, source_text: source, num_cards: count,
+      const cards = await generateCards({
+        mode: source ? 'from_text' : 'from_topic',
+        subject, chapter: bab, topic,
+        num_cards: count,
+        source_text: source || '',
       });
-      if (typeof window.showToast === 'function') {
-        window.showToast('Deck created', 'success');
-      }
-      // Clear the form
-      document.getElementById('newBab').value = '';
-      document.getElementById('newTopic').value = '';
-      document.getElementById('newSource').value = '';
-      renderLibrary();
-      // Auto-start studying the new deck
-      startStudy(id);
+      if (!cards.length) throw new Error('No cards generated');
+      // Show preview step
+      showPreview({ subject, bab, topic, cards });
     } catch (err) {
       if (typeof window.showToast === 'function') {
         window.showToast('Generation failed: ' + err.message, 'error');
@@ -365,6 +361,60 @@
     } finally {
       if (typeof window.setButtonLoading === 'function') window.setButtonLoading(btn, false);
     }
+  }
+
+  // ── Preview step (show extracted cards before confirming) ──
+  function showPreview({ subject, bab, topic, cards }) {
+    const previewSection = document.getElementById('previewSection');
+    const previewList = document.getElementById('previewList');
+    const newDeckSection = document.getElementById('newDeck');
+    if (!previewSection || !previewList) return;
+
+    newDeckSection.style.display = 'none';
+    previewSection.style.display = '';
+    document.getElementById('previewTitle').textContent =
+      `Preview: ${cards.length} cards for "${bab}"`;
+
+    previewList.innerHTML = cards.map((c, i) => `
+      <div class="preview-card">
+        <div class="preview-num">${i + 1}</div>
+        <div class="preview-content">
+          <div class="preview-front"><strong>Q:</strong> ${escHtml(c.front)}</div>
+          <div class="preview-back"><strong>A:</strong> ${escHtml(c.back)}</div>
+          ${c.hint ? `<div class="preview-hint">💡 ${escHtml(c.hint)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    // Wire confirm / back buttons
+    const confirmBtn = document.getElementById('confirmFlashBtn');
+    const backBtn = document.getElementById('previewBackBtn');
+    const cloneConfirm = confirmBtn.cloneNode(true);
+    const cloneBack = backBtn.cloneNode(true);
+    confirmBtn.replaceWith(cloneConfirm);
+    backBtn.replaceWith(cloneBack);
+
+    cloneBack.addEventListener('click', () => {
+      previewSection.style.display = 'none';
+      newDeckSection.style.display = '';
+    });
+    cloneConfirm.addEventListener('click', () => {
+      const deck = makeDeck({ subject, bab, topic });
+      const id = persistNewDeck(deck, cards);
+      previewSection.style.display = 'none';
+      newDeckSection.style.display = '';
+      // Clear form
+      document.getElementById('newBab').value = '';
+      document.getElementById('newTopic').value = '';
+      document.getElementById('newSource').value = '';
+      renderLibrary();
+      if (typeof window.showToast === 'function') {
+        window.showToast('Deck confirmed & created', 'success');
+      }
+      startStudy(id);
+    });
+
+    window.scrollTo({ top: previewSection.offsetTop - 80, behavior: 'smooth' });
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -451,17 +501,23 @@
     }
     ui.flipped = false;
     stage.dataset.flipped = 'false';
-    actions.hidden = true;
+    actions.hidden = true;  // Always hidden until user flips to back
     progress.textContent = `${ui.idx + 1} / ${ui.queue.length} · Box ${card.box}/5`;
   }
 
   function flipCard() {
-    if (!ui.overlayOpen || ui.flipped) return;
-    ui.flipped = true;
-    document.getElementById('fcStage').dataset.flipped = 'true';
-    document.getElementById('fcActions').hidden = false;
-    // Hide hint UI once back is visible
-    document.getElementById('fcHintRow').hidden = true;
+    if (!ui.overlayOpen) return;
+    // Toggle the flip — allows infinite front/back flipping
+    ui.flipped = !ui.flipped;
+    document.getElementById('fcStage').dataset.flipped = String(ui.flipped);
+    // Grading buttons only visible when showing the back
+    document.getElementById('fcActions').hidden = !ui.flipped;
+    if (!ui.flipped) {
+      // Going back to front — hide hint area too
+      document.getElementById('fcHintRow').hidden = false;
+    } else {
+      document.getElementById('fcHintRow').hidden = true;
+    }
   }
 
   function grade(g) {
@@ -499,10 +555,10 @@
     if (e.key === 'Escape') { e.preventDefault(); exitStudy(); return; }
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      if (!ui.flipped) flipCard();
+      flipCard();  // toggles front/back
       return;
     }
-    if (!ui.flipped) return;
+    if (!ui.flipped) return;  // grading only after flip to back
     if (e.key === '1') { e.preventDefault(); grade('hard'); }
     else if (e.key === '2') { e.preventDefault(); grade('okay'); }
     else if (e.key === '3') { e.preventDefault(); grade('easy'); }
@@ -523,11 +579,13 @@
     const horizontalish = Math.abs(dx) > Math.abs(dy) * 1.5;
     const v = Math.abs(dx) / dt;       // px/ms
     const big = Math.abs(dx) > 60 && v > 0.3;
-    if (!ui.flipped) {
-      // Treat tap (small movement) as flip
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) flipCard();
+    // Tap (small movement) = toggle flip
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
+      flipCard();
       return;
     }
+    // Swipe only counts when back is visible
+    if (!ui.flipped) return;
     if (horizontalish && big) {
       grade(dx < 0 ? 'hard' : 'easy');
     }

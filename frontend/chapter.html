@@ -107,6 +107,50 @@
     let copilotHistory = [];
     let detailCache = {};  // keyed by chapter title → detail JSON
 
+    /* ─── Cross-page state persistence (sessionStorage) ─────────────── */
+    const STATE_KEY = 'vsl.chapterState';
+    function savePageState() {
+      try {
+        sessionStorage.setItem(STATE_KEY, JSON.stringify({
+          subject: document.getElementById('subject')?.value,
+          level: document.getElementById('level')?.value,
+          topic: document.getElementById('chapterTopic')?.value,
+          chaptersData,
+          detailCache,
+        }));
+      } catch (e) {}
+    }
+    function restorePageState() {
+      try {
+        const raw = sessionStorage.getItem(STATE_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        if (!s || !Array.isArray(s.chaptersData) || !s.chaptersData.length) return;
+        // Restore form inputs
+        if (s.subject) {
+          const sel = document.getElementById('subject');
+          if (sel && [...sel.options].some(o => o.value === s.subject)) sel.value = s.subject;
+          setSubjectTheme(s.subject);
+        }
+        if (s.level) {
+          const lv = document.getElementById('level');
+          if (lv && [...lv.options].some(o => o.value === s.level)) lv.value = s.level;
+        }
+        if (s.topic) document.getElementById('chapterTopic').value = s.topic;
+        // Restore grid
+        chaptersData = s.chaptersData;
+        detailCache = s.detailCache || {};
+        chapterContext = JSON.stringify(chaptersData);
+        renderGrid();
+        document.getElementById('chapter-grid-section').style.display = '';
+        document.getElementById('copilot-section').style.display = '';
+        document.getElementById('copilot-chat').innerHTML =
+          '<div class="chat-bubble bot">📖 Chapters restored from your last session! Click a card to expand.</div>';
+      } catch (e) {}
+    }
+    // Restore on load
+    restorePageState();
+
     // ── Generate chapter grid ──
     document.getElementById('runBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBtn');
@@ -136,6 +180,7 @@
         copilotHistory = [];
         recordActivity(body.subject);
         showToast(`${chaptersData.length} chapter${chaptersData.length>1?'s':''} found`, 'success');
+        savePageState();
       } catch (err) {
         showToast('Failed: ' + err.message, 'error');
       } finally {
@@ -149,6 +194,7 @@
       document.getElementById('chapter-grid').innerHTML = '';
       chaptersData = [];
       detailCache = {};
+      try { sessionStorage.removeItem(STATE_KEY); } catch (e) {}
     });
 
     // ── Render card grid (5 per row) ──
@@ -205,6 +251,7 @@
 
         // Cache it
         detailCache[cacheKey] = d;
+        savePageState();
         // Mark card as cached visually
         if (cardEl) cardEl.classList.add('cached');
 

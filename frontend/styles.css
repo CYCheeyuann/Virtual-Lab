@@ -1309,6 +1309,11 @@ select option:hover {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   box-shadow: 0 4px 20px rgba(59, 130, 246, 0.25);
 }
+/* Science (General) — warm amber / gold gradient */
+[data-subject="Science"] .chapter-card {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25);
+}
 
 .chapter-card::before {
   content: '';
@@ -1329,6 +1334,9 @@ select option:hover {
 }
 [data-subject="Physics"] .chapter-card:hover {
   box-shadow: 0 10px 36px rgba(59, 130, 246, 0.40);
+}
+[data-subject="Science"] .chapter-card:hover {
+  box-shadow: 0 10px 36px rgba(245, 158, 11, 0.40);
 }
 
 /* Cached indicator — subtle checkmark badge */

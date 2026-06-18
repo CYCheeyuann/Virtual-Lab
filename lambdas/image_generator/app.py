@@ -41,11 +41,13 @@ TEXT_REGION    = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
 TEXT_MODEL_ID  = os.environ.get("MODEL_ID",
                                 "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 
-# Image model in N. Virginia (us-east-1). Defaults to Titan v2; flip via env
-# var to amazon.nova-canvas-v1:0 if you'd rather use Nova. Both share the
-# TEXT_IMAGE request body shape so the code path is identical.
-IMAGE_REGION   = os.environ.get("IMAGE_REGION",   "us-east-1")
-IMAGE_MODEL_ID = os.environ.get("IMAGE_MODEL_ID", "amazon.titan-image-generator-v2:0")
+# Image model — Stability AI SD 3.5 Large in us-west-2.
+# Switched from Titan v2 / Nova Canvas (us-east-1) because account 298493766605
+# has SD 3.5 Marketplace agreement signed but not Titan/Nova in us-east-1.
+# Stability's request body shape is different from Titan's; the code below
+# branches on model ID prefix to support both.
+IMAGE_REGION   = os.environ.get("IMAGE_REGION",   "us-west-2")
+IMAGE_MODEL_ID = os.environ.get("IMAGE_MODEL_ID", "stability.sd3-5-large-v1:0")
 
 VALID_STYLES = {
     "Scientific Diagram", "Textbook Illustration", "3D Render",
@@ -241,23 +243,38 @@ _IMAGE_PROMPT_LIMIT = 1024
 
 def _image_step(prompt):
     client = _get_image_client()
-    body = {
-        "taskType": "TEXT_IMAGE",
-        "textToImageParams": {"text": prompt[:_IMAGE_PROMPT_LIMIT]},
-        "imageGenerationConfig": {
-            "numberOfImages": 1,
-            "height":  1024,
-            "width":   1024,
-            "cfgScale": 8.0,   # Both Titan v2 and Nova accept range 1.1–10
-            "seed":     42,
-        },
-    }
+    truncated = prompt[:_IMAGE_PROMPT_LIMIT]
+
+    # Stability SD 3.5 Large uses a flat prompt-based body. Titan / Nova use
+    # a TEXT_IMAGE task envelope. Branch by model id prefix so the env var
+    # override stays meaningful.
+    if IMAGE_MODEL_ID.startswith("stability."):
+        body = {
+            "prompt": truncated,
+            "mode": "text-to-image",
+            "aspect_ratio": "1:1",
+            "output_format": "jpeg",
+        }
+    else:
+        body = {
+            "taskType": "TEXT_IMAGE",
+            "textToImageParams": {"text": truncated},
+            "imageGenerationConfig": {
+                "numberOfImages": 1,
+                "height":  1024,
+                "width":   1024,
+                "cfgScale": 8.0,   # Both Titan v2 and Nova accept range 1.1–10
+                "seed":     42,
+            },
+        }
+
     resp    = client.invoke_model(modelId=IMAGE_MODEL_ID, body=json.dumps(body))
     payload = json.loads(resp["body"].read())
     images  = payload.get("images") or []
     if not images:
-        # Both models return `error` on safety/validation failures.
-        err = payload.get("error") or payload
+        # Both model families return diagnostic info on safety/validation
+        # failures — Stability uses `finish_reasons`, Titan uses `error`.
+        err = payload.get("finish_reasons") or payload.get("error") or payload
         raise RuntimeError(f"Image model returned no images: {err!r}")
     return images[0]
 

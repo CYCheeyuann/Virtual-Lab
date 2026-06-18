@@ -150,7 +150,6 @@
         </div>
       </div>
       <div class="btn-row" style="margin-top:12px">
-        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
         <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
@@ -173,7 +172,6 @@
     // SVG icon buttons
     document.getElementById('runBtn').innerHTML       = `${iconHtml('bolt')}<span>Generate</span>`;
     document.getElementById('resetBtn').innerHTML     = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
-    document.getElementById('exportBtn').innerHTML    = `${iconHtml('download')}<span>Export PDF</span>`;
     document.getElementById('sendToAiBtn').innerHTML  = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI Chatbot</span>`;
 
     const TAB_TITLES = {
@@ -449,10 +447,7 @@
       setImageState('placeholder');
     });
 
-    /* ─── Export & Send to AI ──────────────────────────────────── */
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      exportToPDF('lab-out-text', `Lab Tools — ${currentTab}`);
-    });
+    /* ─── Send to AI ──────────────────────────────────────────── */
     document.getElementById('sendToAiBtn').addEventListener('click', () => {
       const text = document.getElementById('lab-out-text').innerText.trim();
       if (!text || text.startsWith('Result text')) {

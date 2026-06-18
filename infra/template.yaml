@@ -261,11 +261,13 @@ Resources:
           # Claude (text) runs in Singapore via global inference profile.
           BEDROCK_REGION: ap-southeast-1
           MODEL_ID: global.anthropic.claude-haiku-4-5-20251001-v1:0
-          # Titan Image Generator v2 in N. Virginia (us-east-1).
-          # The IAM policy also covers Nova Canvas / Titan v1, so to swap
-          # just change IMAGE_MODEL_ID below — no other infra change needed.
-          IMAGE_REGION: us-east-1
-          IMAGE_MODEL_ID: amazon.titan-image-generator-v2:0
+          # Stability AI SD 3.5 Large in us-west-2.
+          # Account 298493766605 has SD 3.5 Marketplace agreement signed; it
+          # does NOT have Titan v2 enabled in us-east-1, hence the swap.
+          # IAM grants both Titan/Nova ARNs (us-east-1) and SD 3.5 (us-west-2)
+          # so to flip back, change just the env vars below.
+          IMAGE_REGION: us-west-2
+          IMAGE_MODEL_ID: stability.sd3-5-large-v1:0
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: BUFFERED

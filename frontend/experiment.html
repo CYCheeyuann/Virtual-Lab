@@ -136,7 +136,6 @@
         <button id="newExperimentBtn" class="btn btn-ghost">
           <span>↻</span><span>New Experiment</span>
         </button>
-        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
         <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
@@ -164,7 +163,6 @@
     // Inject button labels
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Experiment</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
-    document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
     document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI</span>`;
 
     let uploadedFile = { data: null, mime: null, name: null };
@@ -450,37 +448,7 @@
       } catch(_) { return null; }
     }
 
-    /* ─── Export / Send to AI ─── */
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      // Open all sections inline for printing
-      if (!sessionCache) { showToast('Nothing to export', 'warning'); return; }
-      // Build a print-friendly buffer in a hidden node, then trigger print.
-      let printBuf = `<h1 style="color:#000">${escapeHtml(sessionCache.topicTitle)}</h1>`;
-      for (const k of ['objective','materials','safety','procedure','expected_results','scientific_explanation','real_life_applications','summary']) {
-        printBuf += `<h2 style="color:#000;margin-top:16px">${SECTION_ICONS[k]} ${SECTION_TITLES[k]}</h2>`;
-        printBuf += renderSectionMarkdown(sessionCache.sections[k] || '');
-      }
-      let host = document.getElementById('print-buffer');
-      if (!host) {
-        host = document.createElement('div');
-        host.id = 'print-buffer';
-        host.style.cssText = 'display:none';
-        document.body.appendChild(host);
-      }
-      host.innerHTML = printBuf;
-      const oldTitle = document.title;
-      document.title = sessionCache.topicTitle;
-      const styleEl = document.createElement('style');
-      styleEl.id = 'print-buffer-style';
-      styleEl.textContent = `@media print { body > *:not(#print-buffer) { display:none !important; } #print-buffer { display:block !important; color:#000; } #print-buffer * { color:#000 !important; } }`;
-      document.head.appendChild(styleEl);
-      setTimeout(() => {
-        window.print();
-        document.title = oldTitle;
-        styleEl.remove();
-      }, 80);
-    });
-
+    /* ─── Send to AI ─── */
     document.getElementById('sendToAiBtn').addEventListener('click', () => {
       if (!sessionCache) { showToast('Generate something first', 'warning'); return; }
       const lines = [`Experiment: ${sessionCache.topicTitle}`];

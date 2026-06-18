@@ -52,7 +52,6 @@
 
       <div class="btn-row" style="margin-top:18px">
         <button id="resetBtn" class="btn btn-ghost"></button>
-        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
         <button id="sendToAiBtn" class="btn btn-ghost"></button>
       </div>
     </section>
@@ -81,7 +80,6 @@
     // Inject SVG icon buttons
     document.getElementById('sendBtn').innerHTML  = `${iconHtml('plane', 'btn-icon-plane')}<span>Send</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('trash', 'btn-icon-trash')}<span>Clear conversation</span>`;
-    document.getElementById('exportBtn').innerHTML= `${iconHtml('download')}<span>Export PDF</span>`;
     document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send conversation to Lab Assistant</span>`;
 
     let history = [];
@@ -183,9 +181,6 @@
       document.getElementById('chat-panel').innerHTML =
         '<div class="chat-bubble bot">Conversation cleared. Ask me anything!</div>';
       showToast('Conversation cleared', 'success', 2200);
-    });
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      exportToPDF('chat-panel', 'Tutor Conversation');
     });
     document.getElementById('sendToAiBtn').addEventListener('click', () => {
       if (!history.length) {

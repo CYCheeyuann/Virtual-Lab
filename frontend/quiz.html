@@ -115,7 +115,6 @@
         <button id="retryBtn" class="btn btn-ghost"></button>
         <button id="newQuizBtn" class="btn btn-ghost"></button>
         <button id="saveWrongToFlashBtn" class="btn btn-primary"></button>
-        <button id="exportBtn" class="btn btn-ghost btn-export"></button>
       </div>
     </section>
 
@@ -155,7 +154,6 @@
     document.getElementById('retryBtn').innerHTML    = `${iconHtml('refresh','btn-icon-rotate')}<span>Retake This Quiz</span>`;
     document.getElementById('newQuizBtn').innerHTML  = `${iconHtml('bolt')}<span>New Quiz</span>`;
     document.getElementById('saveWrongToFlashBtn').innerHTML = `<span>🧠</span><span>Save incorrect answers to Flashcards</span>`;
-    document.getElementById('exportBtn').innerHTML   = `${iconHtml('download')}<span>Export PDF</span>`;
     document.getElementById('historyBackBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Back</span>`;
 
     let uploadedFile = { data: null, mime: null, name: null };
@@ -568,10 +566,6 @@
       unlockChatbox();
       showPhase('phase-setup');
     });
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      exportToPDF('results-container', 'Quiz Results');
-    });
-
     document.getElementById('saveWrongToFlashBtn').addEventListener('click', async () => {
       const btn = document.getElementById('saveWrongToFlashBtn');
       if (!window.Flashcards || !window.Flashcards.isBackendLive()) {

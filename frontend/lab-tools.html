@@ -342,6 +342,49 @@
     const PLACEHOLDER_PNG_B64 =
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=';
 
+    /* Step 1 in the sequential flow used by Safety + What If: fetch a
+       contextual image first via the existing image_generator Lambda
+       (which now uses Stability SD 3.5 in us-west-2). Falls back to a
+       placeholder gracefully if image gen is unavailable or fails — the
+       caller can still proceed to the text step. Returns when the image
+       has actually been rendered to the DOM (or the failure handled). */
+    async function generateContextImage(concept, subjectVal, btn) {
+      const imgUrl = window.STREAM_URLS && window.STREAM_URLS.image_generator;
+      setImageState('skeleton');
+      if (!imgUrl || imgUrl.startsWith('__URL_')) {
+        // No backend wired — show the placeholder PNG so the layout looks intentional
+        showImage(PLACEHOLDER_PNG_B64, `${concept} (mock)`);
+        return;
+      }
+      setButtonLoading(btn, true, 'Generating image…');
+      try {
+        const resp = await fetch(imgUrl, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify({
+            subject: subjectVal,
+            concept,
+            style:  'Scientific Diagram',
+            detail: 'Detailed',
+          }),
+        });
+        let json = {};
+        try { json = await resp.json(); } catch (_) {}
+        if (!resp.ok) throw new Error(json.error || `HTTP ${resp.status}`);
+        if (json.image_base64) {
+          showImage(json.image_base64, concept);
+        } else {
+          setImageState('placeholder');
+          if (json.error) showToast(json.error, 'warning', 5000);
+        }
+      } catch (err) {
+        setImageState('placeholder');
+        showToast(`Image step failed: ${err.message}`, 'warning', 5000);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
+
     /* ─── Generate — dispatch by current tab ───────────────────── */
     document.getElementById('runBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBtn');
@@ -353,10 +396,20 @@
           lab_level:document.getElementById('safety-level').value,
         };
         if (!p.activity) { showToast('Enter an activity first', 'warning'); return; }
-        showImageHidden();
+
+        // Step 1: image first — show contextual lab-safety setup
+        const imgConcept = `Laboratory safety setup for ${p.activity}: PPE, fume hood, emergency equipment, organized bench`;
+        const textPanel = document.getElementById('lab-out-text');
+        textPanel.innerHTML = '<div class="placeholder">⏳ Generating safety scene image first…</div>';
+        await generateContextImage(imgConcept, p.subject, btn);
+
+        // Step 2: stream the safety report into the text panel
         const url = window.STREAM_URLS && window.STREAM_URLS.safety_assistant;
         if (url && !url.startsWith('__URL_')) {
-          streamToPanel(url, p, 'lab-out-text', btn, { successToast: 'Safety report ready' });
+          streamToPanel(url, p, 'lab-out-text', btn, {
+            successToast: 'Safety report ready',
+            loadingLabel: 'Generating safety report…',
+          });
         } else {
           await mockStream('lab-out-text', mockSafetyText(p), btn);
           showToast('🦺 Mock safety report generated (backend not connected)', 'warning');
@@ -425,10 +478,20 @@
           realism:  document.getElementById('whatif-realism').value,
         };
         if (!p.scenario) { showToast('Enter a scenario first', 'warning'); return; }
-        showImageHidden();
+
+        // Step 1: image first — visualize the scenario
+        const imgConcept = `Conceptual scientific illustration of: ${p.scenario}`;
+        const textPanel = document.getElementById('lab-out-text');
+        textPanel.innerHTML = '<div class="placeholder">⏳ Visualizing scenario first…</div>';
+        await generateContextImage(imgConcept, p.subject, btn);
+
+        // Step 2: stream the timeline text
         const url = window.STREAM_URLS && window.STREAM_URLS.what_happens_if;
         if (url && !url.startsWith('__URL_')) {
-          streamToPanel(url, p, 'lab-out-text', btn, { successToast: 'Simulation ready' });
+          streamToPanel(url, p, 'lab-out-text', btn, {
+            successToast: 'Simulation ready',
+            loadingLabel: 'Generating timeline…',
+          });
         } else {
           await mockStream('lab-out-text', mockWhatIfText(p), btn);
           showToast('⚡ Mock simulation generated (backend not connected)', 'warning');

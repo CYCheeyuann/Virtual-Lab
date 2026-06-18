@@ -295,6 +295,55 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub "${FrontendBucket.Arn}/*"
 
+  # ─── CloudFront distribution — fronts the S3 website with HTTPS ─────────────
+  # Free TLS cert via *.cloudfront.net default certificate, no custom domain
+  # needed. PriceClass_100 keeps cost minimal (US/EU/Canada/Israel/HK edges).
+  # First deploy provisioning takes ~10-15 min as the distribution propagates
+  # to edge locations; subsequent updates are fast.
+  WebsiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "${AWS::StackName} — frontend HTTPS"
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2
+        IPV6Enabled: true
+        Origins:
+          - Id: S3WebsiteOrigin
+            # Use the S3 *website* endpoint (not the REST endpoint) so the
+            # IndexDocument / ErrorDocument behaviour configured on the bucket
+            # is honoured for clean URLs and SPA-style fallbacks.
+            DomainName: !Sub "${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              # S3 website endpoints are HTTP-only; CloudFront speaks HTTPS to
+              # the viewer regardless. The bucket itself stays public-read.
+              OriginProtocolPolicy: http-only
+              HTTPPort: 80
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods:  [GET, HEAD]
+          Compress: true
+          # AWS-managed CachingOptimized policy (TTL 86400, gzip+brotli).
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        # SPA-friendly: 403/404 from the bucket falls back to index.html
+        # so deep links work even though the static site has multiple pages.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
 Outputs:
   ChapterAssistantUrl:
     Value: !GetAtt ChapterAssistantFunctionUrl.FunctionUrl
@@ -316,5 +365,11 @@ Outputs:
     Value: !GetAtt ImageGeneratorFunctionUrl.FunctionUrl
   WebsiteUrl:
     Value: !GetAtt FrontendBucket.WebsiteURL
+  CloudFrontUrl:
+    Description: HTTPS URL of the CloudFront distribution (use this in production)
+    Value: !Sub "https://${WebsiteDistribution.DomainName}"
+  CloudFrontDistributionId:
+    Description: Distribution ID — needed for cache invalidations after S3 sync
+    Value: !Ref WebsiteDistribution
   BucketName:
     Value: !Ref FrontendBucket

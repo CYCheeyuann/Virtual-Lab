@@ -41,16 +41,27 @@ jobs:
       - name: Resolve AllowedOrigin from existing stack (if any)
         id: origin
         run: |
-          # On first deploy the stack doesn't exist yet → fall back to "*".
-          # On subsequent deploys we read the WebsiteUrl from the previous
-          # stack so CORS is locked to the exact bucket origin.
+          # Prefer the CloudFront HTTPS URL once the distribution exists, so
+          # CORS is locked to the production HTTPS origin. Falls back to the
+          # S3 website URL on first deploy (before CloudFront is provisioned),
+          # then to "*" on the very first deploy when neither output exists.
           set +e
-          URL=$(aws cloudformation describe-stacks \
+          CF_URL=$(aws cloudformation describe-stacks \
+                  --stack-name virtual-science-lab-assistant \
+                  --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
+                  --output text 2>/dev/null)
+          S3_URL=$(aws cloudformation describe-stacks \
                   --stack-name virtual-science-lab-assistant \
                   --query "Stacks[0].Outputs[?OutputKey=='WebsiteUrl'].OutputValue" \
                   --output text 2>/dev/null)
           set -e
-          if [ -z "$URL" ] || [ "$URL" = "None" ]; then URL="*"; fi
+          if [ -n "$CF_URL" ] && [ "$CF_URL" != "None" ]; then
+            URL="$CF_URL"
+          elif [ -n "$S3_URL" ] && [ "$S3_URL" != "None" ]; then
+            URL="$S3_URL"
+          else
+            URL="*"
+          fi
           echo "value=$URL" >> "$GITHUB_OUTPUT"
           echo "Using AllowedOrigin=$URL"
 
@@ -125,3 +136,25 @@ jobs:
             --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" \
             --output text)
           aws s3 sync frontend/ s3://$BUCKET/ --cache-control no-cache
+
+      - name: Invalidate CloudFront cache
+        run: |
+          # CloudFront caches S3 responses at edge locations; without an
+          # invalidation, viewers can keep seeing stale assets for the cache
+          # TTL. Skip silently on the very first deploy (before the
+          # distribution exists yet).
+          set +e
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --stack-name virtual-science-lab-assistant \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text 2>/dev/null)
+          set -e
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ]; then
+            echo "Invalidating CloudFront distribution $DIST_ID"
+            aws cloudfront create-invalidation \
+              --distribution-id "$DIST_ID" \
+              --paths "/*" \
+              --query 'Invalidation.Id' --output text
+          else
+            echo "No CloudFront distribution yet — skipping invalidation"
+          fi

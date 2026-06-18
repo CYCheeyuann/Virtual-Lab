@@ -261,6 +261,9 @@
 
     /* ─── Output rendering helpers ─────────────────────────────── */
     function setImageState(state) {
+      // Un-hide the image column whenever we're going to use it
+      document.querySelector('.output-image-col').style.display = '';
+      document.querySelector('.output-split').classList.remove('single-col');
       const host = document.getElementById('lab-out-image');
       if (state === 'skeleton') {
         host.innerHTML = `
@@ -273,6 +276,9 @@
       }
     }
     function showImage(b64, caption) {
+      // Un-hide column on real image render
+      document.querySelector('.output-image-col').style.display = '';
+      document.querySelector('.output-split').classList.remove('single-col');
       const host = document.getElementById('lab-out-image');
       host.innerHTML = `
         <img class="generated-image" alt="${escapeHtml(caption || 'AI generated illustration')}"
@@ -280,9 +286,11 @@
         <p class="image-caption">${escapeHtml(caption || '')}</p>`;
     }
     function showImageHidden() {
-      // For tabs that don't produce images
-      const host = document.getElementById('lab-out-image');
-      host.innerHTML = `<div class="image-placeholder">— No image for this tool —</div>`;
+      // Tabs that don't produce images (Safety, What If) — hide the entire
+      // image column instead of showing a "no image" placeholder, and let
+      // the text column take the full width via a single-column override.
+      document.querySelector('.output-image-col').style.display = 'none';
+      document.querySelector('.output-split').classList.add('single-col');
     }
 
     /* ─── Mock streaming helper for Phase 1 ─────────────────────── */

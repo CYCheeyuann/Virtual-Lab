@@ -11,6 +11,8 @@ window.STREAM_URLS = {
   what_happens_if:     '__URL_WHAT_HAPPENS_IF__',
   // Smart Flashcards (new)
   flashcard_generator: '__URL_FLASHCARD_GENERATOR__',
+  // Lab Tools redesign — Scientific Object Generator (new)
+  scientific_object_generator: '__URL_SCIENTIFIC_OBJECT_GENERATOR__',
 };
 
 // Optional shared secret. The deploy workflow replaces __API_KEY__ with the

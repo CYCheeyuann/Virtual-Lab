@@ -66,6 +66,16 @@ Resources:
                   - "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v2:0"
                   - "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v1"
                   - "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-canvas-v1:0"
+              # Stability AI SD 3.5 Large in us-west-2 — used by the
+              # Scientific Object Generator (Lab Tools redesign).
+              # NOTE: account-level model access must also be granted via the
+              # Bedrock console (Model access → Stability AI → Stable Diffusion 3.5 Large).
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - "arn:aws:bedrock:us-west-2::foundation-model/stability.sd3-5-large-v1:0"
+                  - "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-diffusion-xl-v1"
 
   # ─── Chapter Assistant Lambda ───────────────────────────────────────────────
   ChapterAssistantFunction:
@@ -135,6 +145,31 @@ Resources:
       CodeUri: ../lambdas/flashcard_generator/
       Handler: run.sh
       MemorySize: 512
+      Role: !GetAtt AppBedrockRole.Arn
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: buffered
+          PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+
+  # ─── Scientific Object Generator Lambda (Lab Tools redesign) ────────────────
+  # Three modes: overview (Claude Haiku) → image (Stability SD 3.5 Large in
+  # us-west-2) → narrative (Claude Haiku). Strictly sequential per the spec.
+  # Memory bumped to 1024 because base64 images can be ~1.5 MB.
+  # Timeout 300s — image gen on Stability can take 30-60s.
+  ScientificObjectGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambdas/scientific_object_generator/
+      Handler: run.sh
+      MemorySize: 1024
+      Timeout: 300
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
@@ -271,6 +306,8 @@ Outputs:
     Value: !GetAtt ScienceTutorFunctionUrl.FunctionUrl
   FlashcardGeneratorUrl:
     Value: !GetAtt FlashcardGeneratorFunctionUrl.FunctionUrl
+  ScientificObjectGeneratorUrl:
+    Value: !GetAtt ScientificObjectGeneratorFunctionUrl.FunctionUrl
   SafetyAssistantUrl:
     Value: !GetAtt SafetyAssistantFunctionUrl.FunctionUrl
   WhatHappensIfUrl:

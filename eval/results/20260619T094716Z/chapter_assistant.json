@@ -1,0 +1,42 @@
+[
+  {
+    "lambda": "chapter_assistant",
+    "sample_id": "biology-spm-full-syllabus",
+    "input": {
+      "action": "list",
+      "subject": "Biology",
+      "level": "SPM"
+    },
+    "status": 200,
+    "output": {
+      "data": [
+        {
+          "chapterNumber": "1",
+          "title": "Introduction to Biology",
+          "shortDescription": "What biology studies and how scientists work."
+        },
+        {
+          "chapterNumber": "2",
+          "title": "Cell Biology",
+          "shortDescription": "Cell theory and structure."
+        },
+        {
+          "chapterNumber": "3",
+          "title": "Genetics",
+          "shortDescription": "DNA, inheritance, and traits."
+        }
+      ]
+    },
+    "schema_pass": true,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

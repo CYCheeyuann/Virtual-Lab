@@ -1,0 +1,24 @@
+[
+  {
+    "lambda": "what_happens_if",
+    "sample_id": "sun-disappears",
+    "input": {
+      "subject": "Physics",
+      "scenario": "The sun suddenly disappears.",
+      "realism": "real"
+    },
+    "status": 200,
+    "output": "## \u26a1 Scenario\n> The sun suddenly disappears.\n## \u23f1\ufe0f Chain-Reaction Timeline\n### T+8 minutes\nLight stops reaching Earth.\n### T+1 day\nGlobal temperatures drop sharply.\n",
+    "schema_pass": null,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

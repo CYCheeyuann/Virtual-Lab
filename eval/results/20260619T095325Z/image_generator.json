@@ -1,0 +1,29 @@
+[
+  {
+    "lambda": "image_generator",
+    "sample_id": "mitochondrion-diagram",
+    "input": {
+      "subject": "Biology",
+      "concept": "Mitochondrion",
+      "style": "Scientific Diagram",
+      "detail": "Detailed"
+    },
+    "status": 200,
+    "output": {
+      "explanation": "## Mitochondrion\n\nThe **mitochondrion** is a double-membraned organelle responsible for ATP synthesis through oxidative phosphorylation.",
+      "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII=",
+      "prompt_used": "Detailed scientific diagram of a mitochondrion showing outer membrane, inner membrane with cristae, matrix with circular DNA, and ATP synthase complexes."
+    },
+    "schema_pass": true,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

@@ -21,15 +21,14 @@ if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
 import boto3
+from bedrock_stream import friendly_error
 from botocore.config import Config
 from botocore.exceptions import ClientError
-from flask import Flask, request, Response
-
 from cors import cors_headers, preflight_response
-from validators import validate_api_key, sanitize_subject, sanitize_topic
-from bedrock_stream import friendly_error
-from prompt_safety import tag, prefix_system
+from flask import Flask, Response, request
 from json_parse import parse_json_safe
+from prompt_safety import prefix_system, tag
+from validators import sanitize_subject, sanitize_topic, validate_api_key
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -105,8 +104,10 @@ def handler(path):
     concept = sanitize_topic(body.get("concept", ""), max_len=300)
     style   = body.get("style", "Scientific Diagram")
     detail  = body.get("detail", "Detailed")
-    if style  not in VALID_STYLES:  style  = "Scientific Diagram"
-    if detail not in VALID_DETAILS: detail = "Detailed"
+    if style  not in VALID_STYLES:
+        style  = "Scientific Diagram"
+    if detail not in VALID_DETAILS:
+        detail = "Detailed"
 
     if not concept:
         return _json_response({"error": "concept is required"}, status=400)
@@ -278,8 +279,10 @@ def _bedrock_error(err, fallback_text=None, prompt_used=None):
     msg  = err.response.get("Error", {}).get("Message", str(err))
     logger.exception("Bedrock ClientError code=%s message=%s", code, msg)
     payload = {"error": friendly_error(code, msg)}
-    if fallback_text is not None: payload["explanation"]  = fallback_text
-    if prompt_used   is not None: payload["prompt_used"]  = prompt_used
+    if fallback_text is not None:
+        payload["explanation"]  = fallback_text
+    if prompt_used   is not None:
+        payload["prompt_used"]  = prompt_used
     return _json_response(payload, status=500)
 
 

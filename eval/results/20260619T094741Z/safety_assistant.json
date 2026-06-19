@@ -1,0 +1,25 @@
+[
+  {
+    "lambda": "safety_assistant",
+    "sample_id": "acid-base-titration",
+    "input": {
+      "subject": "Chemistry",
+      "activity": "Acid-Base Titration",
+      "materials": "1.0 M HCl, 1.0 M NaOH, burette, conical flask, phenolphthalein",
+      "lab_level": "School Lab"
+    },
+    "status": 200,
+    "output": "## \ud83e\uddba Safety Report \u2014 Acid-Base Titration\n\n### \u26a0\ufe0f Risk Level\n\ud83d\udfe1 Medium \u2014 corrosive reagents and glassware.\n\n### \ud83d\udd2c Hazard Sources\n- Strong acid (HCl)\n- Strong base (NaOH)\n### \ud83e\udd7d PPE Required\n- Safety goggles\n- Lab coat\n- Nitrile gloves\n",
+    "schema_pass": null,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

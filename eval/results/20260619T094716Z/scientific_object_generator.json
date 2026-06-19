@@ -1,0 +1,33 @@
+[
+  {
+    "lambda": "scientific_object_generator",
+    "sample_id": "erlenmeyer-overview",
+    "input": {
+      "mode": "overview",
+      "form": {
+        "name": "Erlenmeyer flask",
+        "material": "Borosilicate glass",
+        "purpose": "Mixing reagents",
+        "useCase": "Acid-base titrations",
+        "appearance": "Conical body, narrow neck",
+        "sterility": "Autoclavable up to 180\u00b0C",
+        "style": "Photorealistic studio"
+      }
+    },
+    "status": 200,
+    "output": {
+      "overview": "An Erlenmeyer flask is a conical lab vessel of borosilicate glass with a narrow neck, designed for mixing reagents while minimizing splashing during titrations and similar manipulations."
+    },
+    "schema_pass": true,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

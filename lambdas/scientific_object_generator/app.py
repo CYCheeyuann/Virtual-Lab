@@ -21,14 +21,13 @@ if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
 import boto3
+from bedrock_stream import friendly_error
 from botocore.config import Config
 from botocore.exceptions import ClientError
-from flask import Flask, request, Response
-
 from cors import cors_headers, preflight_response
+from flask import Flask, Response, request
+from prompt_safety import prefix_system, tag
 from validators import validate_api_key
-from bedrock_stream import friendly_error
-from prompt_safety import tag, prefix_system
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -125,7 +124,7 @@ def _suspect_image_call():
     model in play is Stability — surface the Stability hint regardless of
     whether the message body mentions it explicitly."""
     try:
-        import sys, traceback
+        import traceback
         frames = traceback.extract_stack()
         return any("_handle_image" in f.name for f in frames)
     except Exception:

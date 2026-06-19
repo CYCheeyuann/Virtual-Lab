@@ -1,0 +1,53 @@
+[tool.ruff]
+# Lint scope: backend Python only. Frontend JS is checked elsewhere.
+target-version = "py312"
+line-length = 110
+extend-exclude = [
+    ".aws-sam",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "eval/results",
+]
+
+[tool.ruff.lint]
+# Conservative ruleset to start: pyflakes (F) catches unused imports,
+# pycodestyle errors (E), bugbear (B) for common bug patterns, and pyupgrade
+# (UP) for syntax modernization. Easy to expand later without churn.
+select = ["E", "F", "B", "UP", "I"]
+ignore = [
+    # Long lines in prompt strings are deliberate; line-length already at 110.
+    "E501",
+    # boto3 ClientError handlers genuinely need bare-ish except patterns.
+    "B904",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test fixtures intentionally use star imports / wildcard patches; tests
+# also do post-sys.path-modification imports.
+"tests/**/*.py" = ["F401", "F811", "E402"]
+# Each Lambda's app.py prepends sys.path before importing shared modules so
+# the deploy workflow's "copy shared/*.py into each Lambda" step works
+# transparently. E402 is unavoidable and intentional.
+"lambdas/**/*.py" = ["E402"]
+# Eval harness does the same sys.path dance.
+"eval/**/*.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "live: tests that hit real AWS Bedrock (skipped by default)",
+    "adversarial: prompt-injection / jailbreak coverage",
+]
+filterwarnings = [
+    # Flask's stream_with_context emits a benign cleanup warning when the
+    # test client drops a streaming response without iterating it. The
+    # warning is cosmetic and not actionable in test runs.
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+]

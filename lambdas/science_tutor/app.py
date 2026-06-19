@@ -9,14 +9,17 @@ _shared = os.path.join(os.path.dirname(__file__), "..", "shared")
 if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
-from flask import Flask, request, Response, stream_with_context
-from cors import cors_headers, preflight_response
-from validators import (
-    validate_api_key, sanitize_subject, sanitize_topic,
-    validate_file, trim_history,
-)
 from bedrock_stream import stream_bedrock
+from cors import cors_headers, preflight_response
+from flask import Flask, Response, request, stream_with_context
 from prompt_safety import INJECTION_GUARD, tag
+from validators import (
+    sanitize_subject,
+    sanitize_topic,
+    trim_history,
+    validate_api_key,
+    validate_file,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

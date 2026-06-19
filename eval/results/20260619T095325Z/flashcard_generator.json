@@ -1,0 +1,68 @@
+[
+  {
+    "lambda": "flashcard_generator",
+    "sample_id": "biology-cells-from-topic",
+    "input": {
+      "mode": "from_topic",
+      "subject": "Biology",
+      "chapter": "Cell Biology",
+      "num_cards": 5
+    },
+    "status": 200,
+    "output": {
+      "cards": [
+        {
+          "front": "What is the basic unit of life?",
+          "back": "The **cell** is the basic unit of life.",
+          "hint": "Smallest living unit.",
+          "tags": [
+            "definition"
+          ]
+        },
+        {
+          "front": "What organelle produces ATP?",
+          "back": "The **mitochondrion** produces ATP.",
+          "hint": "Powerhouse.",
+          "tags": [
+            "definition"
+          ]
+        },
+        {
+          "front": "Which structure controls what enters the cell?",
+          "back": "The **cell membrane** controls passage of substances.",
+          "hint": "Outer boundary.",
+          "tags": [
+            "concept"
+          ]
+        },
+        {
+          "front": "Where is genetic material stored?",
+          "back": "In the **nucleus**.",
+          "hint": "Control center.",
+          "tags": [
+            "definition"
+          ]
+        },
+        {
+          "front": "What process splits one cell into two?",
+          "back": "**Mitosis** divides a cell into two identical daughter cells.",
+          "hint": "M-phase.",
+          "tags": [
+            "concept"
+          ]
+        }
+      ]
+    },
+    "schema_pass": true,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

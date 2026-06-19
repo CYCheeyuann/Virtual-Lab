@@ -1,0 +1,24 @@
+[
+  {
+    "lambda": "science_tutor",
+    "sample_id": "explain-photosynthesis",
+    "input": {
+      "subject": "Biology",
+      "message": "Explain photosynthesis in simple terms.",
+      "history": []
+    },
+    "status": 200,
+    "output": "**Photosynthesis** is how plants turn sunlight into food. Chlorophyll captures light energy, which splits water molecules and combines CO\u2082 to make glucose, releasing oxygen as a by-product. \ud83c\udf3f",
+    "schema_pass": null,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

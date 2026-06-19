@@ -1,0 +1,75 @@
+[
+  {
+    "id": "erlenmeyer-overview",
+    "request": {
+      "mode": "overview",
+      "form": {
+        "name": "Erlenmeyer flask",
+        "material": "Borosilicate glass",
+        "purpose": "Mixing reagents",
+        "useCase": "Acid-base titrations",
+        "appearance": "Conical body, narrow neck",
+        "sterility": "Autoclavable up to 180°C",
+        "style": "Photorealistic studio"
+      }
+    },
+    "schema": "object_overview",
+    "canned": {
+      "text": "An Erlenmeyer flask is a conical lab vessel of borosilicate glass with a narrow neck, designed for mixing reagents while minimizing splashing during titrations and similar manipulations."
+    }
+  },
+  {
+    "id": "erlenmeyer-narrative",
+    "request": {
+      "mode": "narrative",
+      "approvedOverview": "An Erlenmeyer flask is a conical borosilicate glass vessel.",
+      "form": {
+        "name": "Erlenmeyer flask",
+        "material": "Borosilicate glass",
+        "purpose": "Mixing reagents",
+        "useCase": "Acid-base titrations",
+        "appearance": "Conical body, narrow neck",
+        "sterility": "Autoclavable",
+        "style": "Photorealistic studio"
+      }
+    },
+    "schema": "object_narrative",
+    "canned": {
+      "text": "The Erlenmeyer flask is a thick-walled conical vessel produced from **borosilicate glass**, a silicate-boron-oxide blend whose low coefficient of thermal expansion makes the wall stable under bunsen-flame heating and rapid cooling.\n\nIts narrow neck reduces evaporation and splashing during the swirling motion that an analyst typically applies during titrations, while the wide base maintains a low centre of gravity for safety on a vibrating bench.\n\nBecause borosilicate is a hard, smooth, hydrophilic surface, the flask resists most aqueous reagents and is straightforward to autoclave at 180 °C for sterilisation. The trade-off is a brittle response to mechanical shock — a hairline fracture from an earlier knock will propagate under thermal stress, so visual inspection before use is essential.\n\nFor downstream contamination control, the flask should be triple-rinsed with the next reagent prior to use, and any sample exposed to chromic acid cleaning solutions must be rinsed thoroughly to avoid Cr(VI) residues."
+    }
+  },
+  {
+    "id": "erlenmeyer-image",
+    "request": {
+      "mode": "image",
+      "approvedOverview": "An Erlenmeyer flask is a conical borosilicate glass vessel.",
+      "form": {
+        "name": "Erlenmeyer flask",
+        "material": "Borosilicate glass",
+        "purpose": "Mixing reagents",
+        "useCase": "Acid-base titrations",
+        "appearance": "Conical body, narrow neck",
+        "sterility": "Autoclavable",
+        "style": "Photorealistic studio"
+      }
+    },
+    "schema": "object_image",
+    "canned": {
+      "image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkAAIAAAoAAv/lxKUAAAAASUVORK5CYII="
+    }
+  },
+  {
+    "id": "missing-required-name",
+    "request": {
+      "mode": "overview",
+      "form": {
+        "material": "Glass",
+        "purpose": "Reaction"
+      }
+    },
+    "schema": null,
+    "canned": {
+      "text": ""
+    }
+  }
+]

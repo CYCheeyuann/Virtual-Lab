@@ -16,15 +16,17 @@ _shared = os.path.join(os.path.dirname(__file__), "..", "shared")
 if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
-from flask import Flask, request, Response, stream_with_context
+from bedrock_stream import MODEL_ID, get_client, stream_bedrock
 from cors import cors_headers, preflight_response
+from flask import Flask, Response, request, stream_with_context
+from json_parse import parse_json_safe
+from prompt_safety import INJECTION_GUARD, prefix_system, tag
 from validators import (
-    validate_api_key, sanitize_subject, sanitize_difficulty, sanitize_topic,
+    sanitize_subject,
+    sanitize_topic,
+    validate_api_key,
     validate_file,
 )
-from bedrock_stream import stream_bedrock, get_client, MODEL_ID
-from prompt_safety import INJECTION_GUARD, tag, prefix_system
-from json_parse import parse_json_safe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

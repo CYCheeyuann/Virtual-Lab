@@ -1,0 +1,74 @@
+[
+  {
+    "id": "biology-cells-from-topic",
+    "request": {
+      "mode": "from_topic",
+      "subject": "Biology",
+      "chapter": "Cell Biology",
+      "num_cards": 5
+    },
+    "schema": "flashcard",
+    "canned": {
+      "text": "[{\"front\":\"What is the basic unit of life?\",\"back\":\"The **cell** is the basic unit of life.\",\"hint\":\"Smallest living unit.\",\"tags\":[\"definition\"]},{\"front\":\"What organelle produces ATP?\",\"back\":\"The **mitochondrion** produces ATP.\",\"hint\":\"Powerhouse.\",\"tags\":[\"definition\"]},{\"front\":\"Which structure controls what enters the cell?\",\"back\":\"The **cell membrane** controls passage of substances.\",\"hint\":\"Outer boundary.\",\"tags\":[\"concept\"]},{\"front\":\"Where is genetic material stored?\",\"back\":\"In the **nucleus**.\",\"hint\":\"Control center.\",\"tags\":[\"definition\"]},{\"front\":\"What process splits one cell into two?\",\"back\":\"**Mitosis** divides a cell into two identical daughter cells.\",\"hint\":\"M-phase.\",\"tags\":[\"concept\"]}]"
+    }
+  },
+  {
+    "id": "physics-from-text",
+    "request": {
+      "mode": "from_text",
+      "subject": "Physics",
+      "chapter": "Newton's Laws",
+      "source_text": "Newton's first law states that an object remains at rest or in uniform motion unless acted on by a net external force. The second law states F=ma. The third law states that for every action there is an equal and opposite reaction.",
+      "num_cards": 4
+    },
+    "schema": "flashcard",
+    "canned": {
+      "text": "[{\"front\":\"What is Newton's first law?\",\"back\":\"An object stays at rest or in uniform motion unless acted on by a net external force (**inertia**).\",\"hint\":\"Inertia.\",\"tags\":[\"definition\"]},{\"front\":\"State Newton's second law as a formula.\",\"back\":\"**F = ma**\",\"hint\":\"Force equals mass times acceleration.\",\"tags\":[\"formula\"]},{\"front\":\"What is Newton's third law?\",\"back\":\"For every **action** there is an equal and opposite **reaction**.\",\"hint\":\"Action-reaction pair.\",\"tags\":[\"concept\"]},{\"front\":\"What does 'a' represent in F=ma?\",\"back\":\"**Acceleration**, in m/s².\",\"hint\":\"Rate of change of velocity.\",\"tags\":[\"definition\"]}]"
+    }
+  },
+  {
+    "id": "from-quiz-mistakes",
+    "request": {
+      "mode": "from_quiz",
+      "subject": "Biology",
+      "chapter": "Genetics",
+      "wrong_answers": [
+        {
+          "question": "What does DNA stand for?",
+          "correct": "Deoxyribonucleic acid",
+          "picked": "Dinitrogen acid",
+          "explanation": "DNA is the molecule that stores genetic info."
+        }
+      ]
+    },
+    "schema": "flashcard",
+    "canned": {
+      "text": "[{\"front\":\"What does DNA stand for?\",\"back\":\"DNA is **deoxyribonucleic acid**, the molecule that stores genetic information.\",\"hint\":\"Sugar-phosphate backbone.\",\"tags\":[\"mistake-review\",\"definition\"]}]"
+    }
+  },
+  {
+    "id": "missing-chapter",
+    "request": {
+      "mode": "from_topic",
+      "subject": "Biology",
+      "num_cards": 5
+    },
+    "schema": null,
+    "canned": {
+      "text": "[]"
+    }
+  },
+  {
+    "id": "garbled-output-handling",
+    "request": {
+      "mode": "from_topic",
+      "subject": "Biology",
+      "chapter": "Cells",
+      "num_cards": 5
+    },
+    "schema": null,
+    "canned": {
+      "text": "I can't help with that."
+    }
+  }
+]

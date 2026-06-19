@@ -106,7 +106,11 @@ def handler(path):
         )
     else:
         # from_text or from_topic
-        source_text = sanitize_topic(body.get("source_text", "") or "", max_len=12000)
+        # Cap source_text at 8 KB (was 12 KB) — keeps Bedrock input cost
+        # bounded while still fitting a typical chapter summary or page of
+        # notes. Anything larger is almost certainly someone trying to burn
+        # tokens; legitimate use stays well under this.
+        source_text = sanitize_topic(body.get("source_text", "") or "", max_len=8000)
         parts = [
             tag("subject",   subject),
             tag("chapter",   chapter),
@@ -152,7 +156,9 @@ def _generate(subject, num_cards, user_prompt):
     client = get_client()
     invoke_body = {
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 8000,
+        # 6000 fits 30 cards × ~150 tokens with headroom; previous 8000 was
+        # over-provisioned and let abusive callers spend more per request.
+        "max_tokens": 6000,
         "system": prefix_system(_FLASH_SYSTEM),
         "messages": [
             {"role": "user", "content": [{"type": "text", "text": user_prompt}]}

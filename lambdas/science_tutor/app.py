@@ -40,7 +40,10 @@ def handler(path):
     body = request.get_json(force=True, silent=True) or {}
     subject   = sanitize_subject(body.get("subject", ""))
     message   = sanitize_topic(body.get("message", ""), max_len=2000)
-    history   = trim_history(body.get("history", []))
+    # Cap history at 10 turns (was 20) to bound per-request input cost.
+    # Legitimate conversations rarely need more, and the frontend ringbuffer
+    # already keeps its own copy if more context is needed.
+    history   = trim_history(body.get("history", []), max_turns=10)
     file_data = body.get("file_data")
     file_mime = body.get("file_mime")
     file_name = sanitize_topic(body.get("file_name", ""), max_len=255) or "uploaded_file"
@@ -71,9 +74,11 @@ def handler(path):
     )
 
     # Build messages from history. Per-message content cap prevents a
-    # malicious client from sending 20 huge turns and burning through the
+    # malicious client from sending many huge turns and burning through the
     # Bedrock token budget — `trim_history` only caps the count.
-    MAX_HISTORY_MSG_CHARS = 4000
+    # 3000 chars ≈ 750 tokens × 10 turns = ~7.5K input tokens worst-case for
+    # the history alone, which is reasonable.
+    MAX_HISTORY_MSG_CHARS = 3000
     messages = []
     for msg in history:
         # Defence-in-depth: only accept the two roles Bedrock expects, and

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
@@ -15,10 +16,28 @@ _client = None
 
 
 def get_client():
-    """Lazy-init singleton Bedrock client."""
+    """Lazy-init singleton Bedrock client.
+
+    Configured with:
+      - adaptive retries (up to 4 attempts) so transient ThrottlingException
+        and ModelStreamErrorException are absorbed automatically rather than
+        bubbling straight to the user.
+      - explicit connect / read timeouts. Default boto3 read timeout is 60s
+        which is shorter than our Lambda timeout (180s) — without an
+        explicit override, a slow Bedrock response truncates streaming
+        mid-flight with a confusing socket error.
+    """
     global _client
     if _client is None:
-        _client = boto3.client("bedrock-runtime", region_name=REGION)
+        cfg = Config(
+            region_name=REGION,
+            connect_timeout=10,
+            # 170s leaves headroom for the 180s Lambda timeout to return a
+            # graceful error instead of being killed by the runtime.
+            read_timeout=170,
+            retries={"max_attempts": 4, "mode": "adaptive"},
+        )
+        _client = boto3.client("bedrock-runtime", config=cfg)
     return _client
 
 

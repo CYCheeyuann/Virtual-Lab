@@ -24,6 +24,8 @@ from validators import (
     validate_api_key, sanitize_subject, sanitize_topic,
 )
 from bedrock_stream import get_client, MODEL_ID
+from prompt_safety import tag, prefix_system
+from json_parse import parse_json_safe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -90,31 +92,40 @@ def handler(path):
             return _err("No usable wrong-answer entries provided")
         num_cards = len(formatted)  # one card per mistake
         user_prompt = (
-            f"Subject: {subject}\nChapter: {chapter}\nTopic: {topic or chapter}\n"
-            f"Generate exactly {num_cards} review flashcards — one per wrong answer.\n\n"
-            f"Wrong answers JSON:\n{json.dumps(formatted, ensure_ascii=False)}\n\n"
-            "For each entry, the card front is the question, the back is the correct "
-            "answer as a complete factual sentence with the key term wrapped in **bold**, "
-            "and the hint is a one-line cue that hints at the correct concept without "
-            "stating it. Tag each card with at least 'mistake-review'."
+            f"{tag('subject', subject)}\n"
+            f"{tag('chapter', chapter)}\n"
+            f"{tag('topic', topic or chapter)}\n"
+            f"{tag('num_cards', str(num_cards))}\n"
+            f"{tag('wrong_answers', json.dumps(formatted, ensure_ascii=False))}\n\n"
+            "Generate exactly the requested number of review flashcards — one "
+            "per entry inside <wrong_answers>. The card front is the question, "
+            "the back is the correct answer as a complete factual sentence "
+            "with the key term wrapped in **bold**, and the hint is a "
+            "one-line cue that hints at the correct concept without stating "
+            "it. Tag each card with at least 'mistake-review'."
         )
     else:
         # from_text or from_topic
         source_text = sanitize_topic(body.get("source_text", "") or "", max_len=12000)
-        user_prompt = (
-            f"Subject: {subject}\nChapter: {chapter}\nTopic: {topic or chapter}\n"
-            f"Generate exactly {num_cards} flashcards.\n"
-        )
+        parts = [
+            tag("subject",   subject),
+            tag("chapter",   chapter),
+            tag("topic",     topic or chapter),
+            tag("num_cards", str(num_cards)),
+        ]
         if source_text:
-            user_prompt += (
-                "\nSource notes (extract concepts from these — do not copy verbatim):\n"
-                f"{source_text}\n"
+            parts.append(tag("source_text", source_text))
+            tail = (
+                "Extract concepts from the contents of <source_text> — do not "
+                "copy verbatim — and produce the requested number of cards."
             )
         else:
-            user_prompt += (
-                "\nNo source notes were provided. Use your knowledge of the chapter to "
-                "produce a balanced set of definition, formula, and concept cards.\n"
+            tail = (
+                "No source notes were provided. Use your knowledge of the "
+                "chapter inside <chapter> to produce a balanced set of "
+                "definition, formula, and concept cards."
             )
+        user_prompt = "\n".join(parts) + "\n\n" + tail
 
     return _generate(subject, num_cards, user_prompt)
 
@@ -142,7 +153,7 @@ def _generate(subject, num_cards, user_prompt):
     invoke_body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 8000,
-        "system": _FLASH_SYSTEM,
+        "system": prefix_system(_FLASH_SYSTEM),
         "messages": [
             {"role": "user", "content": [{"type": "text", "text": user_prompt}]}
         ],
@@ -155,28 +166,18 @@ def _generate(subject, num_cards, user_prompt):
             b.get("text", "") for b in (payload.get("content") or [])
             if b.get("type") == "text"
         ).strip()
-    except Exception as e:
+    except Exception:
         logger.exception("Flashcard generation failed")
-        return _err(f"Generation failed: {type(e).__name__}", 500)
+        return _err("Generation failed. Please try again.", 500)
 
-    # Strip optional ```json fences
-    cleaned = text
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3].rstrip()
-
-    try:
-        cards = json.loads(cleaned)
-        if not isinstance(cards, list):
-            raise ValueError("Expected JSON array")
-    except (json.JSONDecodeError, ValueError) as e:
-        logger.warning("Flashcard JSON parse failed: %s | raw=%s", e, text[:200])
+    cards = parse_json_safe(text, expect=list)
+    if cards is None:
+        logger.warning("Flashcard JSON parse failed: raw=%s", (text or "")[:200])
         h = cors_headers()
         h["Content-Type"] = "application/json"
+        # Don't return raw model output — could carry an injection payload.
         return Response(json.dumps({
             "error": "Card format could not be parsed. Try again.",
-            "raw": text,
         }), status=200, headers=h)
 
     # Light schema cleanup so the frontend gets predictable shapes

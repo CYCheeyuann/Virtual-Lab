@@ -230,7 +230,7 @@
   function escHtml(s) {
     if (typeof window.escapeHtml === 'function') return window.escapeHtml(s);
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
   // Escape, then render **bold** as <strong>
   function richText(s) {

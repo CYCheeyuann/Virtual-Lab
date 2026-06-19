@@ -507,27 +507,36 @@
         host.innerHTML = '<p style="color:var(--c-muted);font-style:italic">No quiz history yet.</p>';
         return;
       }
+      // Render with data-* attributes only — no inline JS handlers — so a
+      // tampered localStorage entry can't smuggle code via h.id.
       host.innerHTML = hist.map(h => `
-        <div class="quiz-history-item">
+        <div class="quiz-history-item" data-quiz-id="${escapeHtml(h.id)}">
           <div class="history-meta">
             <strong>${escapeHtml(h.topic || 'Untitled')}</strong>
-            <span>${h.subject} · ${h.difficulty} · ${new Date(h.ts).toLocaleDateString()}</span>
+            <span>${escapeHtml(h.subject)} · ${escapeHtml(h.difficulty)} · ${escapeHtml(new Date(h.ts).toLocaleDateString())}</span>
           </div>
           <div class="history-score">
             <span class="${h.status === 'Completed' ? 'score-good' : 'score-warn'}">${h.correct}/${h.total} (${h.pct}%)</span>
-            <span class="history-status">${h.status}</span>
+            <span class="history-status">${escapeHtml(h.status)}</span>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="retakeQuiz('${h.id}')">
+          <button class="btn btn-ghost btn-sm" data-act="retake">
             ${iconHtml('refresh','btn-icon-rotate')}<span>Retake</span>
           </button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteQuiz('${h.id}')" title="Delete" style="color:var(--c-error-fg)">
+          <button class="btn btn-ghost btn-sm" data-act="delete" title="Delete" style="color:var(--c-error-fg)">
             ${iconHtml('trash','btn-icon-trash')}<span></span>
           </button>
         </div>
       `).join('');
+
+      // Attach listeners by id from data attribute (NOT from interpolated JS).
+      host.querySelectorAll('[data-quiz-id]').forEach(item => {
+        const id = item.dataset.quizId;
+        item.querySelector('[data-act="retake"]')?.addEventListener('click', () => retakeQuiz(id));
+        item.querySelector('[data-act="delete"]')?.addEventListener('click', () => deleteQuiz(id));
+      });
     }
 
-    window.deleteQuiz = function(id) {
+    function deleteQuiz(id) {
       if (!confirm('Delete this quiz from history?')) return;
       if (!confirm('Are you sure? This cannot be undone.')) return;
       let hist = loadHistory();
@@ -535,9 +544,9 @@
       try { localStorage.setItem(QUIZ_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
       renderHistory();
       showToast('Quiz deleted', 'success', 2000);
-    };
+    }
 
-    window.retakeQuiz = function(id) {
+    function retakeQuiz(id) {
       const hist = loadHistory();
       const entry = hist.find(h => h.id === id);
       if (!entry || !entry.questions) {
@@ -550,7 +559,7 @@
       showPhase('phase-quiz');
       lockChatbox();
       showToast('Retaking quiz — good luck!', 'success');
-    };
+    }
 
     /* ─── Retry / New / Export ──────────────────────────────────────── */
     document.getElementById('retryBtn').addEventListener('click', () => {

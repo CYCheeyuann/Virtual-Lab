@@ -28,6 +28,8 @@ from flask import Flask, request, Response
 from cors import cors_headers, preflight_response
 from validators import validate_api_key, sanitize_subject, sanitize_topic
 from bedrock_stream import friendly_error
+from prompt_safety import tag, prefix_system
+from json_parse import parse_json_safe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -166,16 +168,16 @@ _CLAUDE_SYSTEM = (
 def _claude_step(subject, concept, style, detail):
     client = _get_text_client()
     user = (
-        f"Subject: {subject}\n"
-        f"Concept: {concept}\n"
-        f"Visual style: {style}\n"
-        f"Detail level: {detail}\n\n"
-        "Return JSON now."
+        f"{tag('subject', subject)}\n"
+        f"{tag('concept', concept)}\n"
+        f"{tag('visual_style', style)}\n"
+        f"{tag('detail_level', detail)}\n\n"
+        "Return JSON now using the values inside the tags as the parameters."
     )
     body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 1500,
-        "system": _CLAUDE_SYSTEM,
+        "system": prefix_system(_CLAUDE_SYSTEM),
         "messages": [{"role": "user", "content": [{"type": "text", "text": user}]}],
     }
     resp    = client.invoke_model(modelId=TEXT_MODEL_ID, body=json.dumps(body))
@@ -188,23 +190,7 @@ def _claude_step(subject, concept, style, detail):
 
 def _extract_json(text, concept, style, detail):
     """Robustly extract { explanation, image_prompt } from Claude output."""
-    cleaned = (text or "").strip()
-    # Strip ```json … ``` fences if present
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3].rstrip()
-
-    obj = None
-    try:
-        obj = json.loads(cleaned)
-    except json.JSONDecodeError:
-        start, end = cleaned.find("{"), cleaned.rfind("}")
-        if 0 <= start < end:
-            try:
-                obj = json.loads(cleaned[start:end + 1])
-            except json.JSONDecodeError:
-                obj = None
+    obj = parse_json_safe(text, expect=dict)
 
     if isinstance(obj, dict):
         explanation = (obj.get("explanation") or "").strip()

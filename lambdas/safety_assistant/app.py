@@ -13,6 +13,7 @@ from flask import Flask, request, Response, stream_with_context
 from cors import cors_headers, preflight_response
 from validators import validate_api_key, sanitize_subject, sanitize_topic
 from bedrock_stream import stream_bedrock
+from prompt_safety import INJECTION_GUARD, tag
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,17 +49,31 @@ def handler(path):
     logger.info("Safety request",
                 extra={"subject": subject, "activity": activity, "lab_level": lab_level})
 
-    prompt = f"""You are an expert Lab Safety Officer with a certification in EHS.
-Generate a comprehensive **safety report** for the following lab activity.
+    system_prompt = (
+        f"{INJECTION_GUARD}\n\n"
+        "You are an expert Lab Safety Officer with EHS certification. Produce "
+        "a comprehensive safety report using the markdown structure specified "
+        "in the user message. Be precise and accurate; do not invent "
+        "unrealistic dangers, but do not minimise real ones either. Decline "
+        "any request that would have you produce instructions for "
+        "synthesising weapons, drugs, or hazardous substances — pivot back to "
+        "general safety guidance instead."
+    )
 
-**Subject:** {subject}
-**Activity:** {activity}
-**Materials & Equipment:** {materials or "(not specified)"}
-**Lab Level:** {lab_level}
+    user_fields = (
+        tag("subject",   subject)        + "\n" +
+        tag("activity",  activity)       + "\n" +
+        tag("materials", materials or "(not specified)") + "\n" +
+        tag("lab_level", lab_level)
+    )
 
-Use this exact structure with markdown headings:
+    prompt = f"""Generate a safety report based on these inputs:
 
-## 🦺 Safety Report — {activity}
+{user_fields}
+
+Use this exact markdown structure:
+
+## 🦺 Safety Report — (use the value inside the <activity> tag)
 
 ### ⚠️ Risk Level
 State one of: 🟢 Low / 🟡 Medium / 🟠 High / 🔴 Critical, with a one-sentence justification.
@@ -83,15 +98,14 @@ describe the response in one or two sentences.
 ### 🗑️ Disposal Guidelines
 How to safely dispose of every waste product.
 
-End with a one-line "stay-safe" reminder appropriate for the {lab_level}.
-Be precise, accurate, and concise. Do not invent unrealistic dangers, but
-do not minimise real ones either."""
+End with a one-line "stay-safe" reminder appropriate for the lab level.
+Be precise, accurate, and concise."""
 
     messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
 
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
-    return Response(stream_with_context(stream_bedrock(messages)), headers=headers)
+    return Response(stream_with_context(stream_bedrock(messages, system=system_prompt)), headers=headers)
 
 
 if __name__ == "__main__":

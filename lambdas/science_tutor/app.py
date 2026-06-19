@@ -16,6 +16,7 @@ from validators import (
     validate_file, trim_history,
 )
 from bedrock_stream import stream_bedrock
+from prompt_safety import INJECTION_GUARD, tag
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ def handler(path):
         return Response(json.dumps({"error": file_err}), status=413, headers=h)
 
     system_prompt = (
+        f"{INJECTION_GUARD}\n\n"
         f"You are a Virtual Science Tutor specializing in {subject}. "
         "You are knowledgeable, friendly, and passionate about making science fun and accessible. "
         "Help students explore topics, answer questions, and explain concepts with real examples and fun facts. "
@@ -74,17 +76,29 @@ def handler(path):
     MAX_HISTORY_MSG_CHARS = 4000
     messages = []
     for msg in history:
-        role = msg.get("role", "user")
+        # Defence-in-depth: only accept the two roles Bedrock expects, and
+        # only string content. Anything else from the client is dropped, so a
+        # tampered frontend can't seed fake assistant turns with arbitrary
+        # role values.
+        role = msg.get("role")
         content = msg.get("content", "")
-        if not isinstance(content, str):
+        if role not in ("user", "assistant") or not isinstance(content, str) or not content:
             continue
-        if role in ("user", "assistant") and content:
-            messages.append({
-                "role": role,
-                "content": [{"type": "text", "text": content[:MAX_HISTORY_MSG_CHARS]}],
-            })
+        # Wrap historical USER turns in tags so injection text inside them is
+        # treated as data. Assistant turns are model-authored, so we leave
+        # them as-is.
+        if role == "user":
+            wrapped = tag("history_user", content[:MAX_HISTORY_MSG_CHARS])
+        else:
+            wrapped = content[:MAX_HISTORY_MSG_CHARS]
+        messages.append({
+            "role": role,
+            "content": [{"type": "text", "text": wrapped}],
+        })
 
-    # New user message with optional file
+    # New user message with optional file. The user's text is wrapped in a
+    # <message> tag so any "ignore previous instructions" payload inside it
+    # is treated as data per the security rule in the system prompt.
     user_content = []
     if file_data and file_mime:
         if file_mime.startswith("image/"):
@@ -99,7 +113,7 @@ def handler(path):
                 "title": file_name,
             })
 
-    user_content.append({"type": "text", "text": message or "Hello"})
+    user_content.append({"type": "text", "text": tag("message", message or "Hello")})
     messages.append({"role": "user", "content": user_content})
 
     headers = cors_headers()

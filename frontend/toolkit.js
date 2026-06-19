@@ -320,7 +320,14 @@
   }
 
   function formulaCardHTML(f) {
-    const esc = s => s.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    // Use the central escapeHtml when available; fall back to a complete
+    // local copy. The previous local `esc` was missing the `&` escape and
+    // single-quote escape, so values like "Tom & Jerry" or anything inside
+    // single-quoted attributes weren't safely encoded.
+    const esc = (typeof window.escapeHtml === 'function')
+      ? window.escapeHtml
+      : (s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'));
     return `<div class="tk-formula-card">
       <button class="tk-f-copy" data-latex="${esc(f.latex)}" title="Copy LaTeX">📋</button>
       <div class="tk-f-name" aria-label="${esc(f.name)}">${esc(f.name)}</div>

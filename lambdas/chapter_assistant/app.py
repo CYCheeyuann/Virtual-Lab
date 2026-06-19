@@ -19,6 +19,8 @@ from flask import Flask, request, Response, stream_with_context
 from cors import cors_headers, preflight_response
 from validators import validate_api_key, sanitize_subject, sanitize_topic
 from bedrock_stream import stream_bedrock, get_client, MODEL_ID
+from prompt_safety import INJECTION_GUARD, tag, prefix_system
+from json_parse import parse_json_safe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,19 +70,27 @@ def _handle_list(body):
     level = _level(body.get("level", ""))
     topic = sanitize_topic(body.get("topic", ""), max_len=300)
 
+    fields = (
+        tag("subject", subject) + "\n" +
+        tag("level",   level)   + "\n" +
+        tag("topic",   topic)
+    )
+
     if topic:
-        user = (
-            f"Based on the {level}-level syllabus for {subject}, find the chapter(s) "
-            f"most relevant to '{topic}'. Output as a JSON array (may be 1–3 items)."
+        instruction = (
+            "Find the chapter(s) in the syllabus most relevant to the value "
+            "inside <topic>. Output as a JSON array (1–3 items)."
         )
     else:
-        user = (
-            f"Based on the {level}-level syllabus for {subject}, list ALL main chapters "
-            f"students study. Output as a JSON array."
+        instruction = (
+            "List ALL main chapters students study at the level inside "
+            "<level> for the subject inside <subject>. Output as a JSON array."
         )
 
+    user = f"{fields}\n\n{instruction}"
+
     logger.info("Chapter list subject=%s level=%s topic=%s", subject, level, topic)
-    return _invoke_json(user, _LIST_SYSTEM)
+    return _invoke_json(user, prefix_system(_LIST_SYSTEM))
 
 
 # ── Action: detail — returns JSON object with expanded chapter info ───────────
@@ -103,12 +113,17 @@ def _handle_detail(body):
                         status=400, headers=h)
 
     user = (
-        f"Provide a detailed overview of '{chapter_title}' for {subject} at {level} level. "
-        f"Include subtopics, learning objectives, key concepts, and important vocabulary with definitions."
+        f"{tag('subject', subject)}\n"
+        f"{tag('level', level)}\n"
+        f"{tag('chapter_title', chapter_title)}\n\n"
+        "Provide a detailed overview of the chapter named inside the "
+        "<chapter_title> tag, for the subject and level given. Include "
+        "subtopics, learning objectives, key concepts, and important "
+        "vocabulary with definitions."
     )
 
     logger.info("Chapter detail subject=%s level=%s title=%s", subject, level, chapter_title)
-    return _invoke_json(user, _DETAIL_SYSTEM)
+    return _invoke_json(user, prefix_system(_DETAIL_SYSTEM))
 
 
 # ── Action: stream — legacy streaming markdown (for co-pilot context) ─────────
@@ -118,10 +133,20 @@ def _handle_stream(body):
     level = _level(body.get("level", ""))
     topic = sanitize_topic(body.get("topic", ""), max_len=300)
 
-    topic_clause = f" focusing specifically on **{topic}**" if topic else ""
+    fields = (
+        tag("subject", subject) + "\n" +
+        tag("level",   level)   + "\n" +
+        (tag("topic", topic) + "\n" if topic else "")
+    )
+    topic_clause = (
+        " The user has supplied a focus topic inside <topic>; concentrate on it."
+        if topic else ""
+    )
     prompt = (
-        f"You are an expert {subject} educator teaching at the **{level}** level.\n\n"
-        f"Generate a comprehensive, structured Chapter Overview for {subject} at {level} level{topic_clause}.\n\n"
+        f"{fields}\n"
+        f"You are an expert {subject} educator teaching at {level} level."
+        f"{topic_clause}\n\n"
+        f"Generate a comprehensive, structured Chapter Overview.\n\n"
         "Include:\n"
         "- Main chapters/topics students cover at this level\n"
         "- Core concepts and key definitions for each chapter\n"
@@ -135,7 +160,10 @@ def _handle_stream(body):
     messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
-    return Response(stream_with_context(stream_bedrock(messages)), headers=headers)
+    return Response(
+        stream_with_context(stream_bedrock(messages, system=INJECTION_GUARD)),
+        headers=headers,
+    )
 
 
 # ── Shared JSON invocation helper ─────────────────────────────────────────────
@@ -155,27 +183,22 @@ def _invoke_json(user_prompt, system_prompt):
             b.get("text", "") for b in (payload.get("content") or [])
             if b.get("type") == "text"
         ).strip()
-    except Exception as e:
+    except Exception:
+        # Real exception class + traceback go to CloudWatch only.
         logger.exception("Chapter JSON invoke failed")
         h = cors_headers()
         h["Content-Type"] = "application/json"
-        return Response(json.dumps({"error": f"Generation failed: {type(e).__name__}"}),
+        return Response(json.dumps({"error": "Generation failed. Please try again."}),
                         status=500, headers=h)
 
-    # Parse — strip ```json fences if present
-    cleaned = text
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3].rstrip()
-
-    try:
-        data = json.loads(cleaned)
-    except (json.JSONDecodeError, ValueError):
+    data = parse_json_safe(text)
+    if data is None:
         logger.warning("Chapter JSON parse failed: %s", text[:200])
         h = cors_headers()
         h["Content-Type"] = "application/json"
-        return Response(json.dumps({"error": "Could not parse AI response", "raw": text}),
+        # Don't return raw model output — it can echo prompt-injection payloads
+        # straight back to the browser.
+        return Response(json.dumps({"error": "Could not parse AI response. Please try again."}),
                         status=200, headers=h)
 
     h = cors_headers()

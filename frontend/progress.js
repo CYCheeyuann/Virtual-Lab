@@ -89,11 +89,26 @@ function renderProgressDashboard(targetId) {
   const target = document.getElementById(targetId);
   if (!target) return;
   const p = loadProgress();
-  const accuracy = p.totalQuestions > 0
-    ? Math.round((p.totalCorrect / p.totalQuestions) * 100)
+
+  // Coerce numeric fields to actual numbers so a tampered localStorage entry
+  // cannot smuggle a string like '<img src=x onerror=...>' into a place that
+  // will be rendered with innerHTML. NaN safely falls through to 0.
+  const totalQuestions = Number(p.totalQuestions) || 0;
+  const totalCorrect   = Number(p.totalCorrect)   || 0;
+  const totalQuizzes   = Number(p.totalQuizzes)   || 0;
+  const streak         = Number(p.streak)         || 0;
+  const accuracy = totalQuestions > 0
+    ? Math.round((totalCorrect / totalQuestions) * 100)
     : 0;
-  const streak = p.streak || 0;
-  const lastSubject = p.lastSubject || '—';
+
+  // lastSubject is the only string field — escape it before insertion.
+  // common.js's escapeHtml is loaded later on some pages, so fall back to a
+  // local copy if it isn't on window yet.
+  const _esc = (typeof window.escapeHtml === 'function')
+    ? window.escapeHtml
+    : (s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'));
+  const lastSubject = _esc(p.lastSubject || '—');
 
   target.innerHTML = `
     <h2>📊 Your Learning Dashboard</h2>
@@ -108,7 +123,7 @@ function renderProgressDashboard(targetId) {
       <div class="progress-stat">
         <div class="stat-emoji">📝</div>
         <div class="stat-meta">
-          <span class="stat-value">${p.totalQuizzes} Quiz${p.totalQuizzes === 1 ? '' : 'zes'}</span>
+          <span class="stat-value">${totalQuizzes} Quiz${totalQuizzes === 1 ? '' : 'zes'}</span>
           <span class="stat-label">Completed</span>
         </div>
       </div>
@@ -116,7 +131,7 @@ function renderProgressDashboard(targetId) {
         <div class="accuracy-pie" style="--pct:${accuracy}"></div>
         <div class="stat-meta">
           <span class="stat-value">${accuracy}% Accuracy</span>
-          <span class="stat-label">${p.totalCorrect}/${p.totalQuestions} correct</span>
+          <span class="stat-label">${totalCorrect}/${totalQuestions} correct</span>
         </div>
       </div>
       <div class="progress-stat">

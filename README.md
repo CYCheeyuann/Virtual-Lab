@@ -53,6 +53,7 @@ Lambda Function URLs (7 Flask apps; 6 RESPONSE_STREAM, 1 BUFFERED)
 - Conversation history capped at 20 turns
 - Buttons disabled during streaming (no spam clicks)
 - HTML output escaped to prevent XSS
+- AWS WAF rate limiting (per-IP and per-endpoint caps) — see [docs/security.md](docs/security.md)
 
 ## Project layout
 
@@ -110,3 +111,30 @@ python app.py
 ## License
 
 MIT
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [docs/security.md](docs/security.md) | Abuse protection, WAF configuration, and the Cognito/IAM migration plan |
+| [docs/operational-cadence.md](docs/operational-cadence.md) | Weekly/monthly/quarterly review schedule for quality, cost, and security |
+| [docs/observability-and-cost-controls.md](docs/observability-and-cost-controls.md) | Metrics, alarms, reserved concurrency, and budget configuration |
+| [docs/adr/](docs/adr/) | Architecture Decision Records — canonical log of key design choices |
+| [docs/runbooks/](docs/runbooks/) | Operational runbooks (incident response, model migration, prompt updates, rollback) |
+| [docs/privacy.md](docs/privacy.md) | Data handling and privacy practices |
+
+### Architecture Decision Records (ADRs)
+
+ADRs are the canonical place to understand *why* the architecture looks the
+way it does. They live in [`docs/adr/`](docs/adr/) and follow an append-only
+convention: past decisions are never rewritten — they are superseded by new
+ADRs when things change.
+
+Current ADRs:
+
+- [0001 — SAM vs CDK](docs/adr/0001-sam-vs-cdk.md)
+- [0002 — Function URLs vs API Gateway](docs/adr/0002-function-url-vs-api-gateway.md)
+- [0003 — Claude Haiku vs Sonnet](docs/adr/0003-model-selection-claude-haiku-vs-sonnet.md)
+
+When making a new architectural decision, add a new ADR rather than only
+discussing it in a PR.

@@ -171,15 +171,20 @@ Resources:
   # ─── Flashcard Generator Lambda ─────────────────────────────────────────────
   # Stateless AI card generation: from_text / from_quiz / from_topic.
   # Buffered (non-streaming) — frontend wants the whole deck JSON in one shot.
-  # ReservedConcurrentExecutions=5 — output-token-heavy (up to 6K tokens per
-  # call ≈ $0.03 worth of Claude); cap parallel cost at ~$0.15/sec.
+  # NOTE: ReservedConcurrentExecutions is intentionally NOT set here. AWS
+  # enforces a minimum unreserved concurrency of 10 per account, and this
+  # account's total Lambda concurrency limit is at or near that floor —
+  # any reservation would push unreserved below 10 and CloudFormation
+  # refuses the update. To re-enable: open Service Quotas → Lambda →
+  # "Concurrent executions", request an increase to ≥ 50, then add
+  # `ReservedConcurrentExecutions: 5` back here. See
+  # docs/observability-and-cost-controls.md for full guidance.
   FlashcardGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../lambdas/flashcard_generator/
       Handler: run.sh
       MemorySize: 512
-      ReservedConcurrentExecutions: 5
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
@@ -199,8 +204,9 @@ Resources:
   # us-west-2) → narrative (Claude Haiku). Strictly sequential per the spec.
   # Memory bumped to 1024 because base64 images can be ~1.5 MB.
   # Timeout 300s — image gen on Stability can take 30-60s.
-  # ReservedConcurrentExecutions=5 — Stability SD 3.5 calls cost ~$0.04 per
-  # render; cap parallel spend at ~$0.20/sec to bound runaway abuse.
+  # NOTE: ReservedConcurrentExecutions intentionally not set — see comment
+  # on FlashcardGeneratorFunction above. Add `ReservedConcurrentExecutions: 5`
+  # once the account concurrency quota is raised to ≥ 50.
   ScientificObjectGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -208,7 +214,6 @@ Resources:
       Handler: run.sh
       MemorySize: 1024
       Timeout: 300
-      ReservedConcurrentExecutions: 5
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
@@ -224,16 +229,14 @@ Resources:
         InvokeMode: BUFFERED
 
   # ─── Science Tutor Lambda ──────────────────────────────────────────────────
-  # ReservedConcurrentExecutions=10 — highest-volume endpoint (chat).
-  # Higher cap than the cost-sensitive image Lambdas so multiple
-  # concurrent students aren't queued behind each other, but still
-  # bounds chat-storm abuse at ~10 simultaneous Bedrock streams.
+  # NOTE: ReservedConcurrentExecutions intentionally not set — see comment
+  # on FlashcardGeneratorFunction. Add `ReservedConcurrentExecutions: 10`
+  # once the account concurrency quota is raised to ≥ 50.
   ScienceTutorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../lambdas/science_tutor/
       Handler: run.sh
-      ReservedConcurrentExecutions: 10
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
@@ -289,8 +292,9 @@ Resources:
         InvokeMode: RESPONSE_STREAM
 
   # ─── Image Generator Lambda (Non-Streaming, Stability + Claude) ────────────
-  # ReservedConcurrentExecutions=5 — Stability SD 3.5 calls cost ~$0.04 per
-  # render; cap parallel spend at ~$0.20/sec to bound runaway abuse.
+  # NOTE: ReservedConcurrentExecutions intentionally not set — see comment
+  # on FlashcardGeneratorFunction. Add `ReservedConcurrentExecutions: 5`
+  # once the account concurrency quota is raised to ≥ 50.
   ImageGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -298,7 +302,6 @@ Resources:
       Handler: run.sh
       MemorySize: 1024
       Timeout: 300
-      ReservedConcurrentExecutions: 5
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
@@ -425,7 +428,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-image-generator-throttles"
-      AlarmDescription: "Reserved-concurrency cap hit. Either tune the cap up or investigate abuse."
+      AlarmDescription: "Lambda invocation throttled. Without per-function reserved concurrency, this fires when the account-wide concurrency limit is exceeded."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -477,7 +480,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-scientific-object-throttles"
-      AlarmDescription: "Reserved-concurrency cap hit on scientific object generator."
+      AlarmDescription: "Lambda invocation throttled. Account-wide concurrency limit exceeded."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -529,7 +532,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-science-tutor-throttles"
-      AlarmDescription: "Tutor concurrency cap hit — students are queueing. Bump cap or add capacity."
+      AlarmDescription: "Tutor invocation throttled. Account-wide concurrency limit exceeded — likely a chat storm."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -564,7 +567,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-flashcard-generator-throttles"
-      AlarmDescription: "Flashcard concurrency cap hit."
+      AlarmDescription: "Lambda invocation throttled. Account-wide concurrency limit exceeded."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:

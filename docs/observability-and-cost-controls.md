@@ -102,6 +102,20 @@ Insights releases ship.
 
 ## Reserved concurrency
 
+> ⚠️ **Currently disabled.** This account's Lambda concurrency quota is at
+> or near AWS's 10-execution floor. AWS enforces a hard rule:
+> `UnreservedAccountConcurrency` must always stay ≥ 10. With our intended
+> reservations (5 + 5 + 5 + 10 = 25), the account would need a total
+> concurrency limit of ≥ 35. If your account is at the new-account default
+> of 10, no reservations are possible.
+>
+> **To enable:** Open AWS Console → Service Quotas → Lambda → "Concurrent
+> executions" → Request quota increase to ≥ 50. Once approved, uncomment
+> the `ReservedConcurrentExecutions` lines in `infra/template.yaml` for
+> the four functions noted below and redeploy.
+
+When the quota allows, the intended caps are:
+
 | Function                              | Reserved | Why                                                                 |
 |---------------------------------------|---------:|---------------------------------------------------------------------|
 | `ImageGeneratorFunction`              | **5**    | Stability SD 3.5 ~$0.04/render; cap parallel spend at ~$0.20/sec    |
@@ -110,14 +124,14 @@ Insights releases ship.
 | `ScienceTutorFunction`                | **10**   | Highest-volume endpoint (chat); higher cap so concurrent students aren't queued |
 | All others                            | unset    | Share the unreserved account-level pool                             |
 
-Total reserved: **25** out of the account default 1000-concurrency pool.
-That leaves 975 concurrency for chapter, experiment, quiz, safety, and
-what-if Lambdas, plus any future services.
+Total reserved when enabled: **25**. Reserved concurrency itself is free;
+it just partitions the account pool and acts as both a guarantee (the
+function always has its reservation available) and a hard cap (it never
+exceeds it).
 
-Reserved concurrency itself is free; it just partitions the account pool
-and acts as both a guarantee (the function always has its reservation
-available) and a hard cap (it never exceeds it). The throttle alarms
-below fire when the cap is hit.
+The throttle alarms below still fire on **account-wide** concurrency
+exhaustion even without per-function reservations, so abuse detection
+remains in place.
 
 ### How to tune these later
 

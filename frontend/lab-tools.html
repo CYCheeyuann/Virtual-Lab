@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lab Tools</title>
   <meta name="description" content="All-in-one science toolkit: Safety Assistant, Image Generator, and What Happens If simulator." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧰</text></svg>" />
+  <link rel="icon" href="LOGO.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
@@ -15,7 +15,7 @@
 
   <nav class="navbar">
     <div class="nav-inner">
-      <a class="brand" href="welcome.html">🔬 Virtual Science Lab</a>
+      <a class="brand" href="welcome.html"><img src="LOGO.png" alt="Logo" style="height:1.5em;vertical-align:middle;margin-right:0.3em" />Virtual Science Lab</a>
       <div class="nav-links">
         <a class="nav-link" href="index.html">Dashboard</a>
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
@@ -29,22 +29,22 @@
 
   <main class="page">
     <div class="page-header">
-      <h1>🧰 Lab Tools</h1>
+      <h1>Lab Tools</h1>
       <p>Your all-in-one science toolkit. Safety reports, AI imagery, and "what if" simulations in one place.</p>
     </div>
 
     <!-- Tab bar -->
     <div class="tab-bar" role="tablist">
-      <button class="tab-btn active" role="tab" data-tab="safety"  aria-selected="true">🦺 Safety</button>
-      <button class="tab-btn"        role="tab" data-tab="image"   aria-selected="false">🎨 Image Gen</button>
-      <button class="tab-btn"        role="tab" data-tab="whatif"  aria-selected="false">⚡ What If</button>
+      <button class="tab-btn active" role="tab" data-tab="safety"  aria-selected="true">Safety</button>
+      <button class="tab-btn"        role="tab" data-tab="image"   aria-selected="false">Image Gen</button>
+      <button class="tab-btn"        role="tab" data-tab="whatif"  aria-selected="false">What If</button>
     </div>
 
     <!-- Inputs -->
     <section class="card">
       <!-- Safety form -->
       <div class="tab-panel active" data-panel="safety">
-        <h2>🦺 Safety Assistant</h2>
+        <h2>Safety Assistant</h2>
         <label for="safety-subject">Subject</label>
         <select id="safety-subject" class="input">
           <option value="Biology">Biology</option>
@@ -72,7 +72,7 @@
 
       <!-- Image Gen form -->
       <div class="tab-panel" data-panel="image">
-        <h2>🎨 Science Image Generator</h2>
+        <h2>Science Image Generator</h2>
         <label for="image-subject">Subject</label>
         <select id="image-subject" class="input">
           <option value="Biology">Biology</option>
@@ -105,7 +105,7 @@
 
       <!-- What If form -->
       <div class="tab-panel" data-panel="whatif">
-        <h2>⚡ What Happens If…</h2>
+        <h2>What Happens If…</h2>
         <label for="whatif-subject">Subject</label>
         <select id="whatif-subject" class="input">
           <option value="Biology">Biology</option>
@@ -123,9 +123,9 @@
 
         <label for="whatif-realism">Realism</label>
         <select id="whatif-realism" class="input">
-          <option value="real">🔬 Real Science</option>
-          <option value="theoretical">🧪 Theoretical</option>
-          <option value="scifi">🚀 Sci-Fi Fun</option>
+          <option value="real">Real Science</option>
+          <option value="theoretical">Theoretical</option>
+          <option value="scifi">Sci-Fi Fun</option>
         </select>
       </div>
 
@@ -137,7 +137,7 @@
 
     <!-- Output -->
     <section class="card">
-      <h2 id="output-title">📋 Output</h2>
+      <h2 id="output-title">Output</h2>
       <div class="output-split">
         <div class="output-text-col">
           <div class="output-panel text-panel" id="lab-out-text">
@@ -146,7 +146,7 @@
         </div>
         <div class="output-image-col">
           <div class="image-output" id="lab-out-image">
-            <div class="image-placeholder">🖼️ Image will appear here</div>
+            <div class="image-placeholder">Image will appear here</div>
           </div>
         </div>
       </div>
@@ -177,9 +177,9 @@
     document.getElementById('sendToAiBtn').innerHTML  = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI Chatbot</span>`;
 
     const TAB_TITLES = {
-      safety: '🦺 Safety Report',
-      image:  '🎨 Image &amp; Explanation',
-      whatif: '⚡ Chain Reaction Timeline',
+      safety: 'Safety Report',
+      image:  'Image &amp; Explanation',
+      whatif: 'Chain Reaction Timeline',
     };
 
     let currentTab = 'safety';
@@ -199,7 +199,7 @@
       document.querySelectorAll('.tab-panel').forEach(p => {
         p.classList.toggle('active', p.dataset.panel === tab);
       });
-      document.getElementById('output-title').innerHTML = TAB_TITLES[tab] || '📋 Output';
+      document.getElementById('output-title').innerHTML = TAB_TITLES[tab] || 'Output';
       // Sync subject theme to active tab's subject
       const sel = document.querySelector(`.tab-panel.active select[id$="-subject"]`);
       if (sel) setSubjectTheme(sel.value);
@@ -271,10 +271,10 @@
         host.innerHTML = `
           <div class="image-skeleton">
             <div class="shimmer-block"></div>
-            <p class="image-caption">🎨 Generating image…</p>
+            <p class="image-caption">Generating image…</p>
           </div>`;
       } else if (state === 'placeholder') {
-        host.innerHTML = `<div class="image-placeholder">🖼️ Image will appear here</div>`;
+        host.innerHTML = `<div class="image-placeholder">Image will appear here</div>`;
       }
     }
     function showImage(b64, caption) {
@@ -313,9 +313,9 @@
 
     /* ─── Mock data per tab ────────────────────────────────────── */
     function mockSafetyText(p) {
-      return `## 🦺 Safety Report — ${p.activity || '(activity)'}\n` +
+      return `## Safety Report — ${p.activity || '(activity)'}\n` +
         `**Subject:** ${p.subject} · **Lab:** ${p.lab_level}\n\n` +
-        `### Risk Level\n🟡 Medium\n\n` +
+        `### Risk Level\nMedium\n\n` +
         `### Hazard Sources\n- Corrosive reagents\n- Fragile glassware\n- Spills\n\n` +
         `### PPE Required\n- Lab coat\n- Safety goggles\n- Nitrile gloves\n\n` +
         `### Pre-Lab Checklist\n1. Read SDS for each chemical\n2. Inspect glassware for cracks\n3. Locate eyewash & fire extinguisher\n\n` +
@@ -323,14 +323,14 @@
         `> ⚠️ This is a mock report. Backend will provide a real, AI-generated assessment.`;
     }
     function mockImageText(p) {
-      return `## 🎨 ${p.concept || '(concept)'}\n` +
+      return `## ${p.concept || '(concept)'}\n` +
         `**Style:** ${p.style} · **Detail:** ${p.detail}\n\n` +
         `A ${p.style.toLowerCase()} of **${p.concept}** at ${p.detail.toLowerCase()} detail. ` +
         `Key features include core structure, surrounding context, and labelled components.\n\n` +
         `> ⚠️ Mock explanation. Real images will be generated by Titan once backend is wired.`;
     }
     function mockWhatIfText(p) {
-      return `## ⚡ Scenario\n*"${p.scenario || '(scenario)'}"*\n\n` +
+      return `## Scenario\n*"${p.scenario || '(scenario)'}"*\n\n` +
         `**Realism mode:** ${p.realism}\n\n` +
         `### T+0 seconds\nEvent triggers. Local conditions begin to shift.\n\n` +
         `### T+1 minute\nSecondary effects propagate.\n\n` +
@@ -414,7 +414,7 @@
           });
         } else {
           await mockStream('lab-out-text', mockSafetyText(p), btn);
-          showToast('🦺 Mock safety report generated (backend not connected)', 'warning');
+          showToast('Mock safety report generated (backend not connected)', 'warning');
         }
       }
       else if (currentTab === 'image') {
@@ -470,7 +470,7 @@
           mockImageText(p).split('\n').forEach(line => appendMarkdownLine(text, line, 'lab-out-text'));
           showImage(PLACEHOLDER_PNG_B64, `${p.concept} (mock)`);
           setButtonLoading(btn, false);
-          showToast('🎨 Mock image generated (backend not connected)', 'warning');
+          showToast('Mock image generated (backend not connected)', 'warning');
         }
       }
       else if (currentTab === 'whatif') {
@@ -496,7 +496,7 @@
           });
         } else {
           await mockStream('lab-out-text', mockWhatIfText(p), btn);
-          showToast('⚡ Mock simulation generated (backend not connected)', 'warning');
+          showToast('Mock simulation generated (backend not connected)', 'warning');
         }
       }
       recordActivity(document.querySelector('.tab-panel.active select[id$="-subject"]').value);
@@ -548,9 +548,9 @@
         return;
       }
       const labels = {
-        safety: '🦺 Safety: ' + (document.getElementById('safety-activity').value || 'report'),
-        image:  '🎨 Image: '  + (document.getElementById('image-concept').value || 'concept'),
-        whatif: '⚡ What If: ' + (document.getElementById('whatif-scenario').value.slice(0, 50) || 'scenario'),
+        safety: 'Safety: ' + (document.getElementById('safety-activity').value || 'report'),
+        image:  'Image: '  + (document.getElementById('image-concept').value || 'concept'),
+        whatif: 'What If: ' + (document.getElementById('whatif-scenario').value.slice(0, 50) || 'scenario'),
       };
       window.GlobalChat && window.GlobalChat.injectContent(text, currentTab, labels[currentTab]);
     });

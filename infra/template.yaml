@@ -503,8 +503,8 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: index.html
+        IndexDocument: welcome.html
+        ErrorDocument: welcome.html
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -534,7 +534,7 @@ Resources:
       DistributionConfig:
         Enabled: true
         Comment: !Sub "${AWS::StackName} — frontend HTTPS"
-        DefaultRootObject: index.html
+        DefaultRootObject: welcome.html
         PriceClass: PriceClass_100
         HttpVersion: http2
         IPV6Enabled: true
@@ -563,11 +563,11 @@ Resources:
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
-            ResponsePagePath: /index.html
+            ResponsePagePath: /welcome.html
             ErrorCachingMinTTL: 0
           - ErrorCode: 404
             ResponseCode: 200
-            ResponsePagePath: /index.html
+            ResponsePagePath: /welcome.html
             ErrorCachingMinTTL: 0
         ViewerCertificate:
           CloudFrontDefaultCertificate: true

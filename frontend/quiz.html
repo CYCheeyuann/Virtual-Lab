@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quiz Generator</title>
   <meta name="description" content="AI-powered quiz generator with outline refinement, strict JSON questions, and interactive grading." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>" />
+  <link rel="icon" href="LOGO.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
@@ -15,7 +15,7 @@
 
   <nav class="navbar">
     <div class="nav-inner">
-      <a class="brand" href="welcome.html">🔬 Virtual Science Lab</a>
+      <a class="brand" href="welcome.html"><img src="LOGO.png" alt="Logo" style="height:1.5em;vertical-align:middle;margin-right:0.3em" />Virtual Science Lab</a>
       <div class="nav-links">
         <a class="nav-link" href="index.html">Dashboard</a>
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
@@ -29,7 +29,7 @@
 
   <main class="page">
     <div class="page-header">
-      <h1>📝 Quiz Generator</h1>
+      <h1>Quiz Generator</h1>
       <p>Generate an AI quiz tailored to your topic and difficulty. Review the outline, refine it, then take the test.</p>
     </div>
 
@@ -68,7 +68,7 @@
       <label>Reference Document (optional)</label>
       <div class="dropzone" id="dz">
         <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
-        <p>📄 Drag &amp; drop or click to upload</p>
+        <p>Drag &amp; drop or click to upload</p>
         <small>PDF · DOCX · TXT · Images · JSON</small>
         <div class="file-info" id="file-info"></div>
       </div>
@@ -86,7 +86,7 @@
         Edit the knowledge points below. Add or remove lines freely, then confirm to generate your quiz.
       </p>
       <div class="outline-header" id="outline-header">
-        <span class="outline-icon">📌</span>
+        <span class="outline-icon"></span>
         <span class="outline-title" id="outline-title">Quiz Outline</span>
       </div>
       <textarea id="outlineText" class="input outline-text" rows="12" placeholder="Loading outline…"></textarea>
@@ -121,7 +121,7 @@
 
     <!-- ═══ HISTORY panel ═══ -->
     <section class="card" id="phase-history" style="display:none">
-      <h2>📊 Quiz History</h2>
+      <h2>Quiz History</h2>
       <div id="history-list"></div>
       <div class="btn-row" style="margin-top:14px">
         <button id="historyBackBtn" class="btn btn-ghost"></button>
@@ -155,7 +155,7 @@
     document.getElementById('submitBtn').innerHTML   = `${iconHtml('eye')}<span>Submit &amp; Show Results</span>`;
     document.getElementById('retryBtn').innerHTML    = `${iconHtml('refresh','btn-icon-rotate')}<span>Retake This Quiz</span>`;
     document.getElementById('newQuizBtn').innerHTML  = `${iconHtml('bolt')}<span>New Quiz</span>`;
-    document.getElementById('saveWrongToFlashBtn').innerHTML = `<span>🧠</span><span>Save incorrect answers to Flashcards</span>`;
+    document.getElementById('saveWrongToFlashBtn').innerHTML = `<span>Save incorrect answers to Flashcards</span>`;
     document.getElementById('historyBackBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Back</span>`;
 
     let uploadedFile = { data: null, mime: null, name: null };

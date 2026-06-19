@@ -70,33 +70,15 @@ function getSavedSubject() {
 }
 
 const SUBJECT_ICONS = {
-  Biology:   ['🧬', '🌿', '🍃', '🦠', '🧪', '🌱'],
-  Chemistry: ['⚗️', '🧪', '🔬', '🧫', '⚛️', '💊'],
-  Physics:   ['🔭', '⚛️', '🌌', '🪐', '🛰️', '⚡'],
-  Science:   ['🔬', '⚗️', '🧬', '🌍', '⚛️', '🧪'],
+  Biology:   [],
+  Chemistry: [],
+  Physics:   [],
+  Science:   [],
 };
 
 function updateFloatingIcons(subject) {
-  // Clear previous icons
+  // Decorative floating icons removed per UI cleanup.
   document.querySelectorAll('.floating-icon').forEach(el => el.remove());
-  const set = SUBJECT_ICONS[subject] || SUBJECT_ICONS.Biology;
-  const positions = [
-    { top: '12%',  left: '6%'   },
-    { top: '22%',  left: '88%'  },
-    { top: '46%',  left: '4%'   },
-    { top: '58%',  left: '92%'  },
-    { top: '78%',  left: '10%'  },
-    { top: '85%',  left: '82%'  },
-  ];
-  positions.forEach((pos, i) => {
-    const el = document.createElement('div');
-    el.className = 'floating-icon';
-    el.textContent = set[i % set.length];
-    el.style.top = pos.top;
-    el.style.left = pos.left;
-    el.style.animationDelay = `${i * 1.7}s`;
-    document.body.appendChild(el);
-  });
 }
 
 /* Bind a #subject <select> to the theme system */

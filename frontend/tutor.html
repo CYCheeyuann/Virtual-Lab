@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Science Tutor</title>
   <meta name="description" content="Streaming AI chatbot science tutor with full conversation memory and document analysis support." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>" />
+  <link rel="icon" href="LOGO.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
@@ -15,7 +15,7 @@
 
   <nav class="navbar">
     <div class="nav-inner">
-      <a class="brand" href="welcome.html">🔬 Virtual Science Lab</a>
+      <a class="brand" href="welcome.html"><img src="LOGO.png" alt="Logo" style="height:1.5em;vertical-align:middle;margin-right:0.3em" />Virtual Science Lab</a>
       <div class="nav-links">
         <a class="nav-link" href="index.html">Dashboard</a>
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
@@ -29,7 +29,7 @@
 
   <main class="page">
     <div class="page-header">
-      <h1>🤖 Science Tutor</h1>
+      <h1>Science Tutor</h1>
       <p>Streaming chat with conversation memory. Upload a document and ask the tutor to analyse it.</p>
     </div>
 
@@ -46,7 +46,7 @@
       <label>Optional document (one-time, attached to next message)</label>
       <div class="dropzone" id="dz">
         <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html" hidden />
-        <p>📄 Drag &amp; drop or click to upload</p>
+        <p>Drag &amp; drop or click to upload</p>
         <small>JPG · PNG · WEBP · PDF · DOCX · PPTX · CSV · JSON · HTML</small>
         <div class="file-info" id="file-info"></div>
       </div>
@@ -58,14 +58,14 @@
     </section>
 
     <section class="card">
-      <h2>💬 Conversation</h2>
+      <h2>Conversation</h2>
       <div class="chat-panel" id="chat-panel">
         <div class="chat-bubble bot">
-          🔬 Hi future scientist! I'm your Science Tutor. Ask me anything or upload a document and I'll explain it.
+          Hi future scientist! I'm your Science Tutor. Ask me anything or upload a document and I'll explain it.
         </div>
       </div>
       <div class="chat-input-row">
-        <input id="chatInput" type="text" class="input" placeholder="🔬 Type your science question…" />
+        <input id="chatInput" type="text" class="input" placeholder="Type your science question…" />
         <button id="sendBtn" class="btn btn-primary btn-send"></button>
       </div>
     </section>
@@ -204,7 +204,7 @@
         return `${who}: ${m.content}`;
       }).join('\n\n');
       window.GlobalChat && window.GlobalChat.injectContent(
-        transcript, 'tutor', `🤖 Tutor: ${subject} (${history.length} turns)`
+        transcript, 'tutor', `Tutor: ${subject} (${history.length} turns)`
       );
     });
   </script>

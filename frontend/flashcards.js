@@ -225,7 +225,7 @@
            !!document.getElementById('flashcards-page');
   }
 
-  const SUBJECT_ICON = { Biology: '🧬', Chemistry: '🧪', Physics: '⚛️', Science: '🔬' };
+  const SUBJECT_ICON = { Biology: '', Chemistry: '', Physics: '', Science: '' };
 
   function escHtml(s) {
     if (typeof window.escapeHtml === 'function') return window.escapeHtml(s);
@@ -253,7 +253,7 @@
     grid.innerHTML = store.decks.map(deck => {
       const due = dueCount(deck);
       const total = deck.cards.length;
-      const icon = SUBJECT_ICON[deck.subject] || '🔬';
+      const icon = SUBJECT_ICON[deck.subject] || '';
       return `
         <div class="deck-card" data-subject="${escHtml(deck.subject)}" data-deck="${deck.id}">
           <div class="deck-head">

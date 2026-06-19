@@ -393,7 +393,7 @@ Resources:
   WafWebAcl:
     Type: AWS::WAFv2::WebACL
     Properties:
-      Name: !Sub "${AWS::StackName}-rate-limit-acl"
+      Name: !Sub "${AWS::StackName}-waf-acl-v2"
       Description: "Rate limiting and abuse protection for Virtual Science Lab"
       Scope: REGIONAL
       DefaultAction:
@@ -486,7 +486,7 @@ Resources:
       MetricName: BlockedRequests
       Dimensions:
         - Name: WebACL
-          Value: !Sub "${AWS::StackName}-rate-limit-acl"
+          Value: !Sub "${AWS::StackName}-waf-acl-v2"
         - Name: Rule
           Value: ALL
         - Name: Region

@@ -20,6 +20,7 @@ from cors import cors_headers, preflight_response
 from flask import Flask, Response, request, stream_with_context
 from json_parse import parse_json_safe
 from prompt_safety import INJECTION_GUARD, prefix_system, tag
+from prompts import load_prompt
 from validators import sanitize_subject, sanitize_topic, validate_api_key
 
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,10 @@ app = Flask(__name__)
 app.url_map.strict_slashes = False
 
 VALID_LEVELS = {"Form 4", "SPM", "STPM", "University"}
+
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts")
+_LIST_SYSTEM = load_prompt(_PROMPTS_DIR, "list_system")
+_DETAIL_SYSTEM = load_prompt(_PROMPTS_DIR, "detail_system")
 
 
 def _level(v):
@@ -60,11 +65,6 @@ def handler(path):
 
 # ── Action: list — returns JSON array of chapter cards ────────────────────────
 
-_LIST_SYSTEM = """You are a syllabus expert. Return ONLY a valid JSON array.
-No markdown, no explanation, no code fences.
-Each element: {"chapterNumber": "1", "title": "...", "shortDescription": "..."}"""
-
-
 def _handle_list(body):
     subject = sanitize_subject(body.get("subject", ""))
     level = _level(body.get("level", ""))
@@ -94,12 +94,6 @@ def _handle_list(body):
 
 
 # ── Action: detail — returns JSON object with expanded chapter info ───────────
-
-_DETAIL_SYSTEM = """You are a curriculum expert. Return ONLY a valid JSON object.
-No markdown, no explanation, no code fences.
-Schema: {"title": "...", "subtopics": ["..."], "learningObjectives": ["..."],
-"keyConcepts": ["..."], "keyTerms": [{"term": "...", "definition": "..."}]}"""
-
 
 def _handle_detail(body):
     subject = sanitize_subject(body.get("subject", ""))

@@ -7,6 +7,15 @@ Parameters:
     Type: String
     Default: "*"
     Description: CORS allowed origin (set to S3 website URL after first deploy)
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+    Description: |
+      Deployment environment. Propagated to a tag on every resource so AWS
+      Cost Explorer / dashboards can filter by env. Stack-name suffix is
+      controlled separately by the deploy workflow so prod can keep its
+      legacy stack name unchanged.
   ApiKey:
     Type: String
     Default: ""
@@ -48,10 +57,15 @@ Globals:
     Timeout: 180
     MemorySize: 512
     Runtime: python3.12
+    Tags:
+      Environment: !Ref Environment
+      Project: VirtualScienceLab
     Environment:
       Variables:
         ALLOWED_ORIGIN: !Ref AllowedOrigin
         API_KEY:        !Ref ApiKey
+        AI_FUNCTION_NAME: !Ref AWS::StackName  # falls back if Lambda doesn't pass an explicit one
+        ENVIRONMENT:    !Ref Environment
 
 Resources:
   # ─── IAM Role ───────────────────────────────────────────────────────────────
@@ -321,6 +335,30 @@ Resources:
           # so to flip back, change just the env vars below.
           IMAGE_REGION: us-west-2
           IMAGE_MODEL_ID: stability.sd3-5-large-v1:0
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+
+  # ─── Feedback Collector Lambda (lightweight) ──────────────────────────────
+  # Tiny stateless Lambda that records thumbs-up / thumbs-down events as
+  # structured CloudWatch logs + an EMF FeedbackCount metric (no DB).
+  # 256 MB is more than enough; 30s timeout stays well under the global cap.
+  FeedbackCollectorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambdas/feedback_collector/
+      Handler: run.sh
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt AppBedrockRole.Arn
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_INVOKE_MODE: buffered
+          PORT: "8080"
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: BUFFERED
@@ -628,6 +666,8 @@ Outputs:
     Value: !GetAtt FlashcardGeneratorFunctionUrl.FunctionUrl
   ScientificObjectGeneratorUrl:
     Value: !GetAtt ScientificObjectGeneratorFunctionUrl.FunctionUrl
+  FeedbackCollectorUrl:
+    Value: !GetAtt FeedbackCollectorFunctionUrl.FunctionUrl
   SafetyAssistantUrl:
     Value: !GetAtt SafetyAssistantFunctionUrl.FunctionUrl
   WhatHappensIfUrl:

@@ -13,6 +13,7 @@ from bedrock_stream import stream_bedrock
 from cors import cors_headers, preflight_response
 from flask import Flask, Response, request, stream_with_context
 from prompt_safety import INJECTION_GUARD, tag
+from prompts import load_prompt
 from validators import sanitize_subject, sanitize_topic, validate_api_key
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,9 @@ app = Flask(__name__)
 app.url_map.strict_slashes = False
 
 VALID_LAB_LEVELS = {"School Lab", "University Lab", "Home Experiment", "Field Work"}
+
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts")
+_SAFETY_OFFICER_BODY = load_prompt(_PROMPTS_DIR, "system")
 
 
 def sanitize_lab_level(value):
@@ -51,13 +55,7 @@ def handler(path):
 
     system_prompt = (
         f"{INJECTION_GUARD}\n\n"
-        "You are an expert Lab Safety Officer with EHS certification. Produce "
-        "a comprehensive safety report using the markdown structure specified "
-        "in the user message. Be precise and accurate; do not invent "
-        "unrealistic dangers, but do not minimise real ones either. Decline "
-        "any request that would have you produce instructions for "
-        "synthesising weapons, drugs, or hazardous substances — pivot back to "
-        "general safety guidance instead."
+        f"{_SAFETY_OFFICER_BODY}"
     )
 
     user_fields = (

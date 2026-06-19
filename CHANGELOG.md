@@ -1,189 +1,109 @@
 # Changelog
 
-## Unreleased
+## Unreleased — production operability
 
-### Added — observability + cost controls
+**Multi-environment deploy**
+- `.github/workflows/deploy.yml` accepts a `workflow_dispatch.inputs.environment`
+  of `dev` / `staging` / `prod` (default prod). A push to `main` continues
+  to deploy prod; manual runs can target dev or staging.
+- Stack name is now parameterised: prod keeps the legacy
+  `virtual-science-lab-assistant` (preserves continuity); dev/staging get
+  their own `virtual-science-lab-{env}` stacks.
+- SAM template exposes an `Environment` parameter (allowed values `dev` /
+  `staging` / `prod`) and stamps every Lambda with `Environment` +
+  `Project` tags so AWS Cost Explorer can split by env.
 
-**Per-AI-invocation structured logging**
+**File-based prompt versioning**
+- New `lambdas/shared/prompts.py` — `load_prompt(dir, name)` with
+  path-traversal protection.
+- 10 system prompts extracted from inline strings to
+  `lambdas/<name>/prompts/*.md`. `app.py` loads them at module import.
+- `science_tutor` prompt is templated with `{subject}` and substituted
+  at request time.
+- `tests/unit/test_prompts_loader.py` — 7 new tests.
 
-- New `lambdas/shared/bedrock_metrics.py` — `log_ai_call`, `extract_usage`,
-  `CallTimer`. Emits one JSON log line per AI call with `function`,
-  `model_id`, `mode`, `latency_ms`, `status`, `input_tokens`,
-  `output_tokens`, `error_code`. The same line embeds a CloudWatch
-  Embedded Metric Format (EMF) block, so CloudWatch auto-extracts custom
-  metrics (`LatencyMs`, `InputTokens`, `OutputTokens`, `Errors`) under the
-  namespace `VirtualScienceLab/AI` with `function × model_id` dimensions —
-  no `PutMetricData` API call.
-- `lambdas/shared/bedrock_stream.py` — extended `stream_bedrock` to
-  harvest token usage from the Anthropic stream's `message_start` and
-  `message_delta` events, and added `invoke_bedrock_buffered(client,
-  model_id, body, function_name=, mode=)` for non-streaming calls. Both
-  paths emit exactly one log line per invocation regardless of outcome.
-- All 9 Lambdas refactored to use the new wrappers — 9 inline
-  `client.invoke_model(...)` call sites removed. Each app passes a short
-  `function_name` and `mode` so logs and metrics group cleanly.
-- Stability / Titan responses (no `usage` block) log tokens as `null` and
-  EMF reports them as `0` Count — handled gracefully, not as errors.
+**User feedback widget + collector**
+- New `lambdas/feedback_collector` — stateless Lambda that records
+  thumbs-up / thumbs-down events as structured CloudWatch logs + EMF
+  `FeedbackCount` metric grouped by `feature × rating`. No DB.
+- New `frontend/feedback.{js,css}` — drop-in widget with a per-page-load
+  random `session_id` (no PII, not persisted). Hooked into tutor, quiz,
+  chapter, experiment, lab-tools, and flashcards pages.
+- `tests/lambdas/test_feedback_collector.py` — 8 new tests.
+- Eval harness sample inputs added.
 
-**Lambda Insights**
+**Operations documentation**
+- `docs/privacy.md` — localStorage inventory, backend data flow,
+  retention table, deletion guidance.
+- `docs/runbooks/rollback.md` — three rollback paths plus per-env
+  stack-name reference.
+- `docs/runbooks/incident-response.md` — severity ladder, 6-step triage
+  checklist, postmortem template.
+- `docs/runbooks/model-migration.md` — IAM-first then code-swap pattern,
+  eval rubric gate, A/B testing tip, Stability-specific caveats.
+- `docs/runbooks/prompt-updates.md` — workflow for editing a prompt,
+  reviewer checklist, escape-hatch override pattern.
 
-- Insights extension layer added to `Mappings.RegionToLambdaInsights` (4
-  region entries; bump version when AWS publishes new layers).
-- `CloudWatchLambdaInsightsExecutionRolePolicy` attached to the shared
-  `AppBedrockRole`, so any function can opt in by adding the layer.
-- Enabled on the 4 cost-critical Lambdas: `ImageGeneratorFunction`,
-  `ScientificObjectGeneratorFunction`, `ScienceTutorFunction`,
-  `FlashcardGeneratorFunction`. Other Lambdas can be enabled later by
-  appending one line to their `Layers:` block.
+**Test totals**: 170 tests passing (was 147), all offline.
 
-**Reserved concurrency**
+**Assumptions**:
 
-- `ImageGeneratorFunction`: 5 (Stability ~$0.04/render → $0.20/sec cap)
-- `ScientificObjectGeneratorFunction`: 5 (same Stability call in image mode)
-- `FlashcardGeneratorFunction`: 5 (high output-token cost per call)
-- `ScienceTutorFunction`: 10 (high volume — chat — needs a higher cap)
-- Total reserved: 25/1000 — leaves 975 unreserved for other Lambdas.
+- The `Environment` parameter only affects tags; resources within a
+  stack don't get renamed. Each environment is its own stack.
+- Per-environment GitHub secrets aren't enforced — the same `API_KEY`,
+  `BUDGET_NOTIFICATION_EMAIL`, etc. apply to every env. Configure
+  GitHub Actions environments to split per env.
+- The feedback collector logs to CloudWatch only. Promote to DynamoDB
+  or S3 if long-term storage is needed; the wire contract is
+  forward-compatible.
 
-**CloudWatch alarms (10 total)**
+## 2026-06 — observability + cost controls (commits `1646920`, `b4813ae`)
 
-- 4 Lambdas × `Errors` alarm (Sum > 5 in 5 min)
-- 4 Lambdas × `Throttles` alarm (Sum > 0 in 5 min)
-- 2 image Lambdas × `Duration p99` alarm (> 60000ms over 2 × 5 min)
-- All use `TreatMissingData: notBreaching` so quiet periods don't alarm.
-- Names prefixed with `${AWS::StackName}-…` so multiple environments
-  stay separate.
+- New `lambdas/shared/bedrock_metrics.py` — structured AI-invocation
+  log lines + CloudWatch EMF metrics under namespace
+  `VirtualScienceLab/AI` with dimensions `function × model_id`.
+- Extended `bedrock_stream` to harvest token usage from both streaming
+  (`message_start` / `message_delta` events) and buffered paths.
+- New `invoke_bedrock_buffered` wrapper; all 9 Lambdas refactored.
+- Lambda Insights enabled on the 4 cost-critical functions.
+- 10 CloudWatch alarms (Errors + Throttles per critical Lambda; Duration
+  p99 for the two image Lambdas).
+- Conditional `AWS::Budgets::Budget` resource with 80% / 100% ACTUAL
+  notifications.
+- Reserved concurrency was attempted (5/5/5/10) but rolled back in
+  `b4813ae` because the AWS account's `ap-southeast-1` Lambda
+  concurrency quota is at the floor; documented re-enable path.
+- 10 new unit tests; total 147 passing.
 
-**Monthly cost budget**
+## 2026-06 — testing & evaluation layer (commit `19737c7`)
 
-- New `MonthlyCostBudget` (`AWS::Budgets::Budget`) resource, conditional
-  on `BudgetNotificationEmail` parameter being non-empty.
-- ACTUAL cost notifications at 80% and 100% of `BudgetAmountUSD`
-  (default $50/month).
-- Forecasted-cost thresholds can be added later by appending entries to
-  `NotificationsWithSubscribers`.
+- `tests/` — pytest suite with shared Bedrock mock; covers all 9
+  Lambdas, the shared utility modules, and an adversarial prompt-
+  injection corpus.
+- `tests/schemas.py` — JSON Schemas for every JSON-returning Lambda
+  output, used by both pytest and the eval harness.
+- `eval/run.py` — runnable harness with `--smoke` (mocked, CI gate) and
+  `--live` (real Bedrock) modes.
+- `eval/samples/*.json` — 4–5 inputs per Lambda.
+- `docs/ai-output-rubric.md` — 0–5 scoring rubric per Lambda type.
+- CI workflow `quality` job runs lint + pytest + eval smoke before
+  deploy.
 
-**Deploy workflow**
+## 2026-06 — security hardening (commits `5cd208a`, `7e11865`)
 
-- `.github/workflows/deploy.yml` threads two new GitHub secrets through
-  to SAM's `--parameter-overrides`: `BUDGET_NOTIFICATION_EMAIL` and
-  `BUDGET_AMOUNT_USD`. Both are optional; missing email simply skips the
-  Budget resource.
-
-**Tests**
-
-- `tests/unit/test_bedrock_metrics.py` (10 new tests) covers usage
-  extraction, structured-log shape, EMF block presence, error-status
-  semantics, keyword-only arg enforcement, and `CallTimer` exception
-  propagation.
-- All 147 tests pass; ruff clean; eval smoke run still PASS.
-
-**Documentation**
-
-- `docs/observability-and-cost-controls.md` documents what's logged,
-  where token usage is extracted, the metric namespace, the alarm
-  inventory with thresholds and rationale, the reserved-concurrency
-  table with justification, and a tuning playbook for adjusting
-  thresholds once production traffic is observed.
-
-### Assumptions
-
-- Lambda Insights extension layer version `:53` was used. AWS ships new
-  versions periodically; bump in `Mappings.RegionToLambdaInsights` when
-  needed (~once a year).
-- The 5/5/5/10 reserved-concurrency values are conservative starting
-  points. Real traffic should be observed for ~1 week, then resized
-  using the formula `concurrency ≈ avg RPS × avg duration (s)`.
-- `Duration p99` alarms are only on the two image Lambdas; tutor and
-  flashcard finish in seconds and a duration alarm on them would be
-  noisy or useless.
-- The budget defaults to USD $50/month based on a hobby-level deployment
-  where Stability rendering ($0.04/image) dominates the bill. Production
-  traffic should drive the real number.
-
-## 2026-06 — testing & evaluation layer
-
-See git log for commit `19737c7`.
-
-## 2026-06 — security hardening (P0 + P1)
-
-See git log for commits `5cd208a` and `7e11865`.
-
-**Automated test suite** — 137 tests in `tests/`, runs offline in ~3s:
-
-- `tests/conftest.py` — shared fixtures including a Bedrock mock that
-  resets cached clients across all 9 Lambdas, plus a `load_lambda` helper
-  that imports each Lambda's `app.py` under a unique module name to avoid
-  Flask `app` collisions.
-- `tests/unit/` — 48 tests covering `validators`, `prompt_safety`,
-  `json_parse`, `cors`.
-- `tests/lambdas/` — 81 tests, one file per Lambda, covering happy path,
-  missing required fields, empty input, length-cap truncation, allowlist
-  fallback, model refusal, Bedrock timeout, empty / garbled output, schema
-  validation, fail-closed validation in `experiment_guide`, and the P1
-  payload caps in `flashcard_generator` / `science_tutor`.
-- `tests/adversarial/test_prompt_injection.py` + 8 categorized payloads in
-  `tests/fixtures/adversarial_inputs.json`. Drives every JSON-returning
-  Lambda with each adversarial payload and asserts the SECURITY RULE clause
-  reaches Claude, the user-supplied field arrives wrapped in XML-style
-  tags, and the response remains schema-valid.
-
-**Schemas as code** — `tests/schemas.py` declares JSON Schemas for every
-JSON-returning Lambda output (chapter list / detail, experiment validate /
-node_map, flashcard, image_generator, quiz, object overview / narrative /
-image). Used by both pytest and the eval harness.
-
-**Eval harness** — `eval/`:
-
-- `eval/run.py` runs every Lambda against canned mocks (default) or live
-  Bedrock (`--live`). Smoke mode (`--smoke`) runs one sample per Lambda for
-  CI gating.
-- `eval/samples/<lambda>.json` — 4–5 sample inputs per Lambda (40+ total),
-  including injection / scope-drift attempts.
-- `eval/results/` — timestamped output directories with `_summary.json` and
-  per-Lambda result files containing input, output, schema_pass flag, and
-  a blank scoring template (correctness, structural_completeness,
-  teaching_clarity, safety, consistency, notes, reviewer).
-- `eval/README.md` documents usage and sample-file format.
-
-**Output rubric** — `docs/ai-output-rubric.md` defines the 0–5 scoring
-scale, per-Lambda quality criteria, and a cross-cutting safety floor.
-Includes the explicit policy that any output reproducing the SECURITY RULE
-clause, claiming jailbreak modes, or producing CBRN / drug / explosive
-instructions is `safety: 0` regardless of other axes.
-
-**CI gate** — `.github/workflows/deploy.yml` now has a `quality` job that
-must pass before `deploy` runs:
-
-```
-checkout → setup-python → pip install requirements-test.txt →
-ruff check → pytest → python -m eval.run --smoke
-```
-
-Deploy is gated via `needs: quality`.
-
-**Project files**:
-
-- `requirements-test.txt` — test-only dependencies (pytest, jsonschema, ruff)
-- `pyproject.toml` — ruff config (E + F + B + UP + I, line-length 110) and
-  pytest config (testpaths, markers, warning filters).
-
-### Assumptions
-
-- Tests run **offline by default**. Real Bedrock calls require
-  `RUN_LIVE_TESTS=1` (pytest) or `--live` (eval). CI never hits real AWS.
-- The Bedrock mock simulates Anthropic's `content[*].text` shape and
-  Stability's `images[*]` shape — same wire format the Lambdas use today.
-  If the response shape ever changes, the mock fixtures in
-  `tests/conftest.py` are the single point to update.
-- The eval harness deliberately does NOT score model output automatically.
-  The `scoring` block in each result file is filled in by a human reviewer
-  using the rubric. Automatic scoring on the rubric axes (correctness,
-  teaching clarity) is a follow-up that needs an LLM-as-judge or a held-out
-  eval-grader, both of which were out of scope for this layer.
-- Existing Lambda runtime behaviour was **not** changed. The only
-  non-test code edits were three pre-existing one-line conditionals in
-  `image_generator/app.py` reformatted to satisfy ruff's `E701` rule.
-
-## 2026-06 — security hardening (P0 + P1)
-
-See git log for commits `5cd208a` and `7e11865`.
+- P0: Prompt-injection guards across all 9 Lambdas via shared
+  `prompt_safety` helper (`tag()`, `prefix_system()`, `INJECTION_GUARD`).
+  Every user-controlled field arrives in XML-style tags; the system
+  prompt instructs Claude to treat tag contents as data.
+- P0: Stored-XSS fix in `progress.js` (numeric coercion +
+  `escapeHtml`); `escapeHtml` hardened to also escape `'`.
+- P0: Inline `onclick` removed from `quiz.html`; replaced with
+  `data-act` attributes + `addEventListener`.
+- P0: `experiment_guide` validation now fails closed.
+- P0: Generic error responses; stop returning exception class names.
+- P1: Bedrock client retry/timeout config.
+- P1: CORS hardening (warn on `*`, drop `X-Api-Key` header in wildcard
+  mode, add `nosniff`).
+- P1: Lower per-request payload caps in `flashcard_generator` (8KB
+  source_text, 6000 max_tokens) and `science_tutor` (10 history turns
+  cap × 3000 chars).

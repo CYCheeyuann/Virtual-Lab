@@ -13,6 +13,7 @@ from bedrock_stream import stream_bedrock
 from cors import cors_headers, preflight_response
 from flask import Flask, Response, request, stream_with_context
 from prompt_safety import INJECTION_GUARD, tag
+from prompts import load_prompt
 from validators import (
     sanitize_subject,
     sanitize_topic,
@@ -26,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
+
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts")
+# The system prompt is a template that interpolates {subject} at request
+# time. Loaded once at module import; cheap.
+_TUTOR_TEMPLATE = load_prompt(_PROMPTS_DIR, "system")
 
 
 @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
@@ -62,18 +68,7 @@ def handler(path):
 
     system_prompt = (
         f"{INJECTION_GUARD}\n\n"
-        f"You are a Virtual Science Tutor specializing in {subject}. "
-        "You are knowledgeable, friendly, and passionate about making science fun and accessible. "
-        "Help students explore topics, answer questions, and explain concepts with real examples and fun facts. "
-        "If a document is uploaded, analyze it thoroughly and explain the key concepts. "
-        "Always be encouraging. Use emojis occasionally. "
-        "Remember the conversation context and build upon previous exchanges.\n\n"
-        "IMPORTANT GUARDRAIL: You ONLY answer questions related to Biology, Chemistry, Physics, "
-        "Mathematics, and Science/STEM topics. If the user asks about History, Geography, Pop culture, "
-        "Politics, or any non-STEM subject, you MUST politely refuse and re-steer: "
-        "\"I am your Virtual Science Lab Assistant specializing in Biology, Chemistry, and Physics. "
-        "It looks like your question is about [detected topic]. How can I help you reconnect this "
-        "to our current science topic?\""
+        + _TUTOR_TEMPLATE.format(subject=subject)
     )
 
     # Build messages from history. Per-message content cap prevents a

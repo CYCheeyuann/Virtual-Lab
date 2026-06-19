@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        type: choice
+        options: [dev, staging, prod]
+        default: prod
 
 jobs:
   # ─── Quality gate ───────────────────────────────────────────────────────
@@ -43,6 +49,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Resolve environment + stack name
+        id: env
+        run: |
+          # workflow_dispatch passes an explicit environment input. A push to
+          # main has no input, so default to prod. Prod keeps the legacy
+          # stack name so the live deployment is preserved; dev/staging get
+          # their own stacks alongside.
+          ENV="${{ github.event.inputs.environment }}"
+          ENV="${ENV:-prod}"
+          if [ "$ENV" = "prod" ]; then
+            STACK="virtual-science-lab-assistant"
+          else
+            STACK="virtual-science-lab-${ENV}"
+          fi
+          echo "environment=$ENV"      >> "$GITHUB_OUTPUT"
+          echo "stack_name=$STACK"     >> "$GITHUB_OUTPUT"
+          echo "Deploying environment=$ENV stack=$STACK"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -62,7 +86,8 @@ jobs:
         run: |
           for fn in chapter_assistant experiment_guide science_quiz science_tutor \
                     safety_assistant what_happens_if image_generator \
-                    flashcard_generator scientific_object_generator; do
+                    flashcard_generator scientific_object_generator \
+                    feedback_collector; do
             cp lambdas/shared/*.py "lambdas/${fn}/"
           done
 
@@ -71,6 +96,8 @@ jobs:
 
       - name: Resolve AllowedOrigin from existing stack (if any)
         id: origin
+        env:
+          STACK_NAME: ${{ steps.env.outputs.stack_name }}
         run: |
           # Prefer the CloudFront HTTPS URL once the distribution exists, so
           # CORS is locked to the production HTTPS origin. Falls back to the
@@ -78,11 +105,11 @@ jobs:
           # then to "*" on the very first deploy when neither output exists.
           set +e
           CF_URL=$(aws cloudformation describe-stacks \
-                  --stack-name virtual-science-lab-assistant \
+                  --stack-name "$STACK_NAME" \
                   --query "Stacks[0].Outputs[?OutputKey=='CloudFrontUrl'].OutputValue" \
                   --output text 2>/dev/null)
           S3_URL=$(aws cloudformation describe-stacks \
-                  --stack-name virtual-science-lab-assistant \
+                  --stack-name "$STACK_NAME" \
                   --query "Stacks[0].Outputs[?OutputKey=='WebsiteUrl'].OutputValue" \
                   --output text 2>/dev/null)
           set -e
@@ -102,10 +129,12 @@ jobs:
           ALLOWED_ORIGIN: ${{ steps.origin.outputs.value }}
           BUDGET_EMAIL: ${{ secrets.BUDGET_NOTIFICATION_EMAIL }}
           BUDGET_AMOUNT: ${{ secrets.BUDGET_AMOUNT_USD }}
+          ENVIRONMENT: ${{ steps.env.outputs.environment }}
+          STACK_NAME: ${{ steps.env.outputs.stack_name }}
         run: |
           # Build --parameter-overrides as a list. SAM rejects empty values
           # like `ApiKey=`, so we only include each one when it's set.
-          OVERRIDES="AllowedOrigin=$ALLOWED_ORIGIN"
+          OVERRIDES="AllowedOrigin=$ALLOWED_ORIGIN Environment=$ENVIRONMENT"
           if [ -n "$API_KEY" ]; then
             OVERRIDES="$OVERRIDES ApiKey=$API_KEY"
           fi
@@ -116,7 +145,7 @@ jobs:
             OVERRIDES="$OVERRIDES BudgetAmountUSD=$BUDGET_AMOUNT"
           fi
           sam deploy \
-            --stack-name virtual-science-lab-assistant \
+            --stack-name "$STACK_NAME" \
             --s3-bucket ${{ secrets.SAM_DEPLOY_BUCKET }} \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --region ap-southeast-1 \
@@ -127,10 +156,11 @@ jobs:
       - name: Inject Lambda URLs into frontend config
         env:
           API_KEY: ${{ secrets.API_KEY }}
+          STACK_NAME: ${{ steps.env.outputs.stack_name }}
         run: |
           get_output() {
             aws cloudformation describe-stacks \
-              --stack-name virtual-science-lab-assistant \
+              --stack-name "$STACK_NAME" \
               --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" \
               --output text
           }
@@ -162,6 +192,9 @@ jobs:
           URL=$(get_output ScientificObjectGeneratorUrl)
           sed -i "s|__URL_SCIENTIFIC_OBJECT_GENERATOR__|$URL|g" frontend/config.js
 
+          URL=$(get_output FeedbackCollectorUrl)
+          sed -i "s|__URL_FEEDBACK_COLLECTOR__|$URL|g" frontend/config.js
+
           # Inject the API key (or empty string) so the frontend sends X-Api-Key
           # on every fetch. Reading via $API_KEY env var lets Actions log-scrub
           # the value, and we use `#` as a delimiter to avoid clashing with `/`
@@ -169,14 +202,18 @@ jobs:
           sed -i "s#__API_KEY__#${API_KEY}#g" frontend/config.js
 
       - name: Deploy frontend to S3
+        env:
+          STACK_NAME: ${{ steps.env.outputs.stack_name }}
         run: |
           BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name virtual-science-lab-assistant \
+            --stack-name "$STACK_NAME" \
             --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" \
             --output text)
           aws s3 sync frontend/ s3://$BUCKET/ --cache-control no-cache
 
       - name: Invalidate CloudFront cache
+        env:
+          STACK_NAME: ${{ steps.env.outputs.stack_name }}
         run: |
           # CloudFront caches S3 responses at edge locations; without an
           # invalidation, viewers can keep seeing stale assets for the cache
@@ -184,7 +221,7 @@ jobs:
           # distribution exists yet).
           set +e
           DIST_ID=$(aws cloudformation describe-stacks \
-            --stack-name virtual-science-lab-assistant \
+            --stack-name "$STACK_NAME" \
             --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
             --output text 2>/dev/null)
           set -e

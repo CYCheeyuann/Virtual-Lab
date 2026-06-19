@@ -13,6 +13,8 @@ window.STREAM_URLS = {
   flashcard_generator: '__URL_FLASHCARD_GENERATOR__',
   // Lab Tools redesign — Scientific Object Generator (new)
   scientific_object_generator: '__URL_SCIENTIFIC_OBJECT_GENERATOR__',
+  // User feedback collector (thumbs up / thumbs down) — emits structured logs.
+  feedback_collector: '__URL_FEEDBACK_COLLECTOR__',
 };
 
 // Optional shared secret. The deploy workflow replaces __API_KEY__ with the

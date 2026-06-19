@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="feedback.css" />
 </head>
 <body>
 
@@ -31,10 +32,7 @@
       <h1>📖 Chapter Assistant</h1>
       <p>Select a subject and level to see all chapters, or type a specific topic to filter. Click any card to expand.</p>
     </div>
-
-    <!-- Setup card (Yellow Area — always visible) -->
-    <section class="card" id="setup-card">
-      <h2>Setup</h2>
+a
       <label for="subject">Subject</label>
       <select id="subject" class="input">
         <option value="Biology">Biology</option>
@@ -97,6 +95,7 @@
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
   <script src="flashcards.js"></script>
+  <script src="feedback.js"></script>
   <script>
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Reset</span>`;
@@ -307,6 +306,18 @@
           } finally {
             setButtonLoading(flashBtn, false);
           }
+        });
+      }
+
+      // Attach feedback widget at the bottom of the detail modal.
+      if (window.Feedback) {
+        const fbWrap = document.createElement('div');
+        fbWrap.style.marginTop = '14px';
+        content.appendChild(fbWrap);
+        window.Feedback.attach(fbWrap, {
+          feature: 'chapter',
+          subject: document.getElementById('subject').value,
+          context: (d.title || ch.title || '').slice(0, 80),
         });
       }
     }

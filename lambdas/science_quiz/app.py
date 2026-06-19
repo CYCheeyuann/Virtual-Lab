@@ -21,6 +21,7 @@ from cors import cors_headers, preflight_response
 from flask import Flask, Response, request, stream_with_context
 from json_parse import parse_json_safe
 from prompt_safety import INJECTION_GUARD, prefix_system, tag
+from prompts import load_prompt
 from validators import (
     sanitize_subject,
     sanitize_topic,
@@ -33,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
+
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts")
+_QUIZ_SYSTEM = load_prompt(_PROMPTS_DIR, "quiz_system")
 
 VALID_DIFFICULTIES = {"Form 4", "SPM", "STPM", "University",
                       "Beginner", "Standard", "Expert", "Master"}
@@ -142,23 +146,6 @@ Be specific and educational. Use terminology appropriate for the difficulty valu
 
 
 # ── Phase 2: Quiz generation (synchronous JSON) ─────────────────────────────
-
-_QUIZ_SYSTEM = """You are a strict quiz generator. You MUST return ONLY a valid
-JSON array. No markdown, no explanation text, no ```json fences.
-
-Each element in the array is an object with exactly these keys:
-  "question_stem"       — the question text (string). Wrap core scientific keywords
-                          or key terms in **double asterisks** for emphasis
-                          (e.g. "What is the **centripetal acceleration** of...").
-  "options"             — object with keys "A", "B", "C", "D" (string values).
-                          Also bold key scientific terms within options where relevant.
-  "correct_answer"      — one of "A", "B", "C", "D"
-  "detailed_explanation" — why the correct answer is right and why others are wrong.
-                          Bold the most important scientific keywords in the explanation.
-
-Generate exactly the number of questions requested. Ensure questions are
-accurate, progressively harder, and appropriate for the stated difficulty."""
-
 
 def _handle_generate(body):
     subject    = sanitize_subject(body.get("subject", ""))

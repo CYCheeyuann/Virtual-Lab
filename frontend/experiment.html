@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="feedback.css" />
 </head>
 <body>
 
@@ -159,6 +160,7 @@
   <script src="vortex.js"></script>
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
+  <script src="feedback.js"></script>
   <script>
     // Inject button labels
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Experiment</span>`;
@@ -298,6 +300,20 @@
         renderNodeMap();
         recordActivity(subject);
         showToast('Experiment guide ready — click any node', 'success');
+        // Attach feedback widget below the node-map.
+        if (window.Feedback) {
+          const phaseEl = document.getElementById('phase-nodemap');
+          if (phaseEl && !phaseEl.querySelector('.fb-widget')) {
+            const wrap = document.createElement('div');
+            wrap.style.marginTop = '12px';
+            phaseEl.appendChild(wrap);
+            window.Feedback.attach(wrap, {
+              feature: 'experiment',
+              subject,
+              context: (sessionCache.topicTitle || topic).slice(0, 80),
+            });
+          }
+        }
       } catch (err) {
         if (err.name === 'AbortError') return;
         showToast('Generation failed: ' + err.message, 'error');

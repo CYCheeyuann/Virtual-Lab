@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="feedback.css" />
 </head>
 <body>
 
@@ -161,6 +162,7 @@
   <script src="vortex.js"></script>
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
+  <script src="feedback.js"></script>
   <script>
     /* ────────────────────────────────────────────────────────────────
      *  Lab Tools — Phase 1: frontend skeleton + mock data.
@@ -498,6 +500,26 @@
         }
       }
       recordActivity(document.querySelector('.tab-panel.active select[id$="-subject"]').value);
+      // Attach feedback widget once the run finished. Tab tells us the feature.
+      if (window.Feedback) {
+        const outputCard = document.getElementById('lab-out-text')?.closest('.card');
+        if (outputCard && !outputCard.querySelector('.fb-widget')) {
+          const wrap = document.createElement('div');
+          wrap.style.marginTop = '8px';
+          outputCard.appendChild(wrap);
+          const labelMap = { safety: 'safety', image: 'image', whatif: 'what-if' };
+          const ctxMap = {
+            safety: document.getElementById('safety-activity').value,
+            image:  document.getElementById('image-concept').value,
+            whatif: document.getElementById('whatif-scenario').value,
+          };
+          window.Feedback.attach(wrap, {
+            feature: labelMap[currentTab] || 'lab-tools',
+            subject: document.querySelector('.tab-panel.active select[id$="-subject"]').value,
+            context: (ctxMap[currentTab] || '').slice(0, 80),
+          });
+        }
+      }
     });
 
     /* ─── Reset ────────────────────────────────────────────────── */

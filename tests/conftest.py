@@ -39,6 +39,7 @@ _LOADED: dict = {}
 ALL_LAMBDAS = (
     "chapter_assistant",
     "experiment_guide",
+    "feedback_collector",
     "flashcard_generator",
     "image_generator",
     "safety_assistant",

@@ -514,6 +514,19 @@
         <button class="btn btn-primary fc-exit-done" style="margin-top:14px">Back to Library</button>`;
       summary.querySelector('.fc-exit-done')?.addEventListener('click', exitStudy);
       progress.textContent = `${reviewed} / ${reviewed} done`;
+      // Attach feedback widget at the bottom of the summary block.
+      if (window.Feedback && !summary.querySelector('.fb-widget')) {
+        const wrap = document.createElement('div');
+        wrap.style.marginTop = '14px';
+        summary.appendChild(wrap);
+        const store = Store.load();
+        const deck = store.decks.find(d => d.id === ui.deckId);
+        window.Feedback.attach(wrap, {
+          feature: 'flashcards',
+          subject: deck ? deck.subject : null,
+          context: deck ? `${deck.bab}`.slice(0, 80) : null,
+        });
+      }
       return;
     }
 

@@ -27,6 +27,7 @@ from botocore.exceptions import ClientError
 from cors import cors_headers, preflight_response
 from flask import Flask, Response, request
 from prompt_safety import prefix_system, tag
+from prompts import load_prompt
 from validators import validate_api_key
 
 logging.basicConfig(level=logging.INFO)
@@ -186,13 +187,8 @@ def handler(path):
 
 
 # ── Mode 1: overview (Claude, 1–3 sentences) ───────────────────────────────
-_OVERVIEW_SYSTEM = (
-    "You produce a single concise 1–3 sentence description of a lab tool, "
-    "aimed at a researcher or upper-level student. Plain prose only — no "
-    "bullets, no markdown, no headings, no labelled fields. Focus on what "
-    "the tool is and its key visual/functional attributes derived from the "
-    "inputs. Output the sentences only — no preamble."
-)
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts")
+_OVERVIEW_SYSTEM = load_prompt(_PROMPTS_DIR, "overview_system")
 
 
 def _handle_overview(body):
@@ -315,22 +311,7 @@ def _extract_image_b64(payload):
 
 
 # ── Mode 3: narrative (Claude, paragraph prose) ─────────────────────────────
-_NARRATIVE_SYSTEM = (
-    "You write detailed scientific narratives about lab tools.\n"
-    "Output rules — apply ALL of them:\n"
-    "  1. Produce 4 to 6 SUBSTANTIVE PARAGRAPHS of connected prose.\n"
-    "  2. Do NOT use bullet points, numbered lists, or section headings.\n"
-    "  3. Do NOT label fields like 'Material:' or 'Use:' as standalone lines.\n"
-    "  4. Cover, woven into prose: (a) what the tool is and its physical form; "
-    "(b) realistic lab use; (c) material properties relevant to handling, "
-    "cleaning, and reagent compatibility; (d) safety, sterility, contamination, "
-    "and thermal/chemical limits a user must know.\n"
-    "  5. When you mention a material, explain WHY it was chosen and what "
-    "practical limitations it implies — never just name the material.\n"
-    "  6. Use **bold** sparingly to emphasize at most 4–6 key technical terms.\n"
-    "  7. Tone: informative, professional, suitable for a researcher, "
-    "technician, or upper-level student. Output only the narrative."
-)
+_NARRATIVE_SYSTEM = load_prompt(_PROMPTS_DIR, "narrative_system")
 
 
 def _handle_narrative(body):

@@ -28,6 +28,7 @@ from cors import cors_headers, preflight_response
 from flask import Flask, Response, request
 from json_parse import parse_json_safe
 from prompt_safety import prefix_system, tag
+from prompts import load_prompt
 from validators import sanitize_subject, sanitize_topic, validate_api_key
 
 logging.basicConfig(level=logging.INFO)
@@ -153,16 +154,9 @@ def handler(path):
 
 
 # ── Step 1: Claude (synchronous, ap-southeast-1) ────────────────────────────
-_CLAUDE_SYSTEM = (
-    "You are a science visualisation expert. For each request, output a single "
-    "JSON object with EXACTLY these two string keys:\n"
-    '  "explanation"  — markdown-formatted scientific explanation (150–250 words) '
-    "with short headings (## / ###) and bullet points. Be accurate and engaging.\n"
-    '  "image_prompt" — detailed English prompt for an image-generation model '
-    "(< 900 characters). Describe subject, composition, perspective, lighting, "
-    "labelled features, and visual style. No camera brand names. No text overlays "
-    "unless the style demands them.\n"
-    "Output ONLY the JSON object — no prose, no markdown fences."
+_CLAUDE_SYSTEM = load_prompt(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts"),
+    "claude_system",
 )
 
 

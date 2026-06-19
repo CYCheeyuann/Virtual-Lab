@@ -23,6 +23,7 @@ from cors import cors_headers, preflight_response
 from flask import Flask, Response, request, stream_with_context
 from json_parse import parse_json_safe
 from prompt_safety import INJECTION_GUARD, prefix_system, tag
+from prompts import load_prompt
 from validators import (
     sanitize_difficulty,
     sanitize_subject,
@@ -36,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
+
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts")
+_NODE_SYSTEM = load_prompt(_PROMPTS_DIR, "node_map_system")
 
 
 SECTION_KEYS = [
@@ -168,23 +172,6 @@ def _handle_validate(body):
 
 
 # ── Mode: node_map ─────────────────────────────────────────────────────────
-
-_NODE_SYSTEM = """You are an expert science educator and lab instructor. You
-MUST output ONLY a single valid JSON object — no markdown fences, no preamble,
-no commentary outside the JSON.
-
-The JSON object MUST have exactly two keys at the top level:
-  "topic_title"  — string, e.g. "Circular Motion Experiment"
-  "sections"     — object with EXACTLY these eight keys:
-                     "objective", "materials", "safety", "procedure",
-                     "expected_results", "scientific_explanation",
-                     "real_life_applications", "summary"
-
-Each section is a string of plain text or simple markdown (bullets with "- ",
-numbered steps "1. ", and **bold** for key terms). Each section should be
-100-400 words, focused only on its named role. Do not repeat the topic title
-inside section bodies."""
-
 
 def _handle_node_map(body):
     subject    = sanitize_subject(body.get("subject", ""))

@@ -1,0 +1,33 @@
+[
+  {
+    "id": "tutor-thumbs-up",
+    "request": {
+      "feature": "tutor",
+      "rating": "up",
+      "subject": "Biology",
+      "context": "Photosynthesis explained simply",
+      "session_id": "abc123"
+    },
+    "schema": null,
+    "canned": {}
+  },
+  {
+    "id": "quiz-thumbs-down",
+    "request": {
+      "feature": "quiz",
+      "rating": "down",
+      "subject": "Physics"
+    },
+    "schema": null,
+    "canned": {}
+  },
+  {
+    "id": "invalid-feature",
+    "request": {
+      "feature": "hacking",
+      "rating": "up"
+    },
+    "schema": null,
+    "canned": {}
+  }
+]

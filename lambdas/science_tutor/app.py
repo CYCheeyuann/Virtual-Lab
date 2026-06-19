@@ -127,7 +127,10 @@ def handler(path):
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
     return Response(
-        stream_with_context(stream_bedrock(messages, system=system_prompt)),
+        stream_with_context(
+            stream_bedrock(messages, system=system_prompt,
+                           function_name="science_tutor", mode="chat")
+        ),
         headers=headers,
     )
 

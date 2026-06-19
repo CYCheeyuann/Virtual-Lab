@@ -18,7 +18,7 @@ _shared = os.path.join(os.path.dirname(__file__), "..", "shared")
 if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
-from bedrock_stream import MODEL_ID, get_client
+from bedrock_stream import MODEL_ID, get_client, invoke_bedrock_buffered
 from cors import cors_headers, preflight_response
 from flask import Flask, Response, request
 from json_parse import parse_json_safe
@@ -133,7 +133,7 @@ def handler(path):
             )
         user_prompt = "\n".join(parts) + "\n\n" + tail
 
-    return _generate(subject, num_cards, user_prompt)
+    return _generate(subject, num_cards, user_prompt, mode=mode)
 
 
 _FLASH_SYSTEM = """You are a strict flashcard generator. Output ONLY a valid
@@ -153,7 +153,7 @@ richer (definition → formula → application). Avoid duplicate fronts. Use
 terminology appropriate for the stated subject and chapter."""
 
 
-def _generate(subject, num_cards, user_prompt):
+def _generate(subject, num_cards, user_prompt, mode=None):
     logger.info("Flashcard generate subject=%s n=%d", subject, num_cards)
     client = get_client()
     invoke_body = {
@@ -168,8 +168,10 @@ def _generate(subject, num_cards, user_prompt):
     }
 
     try:
-        resp = client.invoke_model(modelId=MODEL_ID, body=json.dumps(invoke_body))
-        payload = json.loads(resp["body"].read())
+        payload = invoke_bedrock_buffered(
+            client, MODEL_ID, json.dumps(invoke_body),
+            function_name="flashcard_generator", mode=mode,
+        )
         text = "".join(
             b.get("text", "") for b in (payload.get("content") or [])
             if b.get("type") == "text"

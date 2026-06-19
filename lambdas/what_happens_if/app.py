@@ -122,7 +122,13 @@ Be vivid but accurate. Avoid filler. Use lists where useful."""
 
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
-    return Response(stream_with_context(stream_bedrock(messages, system=system_prompt)), headers=headers)
+    return Response(
+        stream_with_context(
+            stream_bedrock(messages, system=system_prompt,
+                           function_name="what_happens_if", mode="stream")
+        ),
+        headers=headers,
+    )
 
 
 if __name__ == "__main__":

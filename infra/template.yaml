@@ -14,6 +14,34 @@ Parameters:
     Description: |
       Optional shared secret. When set, every Lambda Function URL requires
       `X-Api-Key: <value>` on the request. Empty string disables the check.
+  BudgetAmountUSD:
+    Type: Number
+    Default: 50
+    Description: |
+      Monthly cost budget in USD. Triggers ACTUAL notifications at 80% and
+      100%. Bedrock + Lambda + S3 costs are dominated by Bedrock model usage,
+      so right-size this to the expected user volume.
+  BudgetNotificationEmail:
+    Type: String
+    Default: ""
+    Description: |
+      Email address that receives budget threshold notifications. Leave
+      empty to skip Budget creation entirely (the rest of the stack still
+      deploys).
+
+Conditions:
+  HasBudgetEmail: !Not [!Equals [!Ref BudgetNotificationEmail, ""]]
+
+Mappings:
+  # Lambda Insights extension layer ARNs by region. Account 580247275435 is
+  # the official AWS-managed Lambda Insights publisher. Update the version
+  # number from the AWS docs as new layers ship.
+  # https://docs.aws.amazon.com/lambda/latest/dg/monitoring-insights.html#monitoring-insights-extension
+  RegionToLambdaInsights:
+    ap-southeast-1: { LayerArn: "arn:aws:lambda:ap-southeast-1:580247275435:layer:LambdaInsightsExtension:53" }
+    us-east-1:      { LayerArn: "arn:aws:lambda:us-east-1:580247275435:layer:LambdaInsightsExtension:53" }
+    us-west-2:      { LayerArn: "arn:aws:lambda:us-west-2:580247275435:layer:LambdaInsightsExtension:53" }
+    eu-west-1:      { LayerArn: "arn:aws:lambda:eu-west-1:580247275435:layer:LambdaInsightsExtension:53" }
 
 Globals:
   Function:
@@ -40,6 +68,10 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        # Lambda Insights writes its CloudWatch metrics + logs through this
+        # managed policy. Attached here so any function can opt into Insights
+        # by simply adding the layer in its Layers list.
+        - arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy
       Policies:
         - PolicyName: BedrockInvokePolicy
           PolicyDocument:
@@ -139,15 +171,19 @@ Resources:
   # ─── Flashcard Generator Lambda ─────────────────────────────────────────────
   # Stateless AI card generation: from_text / from_quiz / from_topic.
   # Buffered (non-streaming) — frontend wants the whole deck JSON in one shot.
+  # ReservedConcurrentExecutions=5 — output-token-heavy (up to 6K tokens per
+  # call ≈ $0.03 worth of Claude); cap parallel cost at ~$0.15/sec.
   FlashcardGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../lambdas/flashcard_generator/
       Handler: run.sh
       MemorySize: 512
+      ReservedConcurrentExecutions: 5
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+        - !FindInMap [RegionToLambdaInsights, !Ref "AWS::Region", LayerArn]
       Environment:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
@@ -163,6 +199,8 @@ Resources:
   # us-west-2) → narrative (Claude Haiku). Strictly sequential per the spec.
   # Memory bumped to 1024 because base64 images can be ~1.5 MB.
   # Timeout 300s — image gen on Stability can take 30-60s.
+  # ReservedConcurrentExecutions=5 — Stability SD 3.5 calls cost ~$0.04 per
+  # render; cap parallel spend at ~$0.20/sec to bound runaway abuse.
   ScientificObjectGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -170,9 +208,11 @@ Resources:
       Handler: run.sh
       MemorySize: 1024
       Timeout: 300
+      ReservedConcurrentExecutions: 5
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+        - !FindInMap [RegionToLambdaInsights, !Ref "AWS::Region", LayerArn]
       Environment:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
@@ -184,14 +224,20 @@ Resources:
         InvokeMode: BUFFERED
 
   # ─── Science Tutor Lambda ──────────────────────────────────────────────────
+  # ReservedConcurrentExecutions=10 — highest-volume endpoint (chat).
+  # Higher cap than the cost-sensitive image Lambdas so multiple
+  # concurrent students aren't queued behind each other, but still
+  # bounds chat-storm abuse at ~10 simultaneous Bedrock streams.
   ScienceTutorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../lambdas/science_tutor/
       Handler: run.sh
+      ReservedConcurrentExecutions: 10
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+        - !FindInMap [RegionToLambdaInsights, !Ref "AWS::Region", LayerArn]
       Environment:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
@@ -242,7 +288,9 @@ Resources:
         AuthType: NONE
         InvokeMode: RESPONSE_STREAM
 
-  # ─── Image Generator Lambda (Non-Streaming, Nova Canvas + Claude) ──────────
+  # ─── Image Generator Lambda (Non-Streaming, Stability + Claude) ────────────
+  # ReservedConcurrentExecutions=5 — Stability SD 3.5 calls cost ~$0.04 per
+  # render; cap parallel spend at ~$0.20/sec to bound runaway abuse.
   ImageGeneratorFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -250,9 +298,11 @@ Resources:
       Handler: run.sh
       MemorySize: 1024
       Timeout: 300
+      ReservedConcurrentExecutions: 5
       Role: !GetAtt AppBedrockRole.Arn
       Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:27"
+        - !FindInMap [RegionToLambdaInsights, !Ref "AWS::Region", LayerArn]
       Environment:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
@@ -345,6 +395,222 @@ Resources:
             ErrorCachingMinTTL: 0
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # CloudWatch alarms — the four cost-critical Lambdas get Errors + Throttles
+  # coverage; the two image-generation Lambdas additionally get a Duration
+  # p99 alarm because Stability calls take 30-60s normally and a sustained
+  # creep above 60s indicates a real problem.
+  # ───────────────────────────────────────────────────────────────────────────
+
+  # ImageGeneratorFunction
+  ImageGeneratorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-image-generator-errors"
+      AlarmDescription: ">5 errors in 5 min on the image generator Lambda."
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ImageGeneratorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  ImageGeneratorThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-image-generator-throttles"
+      AlarmDescription: "Reserved-concurrency cap hit. Either tune the cap up or investigate abuse."
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ImageGeneratorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  ImageGeneratorDurationP99Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-image-generator-duration-p99"
+      AlarmDescription: "p99 Lambda duration > 60s — Stability render is slowing down."
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ImageGeneratorFunction
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 60000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  # ScientificObjectGeneratorFunction
+  ScientificObjectGeneratorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-scientific-object-errors"
+      AlarmDescription: ">5 errors in 5 min on the scientific object generator Lambda."
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ScientificObjectGeneratorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  ScientificObjectGeneratorThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-scientific-object-throttles"
+      AlarmDescription: "Reserved-concurrency cap hit on scientific object generator."
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ScientificObjectGeneratorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  ScientificObjectGeneratorDurationP99Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-scientific-object-duration-p99"
+      AlarmDescription: "p99 Lambda duration > 60s — Stability render is slowing down."
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ScientificObjectGeneratorFunction
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 60000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  # ScienceTutorFunction (highest volume, no image step)
+  ScienceTutorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-science-tutor-errors"
+      AlarmDescription: ">5 errors in 5 min on the chat Lambda."
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ScienceTutorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  ScienceTutorThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-science-tutor-throttles"
+      AlarmDescription: "Tutor concurrency cap hit — students are queueing. Bump cap or add capacity."
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ScienceTutorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  # FlashcardGeneratorFunction
+  FlashcardGeneratorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-flashcard-generator-errors"
+      AlarmDescription: ">5 errors in 5 min on the flashcard generator Lambda."
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref FlashcardGeneratorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  FlashcardGeneratorThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-flashcard-generator-throttles"
+      AlarmDescription: "Flashcard concurrency cap hit."
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref FlashcardGeneratorFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Monthly cost budget — only created when BudgetNotificationEmail is set.
+  # Ships actual-cost notifications at 80% and 100% of the configured limit.
+  # Forecasted-cost notifications can be added later by appending more
+  # NotificationsWithSubscribers entries here.
+  # ───────────────────────────────────────────────────────────────────────────
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudgetEmail
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-monthly"
+        BudgetLimit:
+          Amount: !Ref BudgetAmountUSD
+          Unit: USD
+        TimeUnit: MONTHLY
+        BudgetType: COST
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
 
 Outputs:
   ChapterAssistantUrl:

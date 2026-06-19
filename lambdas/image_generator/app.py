@@ -21,7 +21,7 @@ if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
 import boto3
-from bedrock_stream import friendly_error
+from bedrock_stream import friendly_error, invoke_bedrock_buffered
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from cors import cors_headers, preflight_response
@@ -181,11 +181,15 @@ def _claude_step(subject, concept, style, detail):
         "system": prefix_system(_CLAUDE_SYSTEM),
         "messages": [{"role": "user", "content": [{"type": "text", "text": user}]}],
     }
-    resp    = client.invoke_model(modelId=TEXT_MODEL_ID, body=json.dumps(body))
-    payload = json.loads(resp["body"].read())
-    text    = "".join(b.get("text", "")
-                      for b in (payload.get("content") or [])
-                      if b.get("type") == "text").strip()
+    payload = invoke_bedrock_buffered(
+        client, TEXT_MODEL_ID, json.dumps(body),
+        function_name="image_generator", mode="claude_expand",
+    )
+    text = "".join(
+        b.get("text", "")
+        for b in (payload.get("content") or [])
+        if b.get("type") == "text"
+    ).strip()
     return _extract_json(text, concept, style, detail)
 
 
@@ -255,8 +259,10 @@ def _image_step(prompt):
             },
         }
 
-    resp    = client.invoke_model(modelId=IMAGE_MODEL_ID, body=json.dumps(body))
-    payload = json.loads(resp["body"].read())
+    payload = invoke_bedrock_buffered(
+        client, IMAGE_MODEL_ID, json.dumps(body),
+        function_name="image_generator", mode="image_render",
+    )
     images  = payload.get("images") or []
     if not images:
         # Both model families return diagnostic info on safety/validation

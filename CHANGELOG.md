@@ -2,7 +2,111 @@
 
 ## Unreleased
 
-### Added — testing & evaluation layer
+### Added — observability + cost controls
+
+**Per-AI-invocation structured logging**
+
+- New `lambdas/shared/bedrock_metrics.py` — `log_ai_call`, `extract_usage`,
+  `CallTimer`. Emits one JSON log line per AI call with `function`,
+  `model_id`, `mode`, `latency_ms`, `status`, `input_tokens`,
+  `output_tokens`, `error_code`. The same line embeds a CloudWatch
+  Embedded Metric Format (EMF) block, so CloudWatch auto-extracts custom
+  metrics (`LatencyMs`, `InputTokens`, `OutputTokens`, `Errors`) under the
+  namespace `VirtualScienceLab/AI` with `function × model_id` dimensions —
+  no `PutMetricData` API call.
+- `lambdas/shared/bedrock_stream.py` — extended `stream_bedrock` to
+  harvest token usage from the Anthropic stream's `message_start` and
+  `message_delta` events, and added `invoke_bedrock_buffered(client,
+  model_id, body, function_name=, mode=)` for non-streaming calls. Both
+  paths emit exactly one log line per invocation regardless of outcome.
+- All 9 Lambdas refactored to use the new wrappers — 9 inline
+  `client.invoke_model(...)` call sites removed. Each app passes a short
+  `function_name` and `mode` so logs and metrics group cleanly.
+- Stability / Titan responses (no `usage` block) log tokens as `null` and
+  EMF reports them as `0` Count — handled gracefully, not as errors.
+
+**Lambda Insights**
+
+- Insights extension layer added to `Mappings.RegionToLambdaInsights` (4
+  region entries; bump version when AWS publishes new layers).
+- `CloudWatchLambdaInsightsExecutionRolePolicy` attached to the shared
+  `AppBedrockRole`, so any function can opt in by adding the layer.
+- Enabled on the 4 cost-critical Lambdas: `ImageGeneratorFunction`,
+  `ScientificObjectGeneratorFunction`, `ScienceTutorFunction`,
+  `FlashcardGeneratorFunction`. Other Lambdas can be enabled later by
+  appending one line to their `Layers:` block.
+
+**Reserved concurrency**
+
+- `ImageGeneratorFunction`: 5 (Stability ~$0.04/render → $0.20/sec cap)
+- `ScientificObjectGeneratorFunction`: 5 (same Stability call in image mode)
+- `FlashcardGeneratorFunction`: 5 (high output-token cost per call)
+- `ScienceTutorFunction`: 10 (high volume — chat — needs a higher cap)
+- Total reserved: 25/1000 — leaves 975 unreserved for other Lambdas.
+
+**CloudWatch alarms (10 total)**
+
+- 4 Lambdas × `Errors` alarm (Sum > 5 in 5 min)
+- 4 Lambdas × `Throttles` alarm (Sum > 0 in 5 min)
+- 2 image Lambdas × `Duration p99` alarm (> 60000ms over 2 × 5 min)
+- All use `TreatMissingData: notBreaching` so quiet periods don't alarm.
+- Names prefixed with `${AWS::StackName}-…` so multiple environments
+  stay separate.
+
+**Monthly cost budget**
+
+- New `MonthlyCostBudget` (`AWS::Budgets::Budget`) resource, conditional
+  on `BudgetNotificationEmail` parameter being non-empty.
+- ACTUAL cost notifications at 80% and 100% of `BudgetAmountUSD`
+  (default $50/month).
+- Forecasted-cost thresholds can be added later by appending entries to
+  `NotificationsWithSubscribers`.
+
+**Deploy workflow**
+
+- `.github/workflows/deploy.yml` threads two new GitHub secrets through
+  to SAM's `--parameter-overrides`: `BUDGET_NOTIFICATION_EMAIL` and
+  `BUDGET_AMOUNT_USD`. Both are optional; missing email simply skips the
+  Budget resource.
+
+**Tests**
+
+- `tests/unit/test_bedrock_metrics.py` (10 new tests) covers usage
+  extraction, structured-log shape, EMF block presence, error-status
+  semantics, keyword-only arg enforcement, and `CallTimer` exception
+  propagation.
+- All 147 tests pass; ruff clean; eval smoke run still PASS.
+
+**Documentation**
+
+- `docs/observability-and-cost-controls.md` documents what's logged,
+  where token usage is extracted, the metric namespace, the alarm
+  inventory with thresholds and rationale, the reserved-concurrency
+  table with justification, and a tuning playbook for adjusting
+  thresholds once production traffic is observed.
+
+### Assumptions
+
+- Lambda Insights extension layer version `:53` was used. AWS ships new
+  versions periodically; bump in `Mappings.RegionToLambdaInsights` when
+  needed (~once a year).
+- The 5/5/5/10 reserved-concurrency values are conservative starting
+  points. Real traffic should be observed for ~1 week, then resized
+  using the formula `concurrency ≈ avg RPS × avg duration (s)`.
+- `Duration p99` alarms are only on the two image Lambdas; tutor and
+  flashcard finish in seconds and a duration alarm on them would be
+  noisy or useless.
+- The budget defaults to USD $50/month based on a hobby-level deployment
+  where Stability rendering ($0.04/image) dominates the bill. Production
+  traffic should drive the real number.
+
+## 2026-06 — testing & evaluation layer
+
+See git log for commit `19737c7`.
+
+## 2026-06 — security hardening (P0 + P1)
+
+See git log for commits `5cd208a` and `7e11865`.
 
 **Automated test suite** — 137 tests in `tests/`, runs offline in ~3s:
 

@@ -1,10 +1,26 @@
-"""Shared Bedrock streaming helper — DRY utility for all Lambdas."""
+"""Shared Bedrock streaming + buffered helpers — DRY utility for all Lambdas.
+
+Two public entry points:
+
+  * `stream_bedrock(messages, ...)` — streaming text. Yields text chunks while
+    quietly harvesting `input_tokens` / `output_tokens` / `stop_reason` from
+    the Anthropic stream's `message_start` and `message_delta` events.
+
+  * `invoke_bedrock_buffered(client, model_id, body, ...)` — non-streaming
+    invoke_model. Returns the parsed JSON payload and emits the same
+    structured usage record before returning.
+
+Both paths flow through `log_ai_call` in `bedrock_metrics.py`, so every AI
+invocation produces exactly one JSON log line that doubles as a CloudWatch
+EMF metric source.
+"""
 
 import json
 import logging
 import os
 
 import boto3
+from bedrock_metrics import CallTimer, extract_usage, log_ai_call
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -14,6 +30,20 @@ REGION = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
 MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 _client = None
+
+
+def _default_function_name():
+    """Resolve a short, log-friendly function label.
+
+    Each Lambda's app.py sets AI_FUNCTION_NAME via env var (or passes
+    `function_name=` explicitly). Falls back to AWS_LAMBDA_FUNCTION_NAME
+    for forgotten cases, and finally "unknown".
+    """
+    return (
+        os.environ.get("AI_FUNCTION_NAME")
+        or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        or "unknown"
+    )
 
 
 def get_client():
@@ -75,13 +105,16 @@ def _friendly_error(error_code, message):
 friendly_error = _friendly_error
 
 
-def stream_bedrock(messages, system=None, max_tokens=4096):
-    """
-    Generator that yields text chunks from Bedrock invoke_model_with_response_stream.
-    Catches exceptions gracefully so the frontend gets a friendly error message
-    while preserving the real error in CloudWatch logs.
+def stream_bedrock(messages, system=None, max_tokens=4096, *, function_name=None, mode=None):
+    """Yield text chunks from invoke_model_with_response_stream.
+
+    Quietly harvests usage fields out of the stream's bookkeeping events
+    (`message_start` carries input_tokens; `message_delta` carries
+    output_tokens). One structured log line is emitted at the end of the
+    stream, regardless of how the call ended.
     """
     client = get_client()
+    function_name = function_name or _default_function_name()
     body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
@@ -95,6 +128,13 @@ def stream_bedrock(messages, system=None, max_tokens=4096):
         MODEL_ID, REGION, max_tokens,
     )
 
+    input_tokens = None
+    output_tokens = None
+    status = "ok"
+    error_code = None
+    timer = CallTimer()
+    timer.__enter__()
+
     try:
         response = client.invoke_model_with_response_stream(
             modelId=MODEL_ID,
@@ -104,26 +144,115 @@ def stream_bedrock(messages, system=None, max_tokens=4096):
             chunk = event.get("chunk")
             if not chunk:
                 continue
-            data = json.loads(chunk["bytes"])
-            if data.get("type") != "content_block_delta":
+            try:
+                data = json.loads(chunk["bytes"])
+            except (ValueError, TypeError):
                 continue
-            delta = data.get("delta", {}) or {}
-            # Only forward visible text. Skip "thinking_delta", "input_json_delta", etc.
-            if delta.get("type") and delta.get("type") != "text_delta":
-                continue
-            text = delta.get("text", "")
-            if text:
-                yield text
+
+            etype = data.get("type")
+
+            if etype == "message_start":
+                # Anthropic event: data["message"]["usage"]["input_tokens"]
+                msg = data.get("message") or {}
+                u = msg.get("usage") or {}
+                if u.get("input_tokens") is not None:
+                    input_tokens = u.get("input_tokens")
+            elif etype == "message_delta":
+                u = data.get("usage") or {}
+                if u.get("output_tokens") is not None:
+                    output_tokens = u.get("output_tokens")
+            elif etype == "content_block_delta":
+                delta = data.get("delta") or {}
+                # Only forward visible text. Skip "thinking_delta",
+                # "input_json_delta", etc.
+                if delta.get("type") and delta.get("type") != "text_delta":
+                    continue
+                text = delta.get("text", "")
+                if text:
+                    yield text
     except ClientError as e:
-        code = e.response.get("Error", {}).get("Code", "")
+        status = "error"
+        error_code = e.response.get("Error", {}).get("Code", "")
         msg = e.response.get("Error", {}).get("Message", str(e))
         logger.exception(
             "Bedrock ClientError code=%s model=%s region=%s message=%s",
-            code, MODEL_ID, REGION, msg,
+            error_code, MODEL_ID, REGION, msg,
         )
-        yield "\n\n" + _friendly_error(code, msg)
+        yield "\n\n" + _friendly_error(error_code, msg)
     except Exception as e:
+        status = "error"
+        error_code = type(e).__name__
         logger.exception(
             "Bedrock invocation failed model=%s region=%s", MODEL_ID, REGION,
         )
-        yield f"\n\n⚠️ An unexpected error occurred ({type(e).__name__}). Please try again later."
+        yield f"\n\n⚠️ An unexpected error occurred ({error_code}). Please try again later."
+    finally:
+        timer.__exit__(None, None, None)
+        log_ai_call(
+            function_name=function_name,
+            model_id=MODEL_ID,
+            latency_ms=timer.elapsed_ms,
+            status=status,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            mode=mode or "stream",
+            error_code=error_code,
+        )
+
+
+def invoke_bedrock_buffered(
+    client,
+    model_id,
+    body,
+    *,
+    function_name=None,
+    mode=None,
+):
+    """Run a non-streaming `invoke_model` call and emit one usage log line.
+
+    Returns the parsed JSON payload (the same object the caller would have
+    obtained via `json.loads(resp["body"].read())`). Re-raises Bedrock /
+    JSON errors after logging so callers can keep their existing
+    error-handling branches.
+    """
+    function_name = function_name or _default_function_name()
+    timer = CallTimer()
+    timer.__enter__()
+    try:
+        resp = client.invoke_model(modelId=model_id, body=body)
+        payload = json.loads(resp["body"].read())
+    except ClientError as e:
+        timer.__exit__(None, None, None)
+        log_ai_call(
+            function_name=function_name,
+            model_id=model_id,
+            latency_ms=timer.elapsed_ms,
+            status="error",
+            mode=mode,
+            error_code=e.response.get("Error", {}).get("Code", "ClientError"),
+        )
+        raise
+    except Exception as e:
+        timer.__exit__(None, None, None)
+        log_ai_call(
+            function_name=function_name,
+            model_id=model_id,
+            latency_ms=timer.elapsed_ms,
+            status="error",
+            mode=mode,
+            error_code=type(e).__name__,
+        )
+        raise
+
+    timer.__exit__(None, None, None)
+    input_tokens, output_tokens = extract_usage(payload)
+    log_ai_call(
+        function_name=function_name,
+        model_id=model_id,
+        latency_ms=timer.elapsed_ms,
+        status="ok",
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        mode=mode,
+    )
+    return payload

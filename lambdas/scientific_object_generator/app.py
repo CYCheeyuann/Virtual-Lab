@@ -21,7 +21,7 @@ if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
 import boto3
-from bedrock_stream import friendly_error
+from bedrock_stream import friendly_error, invoke_bedrock_buffered
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from cors import cors_headers, preflight_response
@@ -215,7 +215,7 @@ def _handle_overview(body):
     )
 
     try:
-        text = _claude_text(prefix_system(_OVERVIEW_SYSTEM), user_prompt, max_tokens=240)
+        text = _claude_text(prefix_system(_OVERVIEW_SYSTEM), user_prompt, max_tokens=240, mode="overview")
     except ClientError as e:
         return _bedrock_err(e)
     except Exception:
@@ -253,13 +253,10 @@ def _handle_image(body):
     }
 
     try:
-        resp = client.invoke_model(
-            modelId=IMAGE_MODEL_ID,
-            body=json.dumps(req_body),
-            accept="application/json",
-            contentType="application/json",
+        payload = invoke_bedrock_buffered(
+            client, IMAGE_MODEL_ID, json.dumps(req_body),
+            function_name="scientific_object_generator", mode="image",
         )
-        payload = json.loads(resp["body"].read())
     except ClientError as e:
         return _bedrock_err(e, hint={"prompt_used": prompt})
     except Exception as e:  # noqa: BLE001
@@ -357,7 +354,7 @@ def _handle_narrative(body):
     )
 
     try:
-        text = _claude_text(prefix_system(_NARRATIVE_SYSTEM), user_prompt, max_tokens=2400)
+        text = _claude_text(prefix_system(_NARRATIVE_SYSTEM), user_prompt, max_tokens=2400, mode="narrative")
     except ClientError as e:
         return _bedrock_err(e)
     except Exception:
@@ -406,7 +403,7 @@ def _strip_residual_bullets(text):
 
 
 # ── Claude text helper ──────────────────────────────────────────────────────
-def _claude_text(system_prompt, user_prompt, max_tokens=1500):
+def _claude_text(system_prompt, user_prompt, max_tokens=1500, mode=None):
     client = _get_text_client()
     body = {
         "anthropic_version": "bedrock-2023-05-31",
@@ -416,8 +413,10 @@ def _claude_text(system_prompt, user_prompt, max_tokens=1500):
             {"role": "user", "content": [{"type": "text", "text": user_prompt}]}
         ],
     }
-    resp = client.invoke_model(modelId=TEXT_MODEL_ID, body=json.dumps(body))
-    payload = json.loads(resp["body"].read())
+    payload = invoke_bedrock_buffered(
+        client, TEXT_MODEL_ID, json.dumps(body),
+        function_name="scientific_object_generator", mode=mode,
+    )
     return "".join(
         b.get("text", "")
         for b in (payload.get("content") or [])

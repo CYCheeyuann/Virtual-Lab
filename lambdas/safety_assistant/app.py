@@ -105,7 +105,13 @@ Be precise, accurate, and concise."""
 
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
-    return Response(stream_with_context(stream_bedrock(messages, system=system_prompt)), headers=headers)
+    return Response(
+        stream_with_context(
+            stream_bedrock(messages, system=system_prompt,
+                           function_name="safety_assistant", mode="stream")
+        ),
+        headers=headers,
+    )
 
 
 if __name__ == "__main__":

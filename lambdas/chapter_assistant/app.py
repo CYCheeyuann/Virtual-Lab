@@ -15,7 +15,7 @@ _shared = os.path.join(os.path.dirname(__file__), "..", "shared")
 if os.path.isdir(_shared):
     sys.path.insert(0, _shared)
 
-from bedrock_stream import MODEL_ID, get_client, stream_bedrock
+from bedrock_stream import MODEL_ID, get_client, invoke_bedrock_buffered, stream_bedrock
 from cors import cors_headers, preflight_response
 from flask import Flask, Response, request, stream_with_context
 from json_parse import parse_json_safe
@@ -90,7 +90,7 @@ def _handle_list(body):
     user = f"{fields}\n\n{instruction}"
 
     logger.info("Chapter list subject=%s level=%s topic=%s", subject, level, topic)
-    return _invoke_json(user, prefix_system(_LIST_SYSTEM))
+    return _invoke_json(user, prefix_system(_LIST_SYSTEM), mode="list")
 
 
 # ── Action: detail — returns JSON object with expanded chapter info ───────────
@@ -123,7 +123,7 @@ def _handle_detail(body):
     )
 
     logger.info("Chapter detail subject=%s level=%s title=%s", subject, level, chapter_title)
-    return _invoke_json(user, prefix_system(_DETAIL_SYSTEM))
+    return _invoke_json(user, prefix_system(_DETAIL_SYSTEM), mode="detail")
 
 
 # ── Action: stream — legacy streaming markdown (for co-pilot context) ─────────
@@ -161,14 +161,17 @@ def _handle_stream(body):
     headers = cors_headers()
     headers["Content-Type"] = "text/plain; charset=utf-8"
     return Response(
-        stream_with_context(stream_bedrock(messages, system=INJECTION_GUARD)),
+        stream_with_context(
+            stream_bedrock(messages, system=INJECTION_GUARD,
+                           function_name="chapter_assistant", mode="stream")
+        ),
         headers=headers,
     )
 
 
 # ── Shared JSON invocation helper ─────────────────────────────────────────────
 
-def _invoke_json(user_prompt, system_prompt):
+def _invoke_json(user_prompt, system_prompt, mode=None):
     client = get_client()
     invoke_body = {
         "anthropic_version": "bedrock-2023-05-31",
@@ -177,8 +180,10 @@ def _invoke_json(user_prompt, system_prompt):
         "messages": [{"role": "user", "content": [{"type": "text", "text": user_prompt}]}],
     }
     try:
-        resp = client.invoke_model(modelId=MODEL_ID, body=json.dumps(invoke_body))
-        payload = json.loads(resp["body"].read())
+        payload = invoke_bedrock_buffered(
+            client, MODEL_ID, json.dumps(invoke_body),
+            function_name="chapter_assistant", mode=mode,
+        )
         text = "".join(
             b.get("text", "") for b in (payload.get("content") or [])
             if b.get("type") == "text"

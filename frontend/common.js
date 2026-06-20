@@ -398,6 +398,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setSubjectTheme(getSavedSubject());
   }
   injectThemeToggle();
-  injectShortcutHint();
   initKeyboardShortcuts();
 });

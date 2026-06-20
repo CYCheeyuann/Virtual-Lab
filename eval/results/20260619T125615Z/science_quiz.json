@@ -1,0 +1,25 @@
+[
+  {
+    "lambda": "science_quiz",
+    "sample_id": "circular-motion-outline",
+    "input": {
+      "action": "outline",
+      "subject": "Physics",
+      "topic": "Circular Motion",
+      "difficulty": "SPM"
+    },
+    "status": 200,
+    "output": "QUIZ OUTLINE \u2014 CIRCULAR MOTION || Key concepts for SPM-level assessment\n1. CENTRIPETAL FORCE || Inward force keeping an object on a circular path.\n2. ANGULAR VELOCITY || Rate of change of angle, in rad/s.\nSUGGESTED FOCUS || Emphasize the relationship between linear and angular quantities.\n",
+    "schema_pass": null,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

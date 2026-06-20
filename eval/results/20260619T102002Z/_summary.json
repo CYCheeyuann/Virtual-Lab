@@ -1,0 +1,53 @@
+{
+  "timestamp": "20260619T102002Z",
+  "live": false,
+  "smoke": true,
+  "overall_pass": true,
+  "lambdas": [
+    {
+      "lambda": "chapter_assistant",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\chapter_assistant.json"
+    },
+    {
+      "lambda": "experiment_guide",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\experiment_guide.json"
+    },
+    {
+      "lambda": "flashcard_generator",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\flashcard_generator.json"
+    },
+    {
+      "lambda": "image_generator",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\image_generator.json"
+    },
+    {
+      "lambda": "safety_assistant",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\safety_assistant.json"
+    },
+    {
+      "lambda": "science_quiz",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\science_quiz.json"
+    },
+    {
+      "lambda": "science_tutor",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\science_tutor.json"
+    },
+    {
+      "lambda": "scientific_object_generator",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\scientific_object_generator.json"
+    },
+    {
+      "lambda": "what_happens_if",
+      "samples": 1,
+      "file": "C:\\Users\\CY\\Desktop\\kiro\\kiro competition\\eval\\results\\20260619T102002Z\\what_happens_if.json"
+    }
+  ]
+}

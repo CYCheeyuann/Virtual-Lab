@@ -1,0 +1,28 @@
+[
+  {
+    "lambda": "experiment_guide",
+    "sample_id": "photosynthesis-validate",
+    "input": {
+      "mode": "validate",
+      "subject": "Biology",
+      "topic": "Photosynthesis in elodea",
+      "difficulty": "Standard"
+    },
+    "status": 200,
+    "output": {
+      "valid": true,
+      "summary": "Will produce a complete experiment guide on photosynthesis using elodea."
+    },
+    "schema_pass": true,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

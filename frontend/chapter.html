@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chapter Assistant</title>
   <meta name="description" content="Interactive chapter overview with card grid, detail modal, and AI co-pilot." />
-  <link rel="icon" href="LOGO.png" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
@@ -15,7 +15,7 @@
 
   <nav class="navbar">
     <div class="nav-inner">
-      <a class="brand" href="welcome.html"><img src="LOGO.png" alt="Logo" style="height:1.5em;vertical-align:middle;margin-right:0.3em" />Virtual Science Lab</a>
+      <a class="brand" href="welcome.html">Virtual Science Lab</a>
       <div class="nav-links">
         <a class="nav-link" href="index.html">Dashboard</a>
         <a class="nav-link active" href="chapter.html">Chapter Assistant</a>
@@ -29,7 +29,7 @@
 
   <main class="page">
     <div class="page-header">
-      <h1>Chapter Assistant</h1>
+      <h1>📖 Chapter Assistant</h1>
       <p>Select a subject and level to see all chapters, or type a specific topic to filter. Click any card to expand.</p>
     </div>
 a
@@ -76,7 +76,7 @@ a
 
     <!-- Co-pilot (stays below grid) -->
     <section class="card" id="copilot-section" style="display:none">
-      <h2>Deep-Dive Co-pilot</h2>
+      <h2>💬 Deep-Dive Co-pilot</h2>
       <p style="color:var(--c-muted);font-size:0.85rem;margin-bottom:10px">
         Ask follow-up questions about any chapter. The AI has full context.
       </p>
@@ -144,7 +144,7 @@ a
         document.getElementById('chapter-grid-section').style.display = '';
         document.getElementById('copilot-section').style.display = '';
         document.getElementById('copilot-chat').innerHTML =
-          '<div class="chat-bubble bot">Chapters restored from your last session! Click a card to expand.</div>';
+          '<div class="chat-bubble bot">📖 Chapters restored from your last session! Click a card to expand.</div>';
       } catch (e) {}
     }
     // Restore on load
@@ -174,7 +174,7 @@ a
         document.getElementById('chapter-grid-section').style.display = '';
         document.getElementById('copilot-section').style.display = '';
         document.getElementById('copilot-chat').innerHTML =
-          '<div class="chat-bubble bot">Chapters loaded! Click a card to expand, or ask me anything.</div>';
+          '<div class="chat-bubble bot">📖 Chapters loaded! Click a card to expand, or ask me anything.</div>';
         chapterContext = JSON.stringify(chaptersData);
         copilotHistory = [];
         recordActivity(body.subject);
@@ -264,13 +264,13 @@ a
     function renderDetailContent(content, d, ch) {
       content.innerHTML = `
         <h2 style="color:var(--c-accent-2);margin-bottom:14px">${escapeHtml(d.title || ch.title)}</h2>
-        ${d.subtopics ? `<h3>Subtopics</h3><ul>${d.subtopics.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
-        ${d.learningObjectives ? `<h3>Learning Objectives</h3><ul>${d.learningObjectives.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
-        ${d.keyConcepts ? `<h3>Key Concepts</h3><ul>${d.keyConcepts.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
-        ${d.keyTerms ? `<h3>Key Terms</h3><dl>${d.keyTerms.map(t=>'<dt>'+escapeHtml(t.term)+'</dt><dd>'+escapeHtml(t.definition)+'</dd>').join('')}</dl>` : ''}
+        ${d.subtopics ? `<h3>📋 Subtopics</h3><ul>${d.subtopics.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+        ${d.learningObjectives ? `<h3>🎯 Learning Objectives</h3><ul>${d.learningObjectives.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+        ${d.keyConcepts ? `<h3>🧠 Key Concepts</h3><ul>${d.keyConcepts.map(s=>'<li>'+escapeHtml(s)+'</li>').join('')}</ul>` : ''}
+        ${d.keyTerms ? `<h3>📖 Key Terms</h3><dl>${d.keyTerms.map(t=>'<dt>'+escapeHtml(t.term)+'</dt><dd>'+escapeHtml(t.definition)+'</dd>').join('')}</dl>` : ''}
         <div class="btn-row" style="margin-top:18px">
           <button id="chapterToFlashBtn" class="btn btn-primary">
-            <span>Turn this Chapter into Flashcards</span>
+            <span>🧠</span><span>Turn this Chapter into Flashcards</span>
           </button>
         </div>`;
 

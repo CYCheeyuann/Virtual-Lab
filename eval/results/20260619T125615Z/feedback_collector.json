@@ -1,0 +1,26 @@
+[
+  {
+    "lambda": "feedback_collector",
+    "sample_id": "tutor-thumbs-up",
+    "input": {
+      "feature": "tutor",
+      "rating": "up",
+      "subject": "Biology",
+      "context": "Photosynthesis explained simply",
+      "session_id": "abc123"
+    },
+    "status": 204,
+    "output": "",
+    "schema_pass": null,
+    "schema_error": null,
+    "scoring": {
+      "correctness": null,
+      "structural_completeness": null,
+      "teaching_clarity": null,
+      "safety": null,
+      "consistency": null,
+      "notes": "",
+      "reviewer": ""
+    }
+  }
+]

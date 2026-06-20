@@ -393,7 +393,7 @@ Resources:
   WafWebAcl:
     Type: AWS::WAFv2::WebACL
     Properties:
-      Name: !Sub "${AWS::StackName}-waf-acl-v2"
+      Name: !Sub "${AWS::StackName}-rate-limit-acl"
       Description: "Rate limiting and abuse protection for Virtual Science Lab"
       Scope: REGIONAL
       DefaultAction:
@@ -486,7 +486,7 @@ Resources:
       MetricName: BlockedRequests
       Dimensions:
         - Name: WebACL
-          Value: !Sub "${AWS::StackName}-waf-acl-v2"
+          Value: !Sub "${AWS::StackName}-rate-limit-acl"
         - Name: Rule
           Value: ALL
         - Name: Region
@@ -503,8 +503,8 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       WebsiteConfiguration:
-        IndexDocument: welcome.html
-        ErrorDocument: welcome.html
+        IndexDocument: index.html
+        ErrorDocument: index.html
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -534,7 +534,7 @@ Resources:
       DistributionConfig:
         Enabled: true
         Comment: !Sub "${AWS::StackName} — frontend HTTPS"
-        DefaultRootObject: welcome.html
+        DefaultRootObject: index.html
         PriceClass: PriceClass_100
         HttpVersion: http2
         IPV6Enabled: true
@@ -563,11 +563,11 @@ Resources:
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
-            ResponsePagePath: /welcome.html
+            ResponsePagePath: /index.html
             ErrorCachingMinTTL: 0
           - ErrorCode: 404
             ResponseCode: 200
-            ResponsePagePath: /welcome.html
+            ResponsePagePath: /index.html
             ErrorCachingMinTTL: 0
         ViewerCertificate:
           CloudFrontDefaultCertificate: true

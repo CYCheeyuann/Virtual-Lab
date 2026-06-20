@@ -111,17 +111,17 @@ function renderProgressDashboard(targetId) {
   const lastSubject = _esc(p.lastSubject || '—');
 
   target.innerHTML = `
-    <h2>Your Learning Dashboard</h2>
+    <h2>📊 Your Learning Dashboard</h2>
     <div class="progress-stats">
       <div class="progress-stat">
-        <div class="stat-emoji streak-flame"></div>
+        <div class="stat-emoji streak-flame">🔥</div>
         <div class="stat-meta">
           <span class="stat-value">${streak}-Day Streak</span>
           <span class="stat-label">Keep it going</span>
         </div>
       </div>
       <div class="progress-stat">
-        <div class="stat-emoji"></div>
+        <div class="stat-emoji">📝</div>
         <div class="stat-meta">
           <span class="stat-value">${totalQuizzes} Quiz${totalQuizzes === 1 ? '' : 'zes'}</span>
           <span class="stat-label">Completed</span>
@@ -135,7 +135,7 @@ function renderProgressDashboard(targetId) {
         </div>
       </div>
       <div class="progress-stat">
-        <div class="stat-emoji"></div>
+        <div class="stat-emoji">🎯</div>
         <div class="stat-meta">
           <span class="stat-value">${lastSubject}</span>
           <span class="stat-label">Last subject</span>

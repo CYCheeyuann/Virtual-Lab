@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Experiment Guide</title>
   <meta name="description" content="AI-generated complete lab guide with safety briefing. Supports document upload for context analysis." />
-  <link rel="icon" href="LOGO.png" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
@@ -15,7 +15,7 @@
 
   <nav class="navbar">
     <div class="nav-inner">
-      <a class="brand" href="welcome.html"><img src="LOGO.png" alt="Logo" style="height:1.5em;vertical-align:middle;margin-right:0.3em" />Virtual Science Lab</a>
+      <a class="brand" href="welcome.html">Virtual Science Lab</a>
       <div class="nav-links">
         <a class="nav-link" href="index.html">Dashboard</a>
         <a class="nav-link" href="chapter.html">Chapter Assistant</a>
@@ -60,7 +60,7 @@
       <label>Reference Document (optional)</label>
       <div class="dropzone" id="dz">
         <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html" hidden />
-        <p>Drag &amp; drop or click to upload</p>
+        <p>📄 Drag &amp; drop or click to upload</p>
         <small>JPG · PNG · WEBP · PDF · DOCX · PPTX · CSV · JSON · HTML</small>
         <div class="file-info" id="file-info"></div>
       </div>
@@ -78,7 +78,7 @@
       <div class="confirm-error" id="confirmError" hidden></div>
       <div class="btn-row" style="margin-top:18px">
         <button id="continueBtn" class="btn btn-primary">
-          <span>Continue &amp; Generate Guide</span>
+          <span>🚀</span><span>Continue &amp; Generate Guide</span>
         </button>
         <button id="confirmBackBtn" class="btn btn-ghost">
           <span>←</span><span>Back to Setup</span>
@@ -90,7 +90,7 @@
     <section class="card" id="phase-nodemap" style="display:none">
       <div class="node-map" id="nodeMap">
         <div class="main-topic-node">
-          <span class="topic-icon"><img src="LOGO.png" alt="" style="height:1.5em;vertical-align:middle" /></span>
+          <span class="topic-icon">🧪</span>
           <h2 class="topic-title" id="mainTopicTitle">Experiment</h2>
           <div class="topic-meta" id="mainTopicMeta"></div>
         </div>
@@ -99,35 +99,35 @@
 
         <div class="node-grid">
           <button class="node-box" data-section="objective" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">🎯</span>
             <span class="node-title">Objective</span>
           </button>
           <button class="node-box" data-section="materials" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">🧰</span>
             <span class="node-title">Materials</span>
           </button>
           <button class="node-box" data-section="safety" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">⚠️</span>
             <span class="node-title">Safety Briefing</span>
           </button>
           <button class="node-box" data-section="procedure" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">🔬</span>
             <span class="node-title">Procedure</span>
           </button>
           <button class="node-box" data-section="expected_results" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">📊</span>
             <span class="node-title">Expected Results</span>
           </button>
           <button class="node-box" data-section="scientific_explanation" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">🧠</span>
             <span class="node-title">Scientific Explanation</span>
           </button>
           <button class="node-box" data-section="real_life_applications" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">🌍</span>
             <span class="node-title">Real-Life Applications</span>
           </button>
           <button class="node-box" data-section="summary" type="button">
-            <span class="node-icon"></span>
+            <span class="node-icon">📝</span>
             <span class="node-title">Summary</span>
           </button>
         </div>
@@ -176,10 +176,10 @@
     let activeAbort = null;
 
     const SECTION_ICONS = {
-      objective: '', materials: '', safety: '',
-      procedure: '', expected_results: '',
-      scientific_explanation: '', real_life_applications: '',
-      summary: '',
+      objective: '🎯', materials: '🧰', safety: '⚠️',
+      procedure: '🔬', expected_results: '📊',
+      scientific_explanation: '🧠', real_life_applications: '🌍',
+      summary: '📝',
     };
     const SECTION_TITLES = {
       objective: 'Objective', materials: 'Materials',
@@ -472,7 +472,7 @@
         lines.push(`\n### ${SECTION_TITLES[k]}\n${sessionCache.sections[k] || ''}`);
       }
       window.GlobalChat && window.GlobalChat.injectContent(
-        lines.join('\n'), 'experiment', 'Experiment: ' + sessionCache.topicTitle
+        lines.join('\n'), 'experiment', '🧪 Experiment: ' + sessionCache.topicTitle
       );
     });
 

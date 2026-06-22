@@ -255,6 +255,7 @@
   flex-wrap: wrap;
   justify-content: center;
 }
+.fc-actions[hidden] { display: none; }
 .fc-grade {
   border: none;
   cursor: pointer;
@@ -305,6 +306,7 @@
   gap: 8px;
   align-items: center;
 }
+.fc-hint-row[hidden] { display: none; }
 
 .fc-summary {
   background: var(--c-bg-glass-2);
@@ -318,6 +320,7 @@
   gap: 10px;
   align-items: center;
 }
+.fc-summary[hidden] { display: none; }
 .fc-summary h3 {
   color: var(--c-text-strong);
   font-size: 1.4rem;

@@ -129,6 +129,8 @@ jobs:
           ALLOWED_ORIGIN: ${{ steps.origin.outputs.value }}
           BUDGET_EMAIL: ${{ secrets.BUDGET_NOTIFICATION_EMAIL }}
           BUDGET_AMOUNT: ${{ secrets.BUDGET_AMOUNT_USD }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          CF_WEBACL_ARN: ${{ secrets.CLOUDFRONT_WEBACL_ARN }}
           ENVIRONMENT: ${{ steps.env.outputs.environment }}
           STACK_NAME: ${{ steps.env.outputs.stack_name }}
         run: |
@@ -143,6 +145,12 @@ jobs:
           fi
           if [ -n "$BUDGET_AMOUNT" ]; then
             OVERRIDES="$OVERRIDES BudgetAmountUSD=$BUDGET_AMOUNT"
+          fi
+          if [ -n "$ALERT_EMAIL" ]; then
+            OVERRIDES="$OVERRIDES AlertEmail=$ALERT_EMAIL"
+          fi
+          if [ -n "$CF_WEBACL_ARN" ]; then
+            OVERRIDES="$OVERRIDES CloudFrontWebACLArn=$CF_WEBACL_ARN"
           fi
           sam deploy \
             --stack-name "$STACK_NAME" \
@@ -209,7 +217,16 @@ jobs:
             --stack-name "$STACK_NAME" \
             --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" \
             --output text)
-          aws s3 sync frontend/ s3://$BUCKET/ --cache-control no-cache
+          # Static assets — moderate cache (filenames not content-hashed yet)
+          aws s3 sync frontend/ s3://$BUCKET/ \
+            --exclude "*" \
+            --include "*.css" --include "*.js" --include "*.png" --include "*.jpg" \
+            --include "*.webp" --include "*.svg" --include "*.woff2" --include "*.ico" \
+            --cache-control "public,max-age=300,must-revalidate"
+          # HTML + injected config — no cache so deploys roll out immediately
+          aws s3 sync frontend/ s3://$BUCKET/ \
+            --exclude "*" --include "*.html" --include "config.js" \
+            --cache-control "no-cache,must-revalidate"
 
       - name: Invalidate CloudFront cache
         env:

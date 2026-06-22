@@ -37,9 +37,23 @@ Parameters:
       Email address that receives budget threshold notifications. Leave
       empty to skip Budget creation entirely (the rest of the stack still
       deploys).
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: |
+      Email address for production alarm notifications (Lambda errors,
+      throttles, duration spikes). Leave empty to skip SNS subscription.
+  CloudFrontWebACLArn:
+    Type: String
+    Default: ""
+    Description: |
+      ARN of a CloudFront-scoped WAFv2 WebACL (deployed separately in
+      us-east-1). Leave empty to skip WAF attachment.
 
 Conditions:
   HasBudgetEmail: !Not [!Equals [!Ref BudgetNotificationEmail, ""]]
+  HasAlertEmail:  !Not [!Equals [!Ref AlertEmail, ""]]
+  HasWebACL:      !Not [!Equals [!Ref CloudFrontWebACLArn, ""]]
 
 Mappings:
   # Lambda Insights extension layer ARNs by region. Account 580247275435 is
@@ -100,17 +114,12 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0"
                   - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
-              # Image generation in us-east-1 — IAM allows BOTH Titan v2 and
-              # Nova Canvas so the runtime model can be switched via the
-              # IMAGE_MODEL_ID env var alone, no IAM redeploy required.
-              # (Titan v2 is Legacy / EOL 2026-06-30; Nova Canvas is the
-              # supported successor.)
+              # Image generation — Stability AI SD 3.5 Large in us-west-2.
+              # Nova Canvas kept in IAM as a future option (no cost until invoked).
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                 Resource:
-                  - "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v2:0"
-                  - "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v1"
                   - "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-canvas-v1:0"
               # Stability AI SD 3.5 Large in us-west-2 — used by the
               # Scientific Object Generator (Lab Tools redesign).
@@ -367,14 +376,13 @@ Resources:
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: index.html
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -384,9 +392,23 @@ Resources:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal: "*"
+            Principal:
+              Service: cloudfront.amazonaws.com
             Action: s3:GetObject
             Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebsiteDistribution}"
+
+  # ─── CloudFront Origin Access Control ───────────────────────────────────────
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
   # ─── CloudFront distribution — fronts the S3 website with HTTPS ─────────────
   # Free TLS cert via *.cloudfront.net default certificate, no custom domain
@@ -403,20 +425,15 @@ Resources:
         PriceClass: PriceClass_100
         HttpVersion: http2
         IPV6Enabled: true
+        WebACLId: !If [HasWebACL, !Ref CloudFrontWebACLArn, !Ref "AWS::NoValue"]
         Origins:
-          - Id: S3WebsiteOrigin
-            # Use the S3 *website* endpoint (not the REST endpoint) so the
-            # IndexDocument / ErrorDocument behaviour configured on the bucket
-            # is honoured for clean URLs and SPA-style fallbacks.
-            DomainName: !Sub "${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com"
-            CustomOriginConfig:
-              # S3 website endpoints are HTTP-only; CloudFront speaks HTTPS to
-              # the viewer regardless. The bucket itself stays public-read.
-              OriginProtocolPolicy: http-only
-              HTTPPort: 80
-              OriginSSLProtocols: [TLSv1.2]
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt CloudFrontOAC.Id
         DefaultCacheBehavior:
-          TargetOriginId: S3WebsiteOrigin
+          TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
           AllowedMethods: [GET, HEAD, OPTIONS]
           CachedMethods:  [GET, HEAD]
@@ -436,6 +453,22 @@ Resources:
             ErrorCachingMinTTL: 0
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # SNS Alert Topic — wired into every CloudWatch alarm below.
+  # ───────────────────────────────────────────────────────────────────────────
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-alerts"
+
+  AlertsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertsTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
 
   # ───────────────────────────────────────────────────────────────────────────
   # CloudWatch alarms — the four cost-critical Lambdas get Errors + Throttles
@@ -461,12 +494,14 @@ Resources:
       Threshold: 5
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   ImageGeneratorThrottlesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-image-generator-throttles"
-      AlarmDescription: "Lambda invocation throttled. Without per-function reserved concurrency, this fires when the account-wide concurrency limit is exceeded."
+      AlarmDescription: "Lambda invocation throttled."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -478,6 +513,8 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   ImageGeneratorDurationP99Alarm:
     Type: AWS::CloudWatch::Alarm
@@ -495,6 +532,8 @@ Resources:
       Threshold: 60000
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   # ScientificObjectGeneratorFunction
   ScientificObjectGeneratorErrorsAlarm:
@@ -513,12 +552,14 @@ Resources:
       Threshold: 5
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   ScientificObjectGeneratorThrottlesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-scientific-object-throttles"
-      AlarmDescription: "Lambda invocation throttled. Account-wide concurrency limit exceeded."
+      AlarmDescription: "Lambda invocation throttled."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -530,6 +571,8 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   ScientificObjectGeneratorDurationP99Alarm:
     Type: AWS::CloudWatch::Alarm
@@ -547,6 +590,8 @@ Resources:
       Threshold: 60000
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   # ScienceTutorFunction (highest volume, no image step)
   ScienceTutorErrorsAlarm:
@@ -565,12 +610,14 @@ Resources:
       Threshold: 5
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   ScienceTutorThrottlesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-science-tutor-throttles"
-      AlarmDescription: "Tutor invocation throttled. Account-wide concurrency limit exceeded — likely a chat storm."
+      AlarmDescription: "Tutor invocation throttled."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -582,6 +629,8 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   # FlashcardGeneratorFunction
   FlashcardGeneratorErrorsAlarm:
@@ -600,12 +649,14 @@ Resources:
       Threshold: 5
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   FlashcardGeneratorThrottlesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AWS::StackName}-flashcard-generator-throttles"
-      AlarmDescription: "Lambda invocation throttled. Account-wide concurrency limit exceeded."
+      AlarmDescription: "Lambda invocation throttled."
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
@@ -617,6 +668,8 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions:    [!Ref AlertsTopic]
 
   # ───────────────────────────────────────────────────────────────────────────
   # Monthly cost budget — only created when BudgetNotificationEmail is set.

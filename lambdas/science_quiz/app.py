@@ -46,6 +46,19 @@ def _sanitize_diff(v):
     return v if v in VALID_DIFFICULTIES else "SPM"
 
 
+def _parse_num_questions(raw, default=10, lo=3, hi=20):
+    """Parse and clamp num_questions; raise ValueError on invalid input."""
+    if raw is None or raw == "":
+        return default
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError("num_questions must be an integer")
+    if n < lo or n > hi:
+        raise ValueError(f"num_questions must be between {lo} and {hi}")
+    return n
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
@@ -152,7 +165,12 @@ def _handle_generate(body):
     topic      = sanitize_topic(body.get("topic", ""), max_len=500)
     difficulty = _sanitize_diff(body.get("difficulty", ""))
     outline    = sanitize_topic(body.get("outline", ""), max_len=4000)
-    num_questions = min(max(int(body.get("num_questions", 10)), 3), 20)
+    try:
+        num_questions = _parse_num_questions(body.get("num_questions"))
+    except ValueError as e:
+        h = cors_headers()
+        h["Content-Type"] = "application/json"
+        return Response(json.dumps({"error": str(e)}), status=400, headers=h)
 
     logger.info("Quiz generate subject=%s topic=%s difficulty=%s n=%d",
                 subject, topic, difficulty, num_questions)

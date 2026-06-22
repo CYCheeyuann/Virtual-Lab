@@ -47,16 +47,15 @@ def _sanitize_diff(v):
 
 
 def _parse_num_questions(raw, default=10, lo=3, hi=20):
-    """Parse and clamp num_questions; raise ValueError on invalid input."""
+    """Parse and clamp num_questions; raise ValueError on non-integer input."""
     if raw is None or raw == "":
         return default
     try:
         n = int(raw)
     except (TypeError, ValueError):
         raise ValueError("num_questions must be an integer")
-    if n < lo or n > hi:
-        raise ValueError(f"num_questions must be between {lo} and {hi}")
-    return n
+    # Clamp to valid range (matches frontend expectations)
+    return max(lo, min(n, hi))
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────

@@ -30,6 +30,47 @@ function iconHtml(name, extraClass = '') {
 }
 
 /* ============================================================
+ *  DEMO MODE — when Lambda URLs are still placeholders (the
+ *  frontend is hosted standalone on Vercel/GH Pages without an
+ *  AWS backend), all AI features fall into "demo mode" instead
+ *  of spamming the user with "URL not configured" errors.
+ * ============================================================ */
+function isDemoMode() {
+  // True when every backend URL is still the build-time placeholder
+  const urls = (typeof window !== 'undefined' && window.STREAM_URLS) || {};
+  const vals = Object.values(urls);
+  if (!vals.length) return true;
+  return vals.every(u => !u || u.startsWith('__URL_'));
+}
+
+let _demoToastShown = false;
+function showDemoToast() {
+  if (_demoToastShown) return;
+  _demoToastShown = true;
+  if (typeof showToast === 'function') {
+    showToast('🎬 Demo Mode — live AI is offline in this preview', 'info', 4000);
+  }
+}
+
+/* Friendly inline panel HTML for when AI output would normally stream */
+function demoModePanelHtml() {
+  return `
+    <div class="demo-mode-panel" style="
+      padding: 20px;
+      border: 1px dashed var(--c-accent);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      color: var(--c-muted);
+      text-align: center;
+      line-height: 1.6;
+    ">
+      <div style="font-size: 1.4rem; margin-bottom: 6px;">🎬</div>
+      <strong style="color: var(--c-accent);">Demo Mode</strong><br>
+      Live AI generation is offline in this preview. The full version connects to AWS Bedrock to generate real responses on demand.
+    </div>`;
+}
+
+/* ============================================================
  *  API HEADERS — shared key + content-type for every fetch.
  * ============================================================ */
 function apiHeaders(extra) {
@@ -223,10 +264,9 @@ async function streamToPanel(url, body, panelId, btn, options = {}) {
   setButtonLoading(btn, true, options.loadingLabel || 'Generating…');
 
   if (!url || url.startsWith('__URL_')) {
-    panel.innerHTML =
-      '<div class="error-msg">⚠️ Streaming URL not configured. Deploy via GitHub Actions first.</div>';
+    panel.innerHTML = demoModePanelHtml();
     setButtonLoading(btn, false);
-    showToast('Streaming URL not configured', 'error');
+    showDemoToast();
     return;
   }
 

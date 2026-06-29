@@ -123,8 +123,8 @@
 
       const url = window.STREAM_URLS.science_tutor;
       if (!url || url.startsWith('__URL_')) {
-        botBubble.innerHTML = '<span class="error-msg">⚠️ Streaming URL not configured.</span>';
-        showToast('Streaming URL not configured', 'error');
+        botBubble.innerHTML = '🎬 <strong>Demo Mode</strong> — live chat AI is offline in this preview. The deployed version connects to Claude Haiku 4.5 on AWS Bedrock.';
+        showDemoToast();
         setButtonLoading(sendBtn, false);
         return;
       }

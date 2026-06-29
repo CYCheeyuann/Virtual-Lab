@@ -160,8 +160,9 @@
   // ══════════════════════════════════════════════════════════════════════
   async function generateCards(payload) {
     const url = window.STREAM_URLS && window.STREAM_URLS.flashcard_generator;
+
     if (!url || url.startsWith('__URL_')) {
-      throw new Error('Flashcards backend not yet deployed');
+      throw new Error('demo-mode');
     }
     const headers = (typeof window.apiHeaders === 'function')
       ? window.apiHeaders()
@@ -337,9 +338,6 @@
     babEl.classList.remove('invalid');
 
     if (!window.Flashcards.isBackendLive()) {
-      if (typeof window.showToast === 'function') {
-        window.showToast('Flashcards backend not yet deployed', 'error');
-      }
       return;
     }
 

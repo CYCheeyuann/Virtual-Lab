@@ -210,7 +210,7 @@
       }
       const url = window.STREAM_URLS && window.STREAM_URLS.experiment_guide;
       if (!url || url.startsWith('__URL_')) {
-        showToast('URL not configured', 'error');
+        showDemoToast();
         return;
       }
 

@@ -154,7 +154,7 @@
     document.getElementById('runBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBtn');
       const url = window.STREAM_URLS && window.STREAM_URLS.chapter_assistant;
-      if (!url || url.startsWith('__URL_')) { showToast('URL not configured','error'); return; }
+      if (!url || url.startsWith('__URL_')) { showDemoToast(); return; }
 
       setButtonLoading(btn, true, 'Generating…');
       const body = {
@@ -278,7 +278,7 @@
       if (flashBtn) {
         if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
           flashBtn.disabled = true;
-          flashBtn.title = 'Flashcards backend not yet deployed';
+          flashBtn.title = 'Demo Mode — AI flashcards offline';
         }
         flashBtn.addEventListener('click', async () => {
           setButtonLoading(flashBtn, true, 'Generating deck…');
@@ -351,7 +351,11 @@
       panel.appendChild(botBubble);
 
       const url = window.STREAM_URLS && window.STREAM_URLS.science_tutor;
-      if (!url || url.startsWith('__URL_')) { botBubble.innerHTML = '⚠️ Not configured.'; return; }
+      if (!url || url.startsWith('__URL_')) {
+        botBubble.innerHTML = '🎬 Demo Mode — chat AI is offline in this preview.';
+        showDemoToast();
+        return;
+      }
 
       const subject = document.getElementById('subject').value;
       const level = document.getElementById('level').value;

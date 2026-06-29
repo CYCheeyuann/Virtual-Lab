@@ -1,8 +1,9 @@
 name: Deploy Virtual Science Lab Assistant
 
+# Manual trigger only — AWS deploy is no longer auto-run on push.
+# Vercel handles the static frontend automatically on every push to main,
+# so AWS deploy only runs when explicitly requested via the Actions UI.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       environment:

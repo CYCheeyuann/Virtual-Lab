@@ -58,7 +58,7 @@
 
       const url = window.STREAM_URLS && window.STREAM_URLS.feedback_collector;
       if (!url || url.startsWith('__URL_')) {
-        status.textContent = '(demo mode)';
+        status.textContent = '(feedback offline — backend not deployed)';
         return;
       }
 

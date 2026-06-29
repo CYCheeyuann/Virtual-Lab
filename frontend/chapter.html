@@ -89,6 +89,7 @@
   </main>
 
   <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
   <script src="progress.js"></script>
   <script src="common.js"></script>
   <script src="vortex.js"></script>
@@ -154,7 +155,7 @@
     document.getElementById('runBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBtn');
       const url = window.STREAM_URLS && window.STREAM_URLS.chapter_assistant;
-      if (!url || url.startsWith('__URL_')) { showDemoToast(); return; }
+      if (!url || url.startsWith('__URL_')) { showToast('URL not configured','error'); return; }
 
       setButtonLoading(btn, true, 'Generating…');
       const body = {
@@ -278,7 +279,7 @@
       if (flashBtn) {
         if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
           flashBtn.disabled = true;
-          flashBtn.title = 'Demo Mode — AI flashcards offline';
+          flashBtn.title = 'Flashcards backend not yet deployed';
         }
         flashBtn.addEventListener('click', async () => {
           setButtonLoading(flashBtn, true, 'Generating deck…');
@@ -351,11 +352,7 @@
       panel.appendChild(botBubble);
 
       const url = window.STREAM_URLS && window.STREAM_URLS.science_tutor;
-      if (!url || url.startsWith('__URL_')) {
-        botBubble.innerHTML = '🎬 Demo Mode — chat AI is offline in this preview.';
-        showDemoToast();
-        return;
-      }
+      if (!url || url.startsWith('__URL_')) { botBubble.innerHTML = '⚠️ Not configured.'; return; }
 
       const subject = document.getElementById('subject').value;
       const level = document.getElementById('level').value;

@@ -130,6 +130,7 @@
   </main>
 
   <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
   <script src="progress.js"></script>
   <script src="common.js"></script>
   <script src="vortex.js"></script>
@@ -235,7 +236,7 @@
 
       const url = window.STREAM_URLS && window.STREAM_URLS.science_quiz;
       if (!url || url.startsWith('__URL_')) {
-        showDemoToast(); return;
+        showToast('Quiz URL not configured', 'error'); return;
       }
 
       setButtonLoading(btn, true, 'Generating outline…');
@@ -303,7 +304,7 @@
 
       const url = window.STREAM_URLS && window.STREAM_URLS.science_quiz;
       if (!url || url.startsWith('__URL_')) {
-        showDemoToast(); return;
+        showToast('Quiz URL not configured', 'error'); return;
       }
 
       setButtonLoading(btn, true, 'Generating quiz…');
@@ -467,7 +468,7 @@
           flashBtn.title = 'Nothing to save — perfect score!';
         } else if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
           flashBtn.disabled = true;
-          flashBtn.title = 'Demo Mode — AI flashcards offline';
+          flashBtn.title = 'Flashcards backend not yet deployed';
         } else {
           flashBtn.disabled = false;
           flashBtn.title = `Convert ${wrongCount} wrong answer${wrongCount === 1 ? '' : 's'} into flashcards`;
@@ -591,6 +592,7 @@
     document.getElementById('saveWrongToFlashBtn').addEventListener('click', async () => {
       const btn = document.getElementById('saveWrongToFlashBtn');
       if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
+        showToast('Flashcards backend not yet deployed', 'error');
         return;
       }
       // Build the wrong-answer list from current quiz state

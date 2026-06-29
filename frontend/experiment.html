@@ -155,6 +155,7 @@
   </div>
 
   <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
   <script src="progress.js"></script>
   <script src="common.js"></script>
   <script src="vortex.js"></script>
@@ -210,7 +211,7 @@
       }
       const url = window.STREAM_URLS && window.STREAM_URLS.experiment_guide;
       if (!url || url.startsWith('__URL_')) {
-        showDemoToast();
+        showToast('URL not configured', 'error');
         return;
       }
 

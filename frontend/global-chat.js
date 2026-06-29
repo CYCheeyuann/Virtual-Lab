@@ -180,10 +180,9 @@
     if (!url || url.startsWith('__URL_')) {
       pushMessage({
         role: 'assistant',
-        content: '🎬 **Demo Mode** — live chat AI is offline in this preview. The deployed version connects to Claude Haiku 4.5 on AWS Bedrock to answer your questions in real time.',
+        content: '⚠️ Tutor URL not configured. Deploy via GitHub Actions first.',
         source: 'system',
       });
-      if (typeof window.showDemoToast === 'function') window.showDemoToast();
       return;
     }
 

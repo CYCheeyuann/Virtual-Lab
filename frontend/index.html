@@ -84,6 +84,7 @@
   </main>
 
   <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
   <script src="progress.js"></script>
   <script src="common.js"></script>
   <script src="vortex.js"></script>
@@ -103,6 +104,7 @@
         tile.setAttribute('href', '#');
         tile.addEventListener('click', (e) => {
           e.preventDefault();
+          showToast('Flashcards backend not yet deployed', 'info');
         });
         if (badge) {
           badge.textContent = 'Coming Soon';

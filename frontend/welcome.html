@@ -3,45 +3,174 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#061119" />
   <title>Welcome — Virtual Science Lab</title>
-  <meta name="description" content="Welcome to Virtual Science Lab — your AI-powered learning companion for Biology, Chemistry, Physics, and General Science." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔬</text></svg>" />
+  <meta name="description" content="Your AI-powered learning companion for Biology, Chemistry, Physics, and General Science. Explore chapters, work through experiment guides, test your understanding, and review with flashcards." />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="redesign.css?v=hero-video-4" />
+  <link rel="stylesheet" href="ui-icons.css" />
 </head>
-<body>
+<body class="expedition-page">
+  <a class="skip-link" href="#expedition">Skip to expedition</a>
 
-  <nav class="navbar">
+  <nav class="navbar expedition-nav" aria-label="Primary navigation">
     <div class="nav-inner">
-      <a class="brand" href="welcome.html"> Virtual Science Lab</a>
+      <a class="brand" href="welcome.html">Virtual Science Lab</a>
       <div class="nav-links">
-        <a class="nav-link" href="index.html">Dashboard</a>
-        <a class="nav-link" href="chapter.html">Chapter Assistant</a>
-        <a class="nav-link" href="experiment.html">Experiment Guide</a>
-        <a class="nav-link" href="quiz.html">Quiz Generator</a>
-        <a class="nav-link" href="flashcards.html">Flashcards</a>
-        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
+        <a class="nav-link" href="#expedition">The Journey</a>
+        <a class="nav-link" href="#how-it-works">How It Works</a>
+        <a class="nav-link nav-link-cta" href="index.html">Open Dashboard <span aria-hidden="true">↗</span></a>
       </div>
     </div>
   </nav>
 
-  <main class="page welcome-hero">
-    <div class="welcome-content">
-      <div class="welcome-icon"><img src="LOGO.png" alt="Virtual Science Lab Logo" style="width:664px;height:400px;" /></div>
-      <h1>Welcome to Virtual Science Lab</h1>
-      <p class="welcome-tagline">Your AI-powered learning companion for Biology, Chemistry, Physics, and General Science.</p>
-      <div class="welcome-features">
-        <div class="welcome-feature"> Explore chapters with interactive cards</div>
-        <div class="welcome-feature"> Generate experiment guides with safety briefings</div>
-        <div class="welcome-feature"> Create quizzes with strict JSON questions</div>
-        <div class="welcome-feature"> Access labs, image generation, and what-if simulations</div>
-      </div>
-      <a class="btn btn-primary welcome-cta" href="index.html">
-        <span>Open Dashboard</span>
-        <span style="font-size:1.2rem">→</span>
-      </a>
+  <div class="journey-progress" aria-hidden="true"><span id="journeyProgress"></span></div>
+
+  <header class="expedition-hero" id="top">
+    <div class="hero-media" data-cinematic-media>
+      <img src="assets/images/science-expedition-hero.png" alt="A science expedition from a rainforest laboratory to a mountain observatory" />
+      <div class="hero-media-shade"></div>
+      <div class="hero-atmosphere" aria-hidden="true"></div>
     </div>
+
+    <div class="hero-copy">
+      <p class="eyebrow"><span></span> Expedition 01 · Virtual Field Station</p>
+      <h1>Science is not a subject.<br /><em>It is a world to explore.</em></h1>
+      <p class="hero-lede">Your AI-powered learning companion for Biology, Chemistry, Physics, and General Science. Explore chapters, work through experiment guides, test your understanding, and review with flashcards.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-expedition" href="index.html">Enter the Lab <span aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost" href="#expedition">Begin the Journey <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="hero-proof" aria-label="Available learning areas">
+        <span>Biology</span><i></i><span>Chemistry</span><i></i><span>Physics</span><i></i><span>General Science</span>
+      </div>
+    </div>
+
+    <a class="scroll-cue" href="#expedition" aria-label="Scroll to explore">
+      <span>Scroll to explore</span><b aria-hidden="true"></b>
+    </a>
+  </header>
+
+  <main id="expedition" class="expedition-story camera-enabled">
+    <div class="journey-camera" data-journey-camera aria-hidden="true">
+      <div class="journey-camera-motion">
+        <img class="journey-camera-poster" src="assets/images/science-expedition-hero.png" alt="" />
+      </div>
+      <div class="journey-camera-shade"></div>
+      <div class="journey-camera-grid"></div>
+      <div class="camera-coordinates" id="cameraCoordinates">04° SKY / ALT 01</div>
+    </div>
+
+    <aside class="journey-rail" aria-label="Expedition chapters">
+      <a href="#basecamp" class="rail-stop active"><span>01</span><b>Basecamp</b></a>
+      <a href="#rainforest" class="rail-stop"><span>02</span><b>Biology</b></a>
+      <a href="#river" class="rail-stop"><span>03</span><b>Chemistry</b></a>
+      <a href="#mountain" class="rail-stop"><span>04</span><b>Physics</b></a>
+      <a href="#summit" class="rail-stop"><span>05</span><b>Summit</b></a>
+    </aside>
+
+    <section class="story-intro reveal" id="basecamp" data-journey-stop="basecamp">
+      <p class="eyebrow"><span></span> Your expedition begins</p>
+      <h2>One place for the whole scientific journey.</h2>
+      <p>Choose a topic, ask a question, or bring a document. The lab builds a clear path from first explanation to hands-on practice and review.</p>
+      <div class="story-stats">
+        <div><strong>4</strong><span>science domains</span></div>
+        <div><strong>7</strong><span>learning tools</span></div>
+        <div><strong>1</strong><span>AI lab companion</span></div>
+      </div>
+    </section>
+
+    <section class="biome biome-biology" id="rainforest" data-journey-stop="rainforest">
+      <div class="biome-number" aria-hidden="true">02</div>
+      <div class="biome-visual reveal">
+        <div class="specimen-card specimen-leaf">
+          <span class="specimen-orbit"></span>
+          <svg viewBox="0 0 120 120" aria-hidden="true"><path d="M96 18C56 20 26 43 22 86c18 12 42 7 55-9 15-18 18-39 19-59Z"/><path d="M28 88c17-27 34-42 61-61M47 65l-4-18M62 51l18 1"/></svg>
+          <small>Specimen B–17</small>
+        </div>
+        <div class="scan-lines" aria-hidden="true"></div>
+      </div>
+      <div class="biome-copy reveal">
+        <p class="eyebrow"><span></span> Rainforest Station · Biology</p>
+        <h2>Start with life.</h2>
+        <p>Explore cells, systems, and ecosystems with chapter maps that turn complex topics into understandable connections.</p>
+        <ul class="feature-list">
+          <li><span>01</span><div><strong>Chapter Assistant</strong><small>Map the big idea before diving into details.</small></div></li>
+          <li><span>02</span><div><strong>Smart Flashcards</strong><small>Remember concepts with focused review.</small></div></li>
+        </ul>
+        <a class="text-link" href="chapter.html">Explore a biology chapter <span>→</span></a>
+      </div>
+    </section>
+
+    <section class="biome biome-chemistry" id="river" data-journey-stop="river">
+      <div class="biome-number" aria-hidden="true">03</div>
+      <div class="biome-copy reveal">
+        <p class="eyebrow"><span></span> Crystal River · Chemistry</p>
+        <h2>See the invisible.</h2>
+        <p>Turn reactions and atomic behaviour into guided procedures, visual explanations, and safety-aware experiments.</p>
+        <ul class="feature-list">
+          <li><span>01</span><div><strong>Experiment Guide</strong><small>From materials to procedure and safety briefing.</small></div></li>
+          <li><span>02</span><div><strong>Lab Safety Assistant</strong><small>Check risks before the first step begins.</small></div></li>
+        </ul>
+        <a class="text-link" href="experiment.html">Plan a chemistry experiment <span>→</span></a>
+      </div>
+      <div class="biome-visual reveal">
+        <div class="molecule-field" aria-hidden="true">
+          <span class="atom a1"></span><span class="atom a2"></span><span class="atom a3"></span><span class="atom a4"></span>
+          <i class="bond b1"></i><i class="bond b2"></i><i class="bond b3"></i>
+        </div>
+        <div class="formula-card"><small>LIVE OBSERVATION</small><strong>H₂O + CO₂</strong><span>molecular interaction</span></div>
+      </div>
+    </section>
+
+    <section class="biome biome-physics" id="mountain" data-journey-stop="mountain">
+      <div class="biome-number" aria-hidden="true">04</div>
+      <div class="biome-visual reveal">
+        <div class="force-orbit" aria-hidden="true"><span></span><span></span><span></span><b></b></div>
+        <div class="measure-card"><small>FORCE VECTOR</small><strong>F = ma</strong><span>change one variable, see what follows</span></div>
+      </div>
+      <div class="biome-copy reveal">
+        <p class="eyebrow"><span></span> High Ridge · Physics</p>
+        <h2>Test what moves the world.</h2>
+        <p>Ask “what if?”, change the conditions, and build intuition for motion, energy, waves, and forces.</p>
+        <ul class="feature-list">
+          <li><span>01</span><div><strong>What‑If Explorer</strong><small>AI-guided scenario explanations to reason through cause and effect.</small></div></li>
+          <li><span>02</span><div><strong>Quiz Generator</strong><small>Check your understanding with instant feedback.</small></div></li>
+        </ul>
+        <a class="text-link" href="lab-tools.html">Open the physics toolkit <span>→</span></a>
+      </div>
+    </section>
+
+    <section class="workflow" id="how-it-works">
+      <div class="workflow-heading reveal">
+        <p class="eyebrow"><span></span> The field method</p>
+        <h2>From curiosity to understanding.</h2>
+        <p>No complicated setup. Follow one repeatable learning loop.</p>
+      </div>
+      <div class="workflow-grid">
+        <article class="workflow-step reveal"><span>01</span><div class="step-icon">?</div><h3>Ask</h3><p>Choose a subject and share what you want to understand.</p></article>
+        <article class="workflow-step reveal"><span>02</span><div class="step-icon">⌁</div><h3>Explore</h3><p>Receive a structured explanation, guide, or simulation.</p></article>
+        <article class="workflow-step reveal"><span>03</span><div class="step-icon">✓</div><h3>Practice</h3><p>Test the idea with experiments, quizzes, and flashcards.</p></article>
+        <article class="workflow-step reveal"><span>04</span><div class="step-icon">↗</div><h3>Progress</h3><p>Return to your dashboard and continue the expedition.</p></article>
+      </div>
+    </section>
+
+    <section class="summit" id="summit" data-journey-stop="summit">
+      <div class="summit-glow" aria-hidden="true"></div>
+      <div class="summit-content reveal">
+        <p class="eyebrow"><span></span> Summit Observatory</p>
+        <h2>Your next discovery<br />starts with one question.</h2>
+        <p>Open the dashboard, choose your scientific path, and let the lab guide the next step.</p>
+        <div class="hero-actions summit-actions">
+          <a class="btn btn-primary btn-expedition" href="index.html">Open Dashboard <span aria-hidden="true">→</span></a>
+          <a class="btn btn-ghost" href="#top">Back to top <span aria-hidden="true">↑</span></a>
+        </div>
+      </div>
+      <footer class="expedition-footer"><a class="brand" href="welcome.html">Virtual Science Lab</a><p>Explore carefully. Question everything.</p><span>© 2026</span></footer>
+    </section>
   </main>
 
   <script src="config.js"></script>
@@ -51,5 +180,8 @@
   <script src="vortex.js"></script>
   <script src="global-chat.js"></script>
   <script src="toolkit.js"></script>
+  <script src="redesign.js"></script>
+  <script src="welcome-video.js?v=hero-video-4"></script>
+  <script src="ui-icons.js"></script>
 </body>
 </html>

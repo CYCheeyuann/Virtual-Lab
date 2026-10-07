@@ -288,6 +288,12 @@ function setupDropzone(zoneId, inputId, infoId, onLoad) {
   if (!zone || !input) return;
 
   zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      input.click();
+    }
+  });
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
   zone.addEventListener('drop', e => {
@@ -306,12 +312,17 @@ function setupDropzone(zoneId, inputId, infoId, onLoad) {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const result = reader.result;
       const comma  = result.indexOf(',');
       const base64 = result.slice(comma + 1);
       info.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-      onLoad({ data: base64, mime: file.type, name: file.name });
+      const textLike = file.type.startsWith('text/') || /\.(txt|csv|json|html)$/i.test(file.name);
+      let text = '';
+      if (textLike) {
+        try { text = await file.text(); } catch (_) {}
+      }
+      onLoad({ data: base64, mime: file.type || 'application/octet-stream', name: file.name, text });
     };
     reader.readAsDataURL(file);
   }

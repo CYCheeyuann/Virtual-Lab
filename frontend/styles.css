@@ -393,6 +393,33 @@ select option:hover {
   font-weight: 500;
 }
 
+.reference-input-group {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  background: rgba(5, 19, 26, 0.34);
+}
+.reference-input-group > label:first-child { margin-top: 0; }
+.reference-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 2px;
+  color: var(--c-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.reference-or::before,
+.reference-or::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--c-border);
+}
+
 /* ─── Output panel ───────────────────────────────────────────────────── */
 .output-panel {
   background: var(--c-bg-glass);

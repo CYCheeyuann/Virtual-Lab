@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Science Tutor</title>
+  <meta name="description" content="Streaming AI chatbot science tutor with full conversation memory and document analysis support." />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="global-chat.css" />
+  <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="feedback.css" />
+  <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="ui-icons.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="brand" href="welcome.html">🔬 Virtual Science Lab</a>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="chapter.html">Chapter Assistant</a>
+        <a class="nav-link" href="experiment.html">Experiment Guide</a>
+        <a class="nav-link" href="quiz.html">Quiz Generator</a>
+        <a class="nav-link" href="flashcards.html">Flashcards</a>
+        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="page-header">
+      <h1> Science Tutor</h1>
+      <p>Streaming chat with conversation memory. Upload a document and ask the tutor to analyse it.</p>
+    </div>
+
+    <section class="card">
+      <h2>Settings</h2>
+      <label for="subject">Subject</label>
+      <select id="subject" class="input">
+        <option value="Biology">Biology</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Physics">Physics</option>
+      <option value="Science">General Science</option>
+      </select>
+
+      <label>Optional document (one-time, attached to next message)</label>
+      <div class="dropzone" id="dz">
+        <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html" hidden />
+        <p>📄 Drag &amp; drop or click to upload</p>
+        <small>JPG · PNG · WEBP · PDF · DOCX · PPTX · CSV · JSON · HTML</small>
+        <div class="file-info" id="file-info"></div>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="resetBtn" class="btn btn-ghost"></button>
+        <button id="sendToAiBtn" class="btn btn-ghost"></button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>💬 Conversation</h2>
+      <div class="chat-panel" id="chat-panel">
+        <div class="chat-bubble bot">
+          🔬 Hi future scientist! I'm your Science Tutor. Ask me anything or upload a document and I'll explain it.
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input id="chatInput" type="text" class="input" placeholder="🔬 Type your science question…" />
+        <button id="sendBtn" class="btn btn-primary btn-send"></button>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
+  <script src="progress.js"></script>
+  <script src="common.js"></script>
+  <script src="vortex.js"></script>
+  <script src="global-chat.js"></script>
+  <script src="toolkit.js"></script>
+  <script src="feedback.js"></script>
+  <script>
+    // Inject SVG icon buttons
+    document.getElementById('sendBtn').innerHTML  = `${iconHtml('plane', 'btn-icon-plane')}<span>Send</span>`;
+    document.getElementById('resetBtn').innerHTML = `${iconHtml('trash', 'btn-icon-trash')}<span>Clear conversation</span>`;
+    document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send conversation to Lab Assistant</span>`;
+
+    let history = [];
+    let pendingFile = { data: null, mime: null, name: null };
+    setupDropzone('dz', 'file', 'file-info', f => pendingFile = f);
+
+    function renderInline(text) {
+      return escapeHtml(text)
+        .replace(/^### (.+)$/gm, '<strong>$1</strong>')
+        .replace(/^## (.+)$/gm,  '<strong>$1</strong>')
+        .replace(/^# (.+)$/gm,   '<strong>$1</strong>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    }
+
+    async function send() {
+      const input = document.getElementById('chatInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const message = input.value.trim();
+      if (!message) return;
+
+      setButtonLoading(sendBtn, true, 'Sending…');
+      const subject = document.getElementById('subject').value;
+      const panel   = document.getElementById('chat-panel');
+
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble user';
+      userBubble.textContent = message;
+      panel.appendChild(userBubble);
+      input.value = '';
+      panel.scrollTop = panel.scrollHeight;
+
+      const botBubble = document.createElement('div');
+      botBubble.className = 'chat-bubble bot';
+      botBubble.innerHTML = '<span class="spinner"></span>Thinking…';
+      panel.appendChild(botBubble);
+
+      const url = window.STREAM_URLS.science_tutor;
+      if (!url || url.startsWith('__URL_')) {
+        botBubble.innerHTML = '<span class="error-msg">⚠️ Streaming URL not configured.</span>';
+        showToast('Streaming URL not configured', 'error');
+        setButtonLoading(sendBtn, false);
+        return;
+      }
+
+      const body = { subject, message, history: history.slice() };
+      if (pendingFile.data) {
+        body.file_data = pendingFile.data;
+        body.file_mime = pendingFile.mime;
+        body.file_name = pendingFile.name;
+        pendingFile = { data: null, mime: null, name: null };
+        document.getElementById('file-info').textContent = '';
+      }
+
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: apiHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        botBubble.innerHTML = '<span class="streaming-cursor"></span>';
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder('utf-8');
+        let full = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          full += dec.decode(value, { stream: true });
+          botBubble.innerHTML = renderInline(full) + '<span class="streaming-cursor"></span>';
+          panel.scrollTop = panel.scrollHeight;
+        }
+        botBubble.innerHTML = renderInline(full);
+        history.push({ role: 'user', content: message });
+        history.push({ role: 'assistant', content: full });
+        recordActivity(subject);
+        // Attach feedback widget to the bot bubble we just finished rendering.
+        if (window.Feedback && full.trim()) {
+          window.Feedback.attach(botBubble, {
+            feature: 'tutor',
+            subject,
+            context: message.slice(0, 80),
+          });
+        }
+      } catch (err) {
+        botBubble.innerHTML = `<span class="error-msg">⚠️ ${err.message}</span>`;
+        showToast(`Failed: ${err.message}`, 'error');
+      } finally {
+        setButtonLoading(sendBtn, false);
+      }
+    }
+
+    document.getElementById('sendBtn').addEventListener('click', send);
+    document.getElementById('chatInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      history = [];
+      pendingFile = { data: null, mime: null, name: null };
+      document.getElementById('file-info').textContent = '';
+      document.getElementById('chat-panel').innerHTML =
+        '<div class="chat-bubble bot">Conversation cleared. Ask me anything!</div>';
+      showToast('Conversation cleared', 'success', 2200);
+    });
+    document.getElementById('sendToAiBtn').addEventListener('click', () => {
+      if (!history.length) {
+        showToast('Have a conversation first', 'warning');
+        return;
+      }
+      const subject = document.getElementById('subject').value;
+      // Compile a summary of the tutor conversation
+      const transcript = history.map(m => {
+        const who = m.role === 'user' ? 'You' : 'Tutor';
+        return `${who}: ${m.content}`;
+      }).join('\n\n');
+      window.GlobalChat && window.GlobalChat.injectContent(
+        transcript, 'tutor', `🤖 Tutor: ${subject} (${history.length} turns)`
+      );
+    });
+  </script>
+  <script src="redesign.js"></script>
+  <script src="ui-icons.js"></script>
+</body>
+</html>

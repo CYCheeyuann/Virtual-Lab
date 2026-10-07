@@ -1,0 +1,55 @@
+/* Thumbs up / down feedback widget — minimal, drop-in. */
+
+.fb-widget {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+  color: var(--c-muted, #a3a3a3);
+  user-select: none;
+}
+
+.fb-widget .fb-label {
+  margin-right: 4px;
+}
+
+.fb-widget button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.fb-widget button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fb-widget button.fb-selected {
+  border-color: var(--c-accent-2, #8ec07c);
+  background: rgba(142, 192, 124, 0.18);
+  color: var(--c-text, #fff);
+}
+
+.fb-widget button[disabled] {
+  cursor: default;
+  opacity: 0.55;
+  transform: none;
+}
+
+.fb-widget .fb-status {
+  margin-left: 4px;
+  font-style: italic;
+  color: var(--c-muted, #a3a3a3);
+}

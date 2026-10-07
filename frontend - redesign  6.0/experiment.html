@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Experiment Guide</title>
+  <meta name="description" content="AI-generated complete lab guide with safety briefing. Supports document upload for context analysis." />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="global-chat.css" />
+  <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="feedback.css" />
+  <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="ui-icons.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="brand" href="welcome.html"> Virtual Science Lab</a>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="chapter.html">Chapter Assistant</a>
+        <a class="nav-link active" href="experiment.html">Experiment Guide</a>
+        <a class="nav-link" href="quiz.html">Quiz Generator</a>
+        <a class="nav-link" href="flashcards.html">Flashcards</a>
+        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="page-header">
+      <h1> Experiment Guide</h1>
+      <p>Generate a complete interactive experiment guide. We'll preview what the AI plans to produce before generating the full set of 8 sections.</p>
+    </div>
+
+    <!-- ═══ Phase 1: Setup ═══ -->
+    <section class="card" id="phase-setup">
+      <h2>1 · Setup</h2>
+
+      <label for="subject">Subject</label>
+      <select id="subject" class="input">
+        <option value="Biology">Biology</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Physics">Physics</option>
+        <option value="Science">General Science</option>
+      </select>
+
+      <label for="topic">Experiment Topic</label>
+      <input id="topic" type="text" class="input"
+        placeholder="e.g. Osmosis, Acid-Base Reactions, Newton's Laws of Motion…" />
+
+      <label for="difficulty">Difficulty</label>
+      <select id="difficulty" class="input">
+        <option value="Form 4">Form 4</option>
+        <option value="SPM" selected>SPM</option>
+        <option value="STPM">STPM</option>
+        <option value="University">University</option>
+      </select>
+
+      <div class="reference-input-group">
+        <label for="notes">Notes (optional)</label>
+        <textarea id="notes" class="input" rows="4" maxlength="4000"
+          placeholder="Write your instructions, observations, syllabus focus, or reference notes here..."></textarea>
+
+        <div class="reference-or"><span>or attach a reference document</span></div>
+        <label>Reference Document (optional)</label>
+        <div class="dropzone" id="dz" role="button" tabindex="0">
+          <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+          <p>Drag &amp; drop a file here, or click to browse</p>
+          <small>JPG · PNG · WEBP · PDF · DOCX · PPTX · CSV · JSON · HTML · TXT</small>
+          <div class="file-info" id="file-info"></div>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="runBtn" class="btn btn-primary"></button>
+        <button id="resetBtn" class="btn btn-ghost"></button>
+      </div>
+    </section>
+
+    <!-- ═══ Phase 2: Confirmation ═══ -->
+    <section class="card" id="phase-confirm" style="display:none">
+      <h2>2 · Confirm Generation</h2>
+      <div class="confirm-summary" id="confirmSummary"></div>
+      <div class="confirm-error" id="confirmError" hidden></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="continueBtn" class="btn btn-primary">
+          <span>🚀</span><span>Continue &amp; Generate Guide</span>
+        </button>
+        <button id="confirmBackBtn" class="btn btn-ghost">
+          <span>←</span><span>Back to Setup</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ═══ Phase 3: Node-Map Output ═══ -->
+    <section class="card" id="phase-nodemap" style="display:none">
+      <div class="node-map" id="nodeMap">
+        <div class="main-topic-node">
+          <span class="topic-icon">🧪</span>
+          <h2 class="topic-title" id="mainTopicTitle">Experiment</h2>
+          <div class="topic-meta" id="mainTopicMeta"></div>
+        </div>
+
+        <svg class="node-connectors" id="nodeConnectors" aria-hidden="true"></svg>
+
+        <div class="node-grid">
+          <button class="node-box" data-section="objective" type="button">
+            <span class="node-icon">🎯</span>
+            <span class="node-title">Objective</span>
+          </button>
+          <button class="node-box" data-section="materials" type="button">
+            <span class="node-icon">🧰</span>
+            <span class="node-title">Materials</span>
+          </button>
+          <button class="node-box" data-section="safety" type="button">
+            <span class="node-icon">⚠️</span>
+            <span class="node-title">Safety Briefing</span>
+          </button>
+          <button class="node-box" data-section="procedure" type="button">
+            <span class="node-icon">🔬</span>
+            <span class="node-title">Procedure</span>
+          </button>
+          <button class="node-box" data-section="expected_results" type="button">
+            <span class="node-icon">📊</span>
+            <span class="node-title">Expected Results</span>
+          </button>
+          <button class="node-box" data-section="scientific_explanation" type="button">
+            <span class="node-icon">🧠</span>
+            <span class="node-title">Scientific Explanation</span>
+          </button>
+          <button class="node-box" data-section="real_life_applications" type="button">
+            <span class="node-icon">🌍</span>
+            <span class="node-title">Real-Life Applications</span>
+          </button>
+          <button class="node-box" data-section="summary" type="button">
+            <span class="node-icon">📝</span>
+            <span class="node-title">Summary</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:24px">
+        <button id="newExperimentBtn" class="btn btn-ghost">
+          <span>↻</span><span>New Experiment</span>
+        </button>
+        <button id="sendToAiBtn" class="btn btn-ghost"></button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detail panel — opens when a node-box is clicked -->
+  <div class="node-detail-backdrop" id="nodeDetailBackdrop" hidden>
+    <div class="node-detail-panel" role="dialog" aria-labelledby="nodeDetailTitle">
+      <button class="node-detail-close" id="nodeDetailClose" type="button" aria-label="Close">✕</button>
+      <h2 id="nodeDetailTitle">
+        <span id="nodeDetailIcon"></span>
+        <span id="nodeDetailTitleText"></span>
+      </h2>
+      <div class="node-detail-body" id="nodeDetailBody"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
+  <script src="progress.js"></script>
+  <script src="common.js"></script>
+  <script src="vortex.js"></script>
+  <script src="global-chat.js"></script>
+  <script src="toolkit.js"></script>
+  <script src="feedback.js"></script>
+  <script>
+    // Inject button labels
+    document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate Experiment</span>`;
+    document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh', 'btn-icon-rotate')}<span>Reset</span>`;
+    document.getElementById('sendToAiBtn').innerHTML = `${iconHtml('plane', 'btn-icon-plane')}<span>Send to AI</span>`;
+
+    let uploadedFile = { data: null, mime: null, name: null };
+    setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
+
+    /* ─── State ─── */
+    const SESSION_KEY = 'vsl.experimentGuide';
+    let sessionCache = null;     // { topicTitle, subject, topic, difficulty, sections }
+    let activeAbort = null;
+
+    const SECTION_ICONS = {
+      objective: '🎯', materials: '🧰', safety: '⚠️',
+      procedure: '🔬', expected_results: '📊',
+      scientific_explanation: '🧠', real_life_applications: '🌍',
+      summary: '📝',
+    };
+    const SECTION_TITLES = {
+      objective: 'Objective', materials: 'Materials',
+      safety: 'Safety Briefing', procedure: 'Procedure',
+      expected_results: 'Expected Results',
+      scientific_explanation: 'Scientific Explanation',
+      real_life_applications: 'Real-Life Applications',
+      summary: 'Summary',
+    };
+
+    /* ─── Phase switcher ─── */
+    function showPhase(id) {
+      ['phase-setup', 'phase-confirm', 'phase-nodemap'].forEach(p => {
+        document.getElementById(p).style.display = p === id ? '' : 'none';
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /* ─── Phase 1 → Phase 2: validate first ─── */
+    document.getElementById('runBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('runBtn');
+      const subject    = document.getElementById('subject').value;
+      const topic      = document.getElementById('topic').value.trim();
+      const difficulty = document.getElementById('difficulty').value;
+      const notes      = document.getElementById('notes').value.trim();
+      if (!topic) {
+        showToast('Please enter an experiment topic', 'warning');
+        return;
+      }
+      const url = window.STREAM_URLS && window.STREAM_URLS.experiment_guide;
+      if (!url || url.startsWith('__URL_')) {
+        showToast('URL not configured', 'error');
+        return;
+      }
+
+      const requestTopic = notes ? `${topic}\n\nReference notes:\n${notes}` : topic;
+      const body = { mode: 'validate', subject, topic: requestTopic, difficulty, notes };
+      if (uploadedFile.data) {
+        body.file_data = uploadedFile.data;
+        body.file_mime = uploadedFile.mime;
+        body.file_name = uploadedFile.name;
+      }
+
+      setButtonLoading(btn, true, 'Validating…');
+      try {
+        const resp = await fetch(url, {
+          method: 'POST', headers: apiHeaders(), body: JSON.stringify(body),
+        });
+        const json = await resp.json();
+        renderConfirm(json, { subject, topic, difficulty });
+      } catch (err) {
+        showToast('Validation failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    function renderConfirm(json, meta) {
+      const summaryEl = document.getElementById('confirmSummary');
+      const errorEl   = document.getElementById('confirmError');
+      const continueBtn = document.getElementById('continueBtn');
+      if (json && json.valid) {
+        summaryEl.innerHTML = `
+          <div class="confirm-line">${escapeHtml(json.summary || '')}</div>
+          <div class="confirm-meta">
+            <span><strong>Subject:</strong> ${escapeHtml(meta.subject)}</span>
+            <span><strong>Topic:</strong> ${escapeHtml(meta.topic)}</span>
+            <span><strong>Difficulty:</strong> ${escapeHtml(meta.difficulty)}</span>
+            ${uploadedFile.name ? `<span><strong>Document:</strong> ${escapeHtml(uploadedFile.name)}</span>` : ''}
+          </div>`;
+        errorEl.hidden = true;
+        continueBtn.disabled = false;
+      } else {
+        summaryEl.innerHTML = '';
+        errorEl.innerHTML = `❌ ${escapeHtml((json && json.error) || 'Validation failed')}`;
+        errorEl.hidden = false;
+        continueBtn.disabled = true;
+      }
+      showPhase('phase-confirm');
+    }
+
+    document.getElementById('confirmBackBtn').addEventListener('click', () => {
+      showPhase('phase-setup');
+    });
+
+    /* ─── Phase 2 → Phase 3: full generation ─── */
+    document.getElementById('continueBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('continueBtn');
+      const subject    = document.getElementById('subject').value;
+      const topic      = document.getElementById('topic').value.trim();
+      const difficulty = document.getElementById('difficulty').value;
+      const notes      = document.getElementById('notes').value.trim();
+      const url = window.STREAM_URLS.experiment_guide;
+
+      const requestTopic = notes ? `${topic}\n\nReference notes:\n${notes}` : topic;
+      const body = { mode: 'node_map', subject, topic: requestTopic, difficulty, notes };
+      if (uploadedFile.data) {
+        body.file_data = uploadedFile.data;
+        body.file_mime = uploadedFile.mime;
+        body.file_name = uploadedFile.name;
+      }
+
+      // Abort any in-flight previous generation
+      if (activeAbort) { try { activeAbort.abort(); } catch(_){} }
+      activeAbort = new AbortController();
+
+      setButtonLoading(btn, true, 'Generating 8 sections…');
+      try {
+        const resp = await fetch(url, {
+          method: 'POST', headers: apiHeaders(),
+          body: JSON.stringify(body),
+          signal: activeAbort.signal,
+        });
+        const json = await resp.json();
+        if (json.error && !json.sections) throw new Error(json.error);
+        sessionCache = {
+          topicTitle: json.topic_title || `${topic} Experiment`,
+          subject, topic, difficulty,
+          sections: json.sections || {},
+        };
+        saveCache();
+        renderNodeMap();
+        recordActivity(subject);
+        showToast('Experiment guide ready — click any node', 'success');
+        // Attach feedback widget below the node-map.
+        if (window.Feedback) {
+          const phaseEl = document.getElementById('phase-nodemap');
+          if (phaseEl && !phaseEl.querySelector('.fb-widget')) {
+            const wrap = document.createElement('div');
+            wrap.style.marginTop = '12px';
+            phaseEl.appendChild(wrap);
+            window.Feedback.attach(wrap, {
+              feature: 'experiment',
+              subject,
+              context: (sessionCache.topicTitle || topic).slice(0, 80),
+            });
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        showToast('Generation failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+        activeAbort = null;
+      }
+    });
+
+    /* ─── Reset ─── */
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('topic').value = '';
+      document.getElementById('difficulty').value = 'SPM';
+      document.getElementById('notes').value = '';
+      document.getElementById('file-info').textContent = '';
+      document.getElementById('file').value = '';
+      uploadedFile = { data: null, mime: null, name: null };
+    });
+    document.getElementById('newExperimentBtn').addEventListener('click', () => {
+      sessionCache = null;
+      try { sessionStorage.removeItem(SESSION_KEY); } catch(_){}
+      // Clear viewed markers
+      document.querySelectorAll('.node-box.viewed').forEach(b => b.classList.remove('viewed'));
+      showPhase('phase-setup');
+    });
+
+    /* ─── Node map render ─── */
+    function renderNodeMap() {
+      if (!sessionCache) return;
+      document.getElementById('mainTopicTitle').textContent = sessionCache.topicTitle;
+      document.getElementById('mainTopicMeta').textContent =
+        `${sessionCache.subject} · ${sessionCache.difficulty}`;
+      // Reset viewed markers
+      document.querySelectorAll('.node-box.viewed').forEach(b => b.classList.remove('viewed'));
+      showPhase('phase-nodemap');
+      // Draw connectors after layout settles
+      requestAnimationFrame(() => {
+        drawConnectors();
+        // Re-draw on resize
+        if (!window._expConnHooked) {
+          window._expConnHooked = true;
+          let t;
+          window.addEventListener('resize', () => {
+            clearTimeout(t);
+            t = setTimeout(drawConnectors, 120);
+          });
+        }
+      });
+    }
+
+    function drawConnectors() {
+      const svg = document.getElementById('nodeConnectors');
+      const main = document.querySelector('.main-topic-node');
+      const map = document.getElementById('nodeMap');
+      const boxes = document.querySelectorAll('.node-box');
+      if (!svg || !main || !map) return;
+      // Skip on narrow viewports — layout switches to stack and connectors look noisy
+      if (window.innerWidth < 900) {
+        svg.innerHTML = '';
+        return;
+      }
+      const mapRect = map.getBoundingClientRect();
+      const mainRect = main.getBoundingClientRect();
+      const sx = mainRect.left + mainRect.width / 2 - mapRect.left;
+      const sy = mainRect.bottom - mapRect.top;
+      let paths = '';
+      boxes.forEach(box => {
+        const r = box.getBoundingClientRect();
+        const tx = r.left + r.width / 2 - mapRect.left;
+        const ty = r.top - mapRect.top;
+        const cy = (sy + ty) / 2;
+        paths += `<path d="M ${sx} ${sy} C ${sx} ${cy}, ${tx} ${cy}, ${tx} ${ty}" />`;
+      });
+      svg.innerHTML = paths;
+      svg.setAttribute('viewBox', `0 0 ${mapRect.width} ${mapRect.height}`);
+      svg.setAttribute('width', mapRect.width);
+      svg.setAttribute('height', mapRect.height);
+    }
+
+    /* ─── Detail panel (modal) ─── */
+    function openDetail(sectionKey) {
+      if (!sessionCache || !sessionCache.sections) return;
+      const body = sessionCache.sections[sectionKey] || '';
+      document.getElementById('nodeDetailIcon').textContent = SECTION_ICONS[sectionKey] || '';
+      document.getElementById('nodeDetailTitleText').textContent = SECTION_TITLES[sectionKey] || sectionKey;
+      document.getElementById('nodeDetailBody').innerHTML = renderSectionMarkdown(body);
+      document.getElementById('nodeDetailBackdrop').hidden = false;
+      // Mark the box as viewed
+      document.querySelector(`.node-box[data-section="${sectionKey}"]`)?.classList.add('viewed');
+    }
+    function closeDetail() {
+      document.getElementById('nodeDetailBackdrop').hidden = true;
+    }
+    document.querySelectorAll('.node-box').forEach(box => {
+      box.addEventListener('click', () => openDetail(box.dataset.section));
+    });
+    document.getElementById('nodeDetailClose').addEventListener('click', closeDetail);
+    document.getElementById('nodeDetailBackdrop').addEventListener('click', (e) => {
+      // Click on the backdrop (outside the panel) closes
+      if (e.target === e.currentTarget) closeDetail();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !document.getElementById('nodeDetailBackdrop').hidden) {
+        closeDetail();
+      }
+    });
+
+    /* ─── Tiny markdown renderer for section bodies ─── */
+    function renderSectionMarkdown(s) {
+      if (!s) return '<p style="color:var(--c-muted);font-style:italic">(content unavailable — try regenerating)</p>';
+      const lines = String(s).split('\n');
+      const out = [];
+      let inUL = false, inOL = false;
+      const closeLists = () => {
+        if (inUL) { out.push('</ul>'); inUL = false; }
+        if (inOL) { out.push('</ol>'); inOL = false; }
+      };
+      for (const raw of lines) {
+        const line = raw.trimEnd();
+        if (!line.trim()) { closeLists(); continue; }
+        const inline = escapeHtml(line)
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>');
+        if (/^\s*[-*]\s+/.test(line)) {
+          if (!inUL) { closeLists(); out.push('<ul>'); inUL = true; }
+          out.push(`<li>${inline.replace(/^\s*[-*]\s+/, '')}</li>`);
+        } else if (/^\s*\d+\.\s+/.test(line)) {
+          if (!inOL) { closeLists(); out.push('<ol>'); inOL = true; }
+          out.push(`<li>${inline.replace(/^\s*\d+\.\s+/, '')}</li>`);
+        } else {
+          closeLists();
+          out.push(`<p>${inline}</p>`);
+        }
+      }
+      closeLists();
+      return out.join('');
+    }
+
+    /* ─── Cache persistence ─── */
+    function saveCache() {
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionCache)); } catch(_){}
+    }
+    function loadCache() {
+      try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || !obj.sections) return null;
+        return obj;
+      } catch(_) { return null; }
+    }
+
+    /* ─── Send to AI ─── */
+    document.getElementById('sendToAiBtn').addEventListener('click', () => {
+      if (!sessionCache) { showToast('Generate something first', 'warning'); return; }
+      const lines = [`Experiment: ${sessionCache.topicTitle}`];
+      for (const k of ['objective','materials','safety','procedure','expected_results','scientific_explanation','real_life_applications','summary']) {
+        lines.push(`\n### ${SECTION_TITLES[k]}\n${sessionCache.sections[k] || ''}`);
+      }
+      window.GlobalChat && window.GlobalChat.injectContent(
+        lines.join('\n'), 'experiment', '🧪 Experiment: ' + sessionCache.topicTitle
+      );
+    });
+
+    /* ─── Restore cache on page load ─── */
+    (function restoreOnLoad() {
+      const cached = loadCache();
+      if (cached && cached.sections && Object.keys(cached.sections).length === 8) {
+        sessionCache = cached;
+        // Pre-fill setup form so "New Experiment" + edits feel coherent
+        const subjEl = document.getElementById('subject');
+        if ([...subjEl.options].some(o => o.value === cached.subject)) subjEl.value = cached.subject;
+        document.getElementById('topic').value = cached.topic || '';
+        const savedDifficulty = ['Form 4', 'SPM', 'STPM', 'University'].includes(cached.difficulty)
+          ? cached.difficulty
+          : 'SPM';
+        document.getElementById('difficulty').value = savedDifficulty;
+        renderNodeMap();
+      }
+    })();
+  </script>
+  <script src="redesign.js"></script>
+  <script src="ui-icons.js"></script>
+</body>
+</html>

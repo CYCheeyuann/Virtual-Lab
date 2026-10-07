@@ -1,0 +1,105 @@
+/* One consistent expedition-style icon language across all app pages. */
+.vsl-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05em;
+  height: 1.05em;
+  flex: 0 0 auto;
+  margin-inline: .08em;
+  color: var(--c-accent, #78e4bd);
+  vertical-align: -.16em;
+}
+.vsl-icon svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.vsl-status-dot {
+  display: inline-block;
+  width: .62em;
+  height: .62em;
+  margin-inline: .18em;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+  box-shadow: 0 0 9px currentColor;
+  vertical-align: .02em;
+}
+.vsl-status-dot[data-tone="good"] { color: #78e4bd; }
+.vsl-status-dot[data-tone="medium"] { color: #f4bd68; }
+.vsl-status-dot[data-tone="hard"] { color: #ff7e79; }
+.vsl-status-dot[data-tone="neutral"] { color: #9bb1ae; }
+
+.stat-emoji {
+  display: grid !important;
+  place-items: center;
+  width: 42px !important;
+  height: 42px !important;
+  flex: 0 0 42px;
+  color: var(--c-accent) !important;
+  font-size: 1rem !important;
+  text-shadow: none !important;
+  border: 1px solid rgba(var(--c-accent-rgb), .26);
+  border-radius: 13px;
+  background: rgba(var(--c-accent-rgb), .08);
+}
+.stat-emoji .vsl-icon { width: 23px; height: 23px; margin: 0; }
+.streak-flame { animation: none !important; }
+
+h1 > .vsl-icon,
+h2 > .vsl-icon,
+h3 > .vsl-icon,
+.gc-title > .vsl-icon,
+.tk-title > .vsl-icon {
+  width: 1em;
+  height: 1em;
+  margin-right: .38em;
+  padding: .12em;
+  border: 1px solid rgba(var(--c-accent-rgb), .26);
+  border-radius: .3em;
+  background: rgba(var(--c-accent-rgb), .08);
+}
+
+.topic-icon .vsl-icon,
+.node-icon .vsl-icon,
+.outline-icon .vsl-icon,
+.tile-icon .vsl-icon { width: 1em; height: 1em; margin: 0; }
+
+.gc-fab .vsl-icon,
+#global-chat-fab .vsl-icon,
+.global-chat-fab .vsl-icon {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  color: #052018;
+}
+.tk-fab-icon { display: grid; place-items: center; }
+.tk-fab-icon .vsl-icon,
+.tk-fab .vsl-icon,
+#tk-fab .vsl-icon,
+#toolkit-fab .vsl-icon {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  color: var(--c-accent, #78e4bd);
+}
+.gc-icon-btn .vsl-icon,
+.gc-send-btn .vsl-icon,
+.tk-close .vsl-icon,
+.tk-f-copy .vsl-icon,
+.fb-up .vsl-icon,
+.fb-down .vsl-icon {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.gc-empty .vsl-icon,
+.chat-bubble .vsl-icon,
+.footer-hint .vsl-icon,
+.toast .vsl-icon,
+.error-msg .vsl-icon { margin-right: .28em; }
+
+.floating-icon { color: var(--c-accent); }
+.floating-icon .vsl-icon { width: 1em; height: 1em; margin: 0; }
+
+@media (max-width: 600px) {
+  .stat-emoji { width: 38px !important; height: 38px !important; flex-basis: 38px; }
+  .stat-emoji .vsl-icon { width: 21px; height: 21px; }
+}

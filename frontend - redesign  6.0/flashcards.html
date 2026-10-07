@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Flashcards</title>
+  <meta name="description" content="AI-generated spaced repetition flashcards organized by Subject and Bab." />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="global-chat.css" />
+  <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="flashcards.css" />
+  <link rel="stylesheet" href="feedback.css" />
+  <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="ui-icons.css" />
+</head>
+<body id="flashcards-page">
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="brand" href="welcome.html"> Virtual Science Lab</a>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="chapter.html">Chapter Assistant</a>
+        <a class="nav-link" href="experiment.html">Experiment Guide</a>
+        <a class="nav-link" href="quiz.html">Quiz Generator</a>
+        <a class="nav-link active" href="flashcards.html">Flashcards</a>
+        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="page-header">
+      <h1>Smart Flashcards</h1>
+      <p>AI-generated spaced repetition decks. Cards auto-schedule across 5 Leitner boxes (1d → 30d) so the right card surfaces on the right day.</p>
+    </div>
+
+    <!-- ─── New Deck Form ─── -->
+    <section class="card" id="newDeck">
+      <h2>Create a New Deck</h2>
+
+      <label for="subject">Subject</label>
+      <select id="subject" class="input">
+        <option value="Biology">Biology</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Physics">Physics</option>
+        <option value="Science">General Science</option>
+      </select>
+
+      <label for="newBab">Chapter Name / Bab <span class="required">*</span></label>
+      <input id="newBab" class="input" type="text"
+             placeholder="e.g. Bab 3: Keturunan, or Circular Motion" />
+
+      <label for="newTopic">Topic / Focus (optional)</label>
+      <input id="newTopic" class="input" type="text"
+             placeholder="e.g. Centripetal acceleration formulas" />
+
+      <div class="reference-input-group">
+        <label for="newSource">Source Notes (optional)</label>
+        <textarea id="newSource" class="input" rows="6" maxlength="8000"
+                  placeholder="Write or paste notes, a chapter summary, or leave blank for a generic AI deck."></textarea>
+
+        <div class="reference-or"><span>or attach a reference document</span></div>
+        <label>Reference Document (optional)</label>
+        <div class="dropzone" id="flashSourceDz" role="button" tabindex="0">
+          <input type="file" id="flashSourceFile" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+          <p>Drag &amp; drop a file here, or click to browse</p>
+          <small>PDF · DOCX · PPTX · TXT · Images · CSV · JSON · HTML</small>
+          <div class="file-info" id="flashSourceFileInfo"></div>
+        </div>
+      </div>
+
+      <label for="newCount">How many cards?</label>
+      <select id="newCount" class="input">
+        <option>8</option>
+        <option selected>12</option>
+        <option>16</option>
+        <option>20</option>
+      </select>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="generateDeckBtn" class="btn btn-primary">
+          <span>🧠</span><span>Generate Deck</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ─── Preview Step (before confirming deck) ─── -->
+    <section class="card" id="previewSection" style="display:none">
+      <h2 id="previewTitle">Preview: Cards</h2>
+      <p style="color:var(--c-muted);font-size:0.88rem;margin-bottom:12px">
+        Review the generated flashcards below. Once confirmed, they'll be saved and the study session begins.
+      </p>
+      <div id="previewList" class="preview-list"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="confirmFlashBtn" class="btn btn-primary">
+          <span>✅</span><span>Confirm &amp; Start Studying</span>
+        </button>
+        <button id="previewBackBtn" class="btn btn-ghost">
+          <span>←</span><span>Back to Setup</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ─── Deck Library ─── -->
+    <section class="card">
+      <h2>📚 Your Deck Library</h2>
+      <div id="deckGrid" class="deck-grid"></div>
+    </section>
+
+    <p class="footer-hint">
+      💡 Tip — generate flashcards directly from a chapter overview or your wrong quiz answers using the buttons inside <strong>Chapter Assistant</strong> and <strong>Quiz Generator</strong>.
+    </p>
+  </main>
+
+  <!-- ═══ Distraction-free Study Overlay ═══ -->
+  <div class="fc-overlay" id="fcOverlay" role="dialog" aria-label="Flashcard Study Mode">
+    <div class="fc-session" id="fcSession" tabindex="-1">
+      <div class="fc-session-bar">
+        <span class="fc-progress" id="fcProgress">0 / 0</span>
+        <button class="fc-exit-btn" id="fcExitBtn" type="button" aria-label="Exit study mode">✕ Exit</button>
+      </div>
+
+      <div class="fc-stage" id="fcStage" data-flipped="false" tabindex="0">
+        <div class="fc-card">
+          <div class="fc-face fc-front">
+            <div class="fc-prompt" id="fcPrompt"></div>
+          </div>
+          <div class="fc-face fc-back">
+            <div class="fc-answer" id="fcAnswer"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fc-hint-row" id="fcHintRow" hidden>
+        <button class="fc-hint-toggle" id="fcHintBtn" type="button">Reveal Hint</button>
+        <div class="fc-hint" id="fcHint" hidden></div>
+      </div>
+
+      <div class="fc-actions" id="fcActions">
+        <button class="fc-grade fc-hard" data-grade="hard" type="button">
+          <span>🔴 Hard</span><span class="fc-shortcut">1</span>
+        </button>
+        <button class="fc-grade fc-okay" data-grade="okay" type="button">
+          <span>🟡 Okay</span><span class="fc-shortcut">2</span>
+        </button>
+        <button class="fc-grade fc-easy" data-grade="easy" type="button">
+          <span>🟢 Easy</span><span class="fc-shortcut">3</span>
+        </button>
+      </div>
+
+      <div class="fc-shortcuts-hint">
+        Left-click card or press <strong>Enter</strong> to flip · <strong>1 / 2 / 3</strong> grade anytime · <strong>Esc</strong> to exit
+      </div>
+
+      <div class="fc-summary" id="fcSummary" hidden></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
+  <script src="progress.js"></script>
+  <script src="common.js"></script>
+  <script src="vortex.js"></script>
+  <script src="global-chat.js"></script>
+  <script src="toolkit.js"></script>
+  <script src="flashcards.js"></script>
+  <script src="feedback.js"></script>
+  <script src="redesign.js"></script>
+  <script src="ui-icons.js"></script>
+</body>
+</html>

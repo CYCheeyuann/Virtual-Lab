@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Generator</title>
+  <meta name="description" content="AI-powered quiz generator with outline refinement, strict JSON questions, and interactive grading." />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="global-chat.css" />
+  <link rel="stylesheet" href="toolkit.css" />
+  <link rel="stylesheet" href="feedback.css" />
+  <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="ui-icons.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="brand" href="welcome.html"> Virtual Science Lab</a>
+      <div class="nav-links">
+        <a class="nav-link" href="index.html">Dashboard</a>
+        <a class="nav-link" href="chapter.html">Chapter Assistant</a>
+        <a class="nav-link" href="experiment.html">Experiment Guide</a>
+        <a class="nav-link active" href="quiz.html">Quiz Generator</a>
+        <a class="nav-link" href="flashcards.html">Flashcards</a>
+        <a class="nav-link" href="lab-tools.html">Lab Tools</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="page-header">
+      <h1> Quiz Generator</h1>
+      <p>Generate an AI quiz tailored to your topic and difficulty. Review the outline, refine it, then take the test.</p>
+    </div>
+
+    <!-- ═══ PHASE 1: Setup ═══ -->
+    <section class="card" id="phase-setup">
+      <h2>1 · Setup</h2>
+
+      <label for="subject">Subject</label>
+      <select id="subject" class="input">
+        <option value="Biology">Biology</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Physics">Physics</option>
+      <option value="Science">General Science</option>
+      </select>
+
+      <label for="topic">Chapter / Topic</label>
+      <input id="topic" type="text" class="input"
+        placeholder="e.g. Electrochemistry, Genetic Inheritance, Circular Motion…" />
+
+      <label for="difficulty">Difficulty / Level</label>
+      <select id="difficulty" class="input">
+        <option value="Form 4">Form 4</option>
+        <option value="SPM" selected>SPM</option>
+        <option value="STPM">STPM</option>
+        <option value="University">University</option>
+      </select>
+
+      <label for="numQ">Number of questions</label>
+      <select id="numQ" class="input">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+      </select>
+
+      <div class="reference-input-group">
+        <label for="sourceNotes">Notes (optional)</label>
+        <textarea id="sourceNotes" class="input" rows="4" maxlength="4000"
+          placeholder="Write the learning points, syllabus focus, or source notes for this quiz..."></textarea>
+
+        <div class="reference-or"><span>or attach a reference document</span></div>
+        <label>Reference Document (optional)</label>
+        <div class="dropzone" id="dz" role="button" tabindex="0">
+          <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+          <p>Drag &amp; drop a file here, or click to browse</p>
+          <small>PDF · DOCX · PPTX · TXT · Images · CSV · JSON · HTML</small>
+          <div class="file-info" id="file-info"></div>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:18px">
+        <button id="outlineBtn" class="btn btn-primary"></button>
+        <button id="historyBtn" class="btn btn-ghost"></button>
+      </div>
+    </section>
+
+    <!-- ═══ PHASE 1b: Outline review ═══ -->
+    <section class="card" id="phase-outline" style="display:none">
+      <h2>2 · Review Outline</h2>
+      <p style="color:var(--c-muted);font-size:0.88rem;margin-bottom:12px">
+        Edit the knowledge points below. Add or remove lines freely, then confirm to generate your quiz.
+      </p>
+      <div class="outline-header" id="outline-header">
+        <span class="outline-icon">📌</span>
+        <span class="outline-title" id="outline-title">Quiz Outline</span>
+      </div>
+      <textarea id="outlineText" class="input outline-text" rows="12" placeholder="Loading outline…"></textarea>
+
+      <div class="btn-row" style="margin-top:14px">
+        <button id="generateBtn" class="btn btn-primary"></button>
+        <button id="backBtn" class="btn btn-ghost"></button>
+      </div>
+    </section>
+
+    <!-- ═══ PHASE 3: Quiz execution ═══ -->
+    <section class="card" id="phase-quiz" style="display:none">
+      <h2>3 · Answer the Quiz</h2>
+      <div class="quiz-progress-bar" id="quiz-progress"></div>
+      <div id="quiz-container"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="submitBtn" class="btn btn-primary"></button>
+      </div>
+    </section>
+
+    <!-- ═══ PHASE 4: Results ═══ -->
+    <section class="card" id="phase-results" style="display:none">
+      <h2>4 · Results</h2>
+      <div id="score-display"></div>
+      <div id="results-container"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button id="retryBtn" class="btn btn-ghost"></button>
+        <button id="newQuizBtn" class="btn btn-ghost"></button>
+        <button id="saveWrongToFlashBtn" class="btn btn-primary"></button>
+      </div>
+    </section>
+
+    <!-- ═══ HISTORY panel ═══ -->
+    <section class="card" id="phase-history" style="display:none">
+      <h2>📊 Quiz History</h2>
+      <div id="history-list"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button id="historyBackBtn" class="btn btn-ghost"></button>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="demo-mode.js"></script>
+  <script src="progress.js"></script>
+  <script src="common.js"></script>
+  <script src="vortex.js"></script>
+  <script src="global-chat.js"></script>
+  <script src="toolkit.js"></script>
+  <script src="flashcards.js"></script>
+  <script src="feedback.js"></script>
+  <script>
+    /* ════════════════════════════════════════════════════════════════════
+     *  Quiz Generator — 4-phase workflow + history + chatbox lock
+     * ════════════════════════════════════════════════════════════════════ */
+
+    /* ── Markdown-safe escape: escapeHtml then render **bold** ── */
+    function quizHtml(s) {
+      return escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    }
+
+    // ── Button icons ──
+    document.getElementById('outlineBtn').innerHTML  = `${iconHtml('bolt')}<span>Generate Outline</span>`;
+    document.getElementById('historyBtn').innerHTML  = `${iconHtml('eye')}<span>Quiz History</span>`;
+    document.getElementById('generateBtn').innerHTML = `${iconHtml('bolt')}<span>Confirm &amp; Generate Quiz</span>`;
+    document.getElementById('backBtn').innerHTML     = `${iconHtml('refresh','btn-icon-rotate')}<span>Back to Setup</span>`;
+    document.getElementById('submitBtn').innerHTML   = `${iconHtml('eye')}<span>Submit &amp; Show Results</span>`;
+    document.getElementById('retryBtn').innerHTML    = `${iconHtml('refresh','btn-icon-rotate')}<span>Retake This Quiz</span>`;
+    document.getElementById('newQuizBtn').innerHTML  = `${iconHtml('bolt')}<span>New Quiz</span>`;
+    document.getElementById('saveWrongToFlashBtn').innerHTML = `<span>🧠</span><span>Save incorrect answers to Flashcards</span>`;
+    document.getElementById('historyBackBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Back</span>`;
+
+    let uploadedFile = { data: null, mime: null, name: null };
+    setupDropzone('dz', 'file', 'file-info', f => uploadedFile = f);
+
+    // ── State ──
+    const QUIZ_HISTORY_KEY = 'vsl.quizHistory';
+    let quizData = [];       // current quiz questions (JSON)
+    let userAnswers = {};    // { index: 'A'|'B'|'C'|'D' }
+    let quizMeta = {};       // { subject, topic, difficulty, numQ }
+    let quizActive = false;  // true while Phase 3 is showing
+
+    /* ─── Lab Assistant lockout during quiz ─────────────────────────── */
+    function lockChatbox() {
+      quizActive = true;
+      const fab = document.getElementById('gc-fab');
+      if (fab) {
+        fab.dataset.origTitle = fab.title;
+        fab.title = '🔒 Chat locked during quiz';
+        fab.style.opacity = '0.45';
+        fab.style.pointerEvents = 'none';
+      }
+      // Navigation guard: warn user before leaving mid-quiz
+      window.addEventListener('beforeunload', navGuard);
+    }
+    function unlockChatbox() {
+      quizActive = false;
+      const fab = document.getElementById('gc-fab');
+      if (fab) {
+        fab.title = fab.dataset.origTitle || 'Open AI Lab Assistant';
+        fab.style.opacity = '';
+        fab.style.pointerEvents = '';
+      }
+      window.removeEventListener('beforeunload', navGuard);
+    }
+    function navGuard(e) {
+      e.preventDefault();
+      e.returnValue = 'You have an active quiz. Leaving now will end it as Incomplete.';
+      return e.returnValue;
+    }
+    // Also intercept nav links during quiz
+    document.querySelectorAll('a.nav-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        if (!quizActive) return;
+        e.preventDefault();
+        if (confirm('You have an active quiz. Leaving now will end it and record as Incomplete.\n\nLeave anyway?')) {
+          finishQuiz(false);
+          window.location.href = link.href;
+        }
+      });
+    });
+    // Intercept GlobalChat.open to block during quiz
+    const _origGCOpen = window.GlobalChat && window.GlobalChat.open;
+    if (window.GlobalChat) {
+      window.GlobalChat.open = function () {
+        if (quizActive) {
+          showToast('🔒 Lab Assistant is locked during the quiz. Complete or submit your quiz first.', 'warning');
+          return;
+        }
+        _origGCOpen && _origGCOpen();
+      };
+    }
+
+    /* ─── Phase navigation ─────────────────────────────────────────── */
+    function showPhase(id) {
+      ['phase-setup','phase-outline','phase-quiz','phase-results','phase-history'].forEach(p => {
+        document.getElementById(p).style.display = p === id ? '' : 'none';
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /* ─── Phase 1: Generate outline (streaming) ────────────────────── */
+    document.getElementById('outlineBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('outlineBtn');
+      const topic = document.getElementById('topic').value.trim();
+      if (!topic) { showToast('Enter a topic first', 'warning'); return; }
+
+      const url = window.STREAM_URLS && window.STREAM_URLS.science_quiz;
+      if (!url || url.startsWith('__URL_')) {
+        showToast('Quiz URL not configured', 'error'); return;
+      }
+
+      setButtonLoading(btn, true, 'Generating outline…');
+      const notes = document.getElementById('sourceNotes').value.trim();
+      const requestTopic = notes ? `${topic}\n\nReference notes:\n${notes}` : topic;
+      const body = {
+        action: 'outline',
+        subject: document.getElementById('subject').value,
+        topic: requestTopic,
+        difficulty: document.getElementById('difficulty').value,
+        notes,
+      };
+      if (uploadedFile.data) {
+        body.file_data = uploadedFile.data;
+        body.file_mime = uploadedFile.mime;
+        body.file_name = uploadedFile.name;
+      }
+
+      try {
+        const resp = await fetch(url, {
+          method: 'POST', headers: apiHeaders(), body: JSON.stringify(body),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder('utf-8');
+        let full = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          full += dec.decode(value, { stream: true });
+        }
+        // Parse the title from the new ALL CAPS || format
+        const lines = full.split('\n');
+        let title = `Quiz Outline — ${topic}`;
+        // First non-empty line is the ALL CAPS title line
+        const titleIdx = lines.findIndex(l => l.trim().length > 0);
+        if (titleIdx >= 0) {
+          const titleLine = lines[titleIdx].trim();
+          // Check for the || pattern (new format) or ## pattern (legacy)
+          if (titleLine.includes('||')) {
+            title = titleLine.split('||')[0].trim();
+          } else if (/^##\s+/.test(titleLine)) {
+            title = titleLine.replace(/^##\s+/, '').trim();
+          } else {
+            title = titleLine;
+          }
+          lines.splice(titleIdx, 1);
+          // Drop any leading blank lines after removing title
+          while (lines.length && !lines[0].trim()) lines.shift();
+        }
+        document.getElementById('outline-title').textContent = title;
+        document.getElementById('outlineText').value = lines.join('\n');
+        showPhase('phase-outline');
+        showToast('Outline ready — review and edit, then generate', 'success');
+      } catch (err) {
+        showToast('Outline failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    document.getElementById('backBtn').addEventListener('click', () => showPhase('phase-setup'));
+
+    /* ─── Phase 2: Generate quiz (JSON) ────────────────────────────── */
+    document.getElementById('generateBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('generateBtn');
+      const outline = document.getElementById('outlineText').value.trim();
+      if (!outline) { showToast('Outline is empty', 'warning'); return; }
+
+      const url = window.STREAM_URLS && window.STREAM_URLS.science_quiz;
+      if (!url || url.startsWith('__URL_')) {
+        showToast('Quiz URL not configured', 'error'); return;
+      }
+
+      setButtonLoading(btn, true, 'Generating quiz…');
+      quizMeta = {
+        subject: document.getElementById('subject').value,
+        topic: document.getElementById('topic').value.trim(),
+        difficulty: document.getElementById('difficulty').value,
+        numQ: parseInt(document.getElementById('numQ').value, 10),
+      };
+      const body = {
+        action: 'generate',
+        ...quizMeta,
+        outline,
+        num_questions: quizMeta.numQ,
+        notes: document.getElementById('sourceNotes').value.trim(),
+      };
+
+      try {
+        const resp = await fetch(url, {
+          method: 'POST', headers: apiHeaders(), body: JSON.stringify(body),
+        });
+        const json = await resp.json();
+        if (json.error && !json.questions) throw new Error(json.error);
+        quizData = json.questions || [];
+        if (!quizData.length) throw new Error('No questions returned');
+        userAnswers = {};
+        renderQuiz();
+        showPhase('phase-quiz');
+        lockChatbox();
+        showToast(`${quizData.length} questions generated — good luck!`, 'success');
+      } catch (err) {
+        showToast('Quiz generation failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    /* ─── Phase 3: Render interactive quiz ─────────────────────────── */
+    function renderQuiz() {
+      const container = document.getElementById('quiz-container');
+      container.innerHTML = '';
+      updateProgress();
+      quizData.forEach((q, qi) => {
+        const card = document.createElement('div');
+        card.className = 'quiz-question';
+        card.dataset.qi = qi;
+        card.innerHTML = `
+          <div class="quiz-q-title">Q${qi + 1}. ${quizHtml(q.question_stem)}</div>
+          <div class="quiz-options" data-qi="${qi}"></div>`;
+        const optsHost = card.querySelector('.quiz-options');
+        ['A','B','C','D'].forEach(letter => {
+          const text = (q.options && q.options[letter]) || '';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'quiz-option';
+          btn.dataset.letter = letter;
+          btn.dataset.qi = qi;
+          btn.innerHTML = `<span class="opt-letter">${letter}</span><span>${quizHtml(text)}</span>`;
+          btn.addEventListener('click', () => selectOption(qi, letter));
+          optsHost.appendChild(btn);
+        });
+        container.appendChild(card);
+      });
+    }
+
+    function selectOption(qi, letter) {
+      userAnswers[qi] = letter;
+      const card = document.querySelector(`.quiz-question[data-qi="${qi}"]`);
+      card.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.letter === letter);
+      });
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const answered = Object.keys(userAnswers).length;
+      const total = quizData.length;
+      const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+      document.getElementById('quiz-progress').innerHTML =
+        `<div class="progress-fill" style="width:${pct}%"></div>
+         <span class="progress-label">${answered}/${total} answered</span>`;
+    }
+
+    /* ─── Phase 4: Submit & evaluate ───────────────────────────────── */
+    document.getElementById('submitBtn').addEventListener('click', () => {
+      const answered = Object.keys(userAnswers).length;
+      const total = quizData.length;
+      if (answered < total) {
+        const skip = total - answered;
+        const msg = `You have ${skip} unanswered question${skip>1?'s':''}.\n\n` +
+                    `Submitting now will NOT save this as a completed quiz ` +
+                    `and will NOT count toward your dashboard progress.\n\nSubmit anyway?`;
+        if (!confirm(msg)) return;
+        // Mark as incomplete
+        finishQuiz(false);
+      } else {
+        finishQuiz(true);
+      }
+    });
+
+    function finishQuiz(isComplete) {
+      unlockChatbox();
+
+      let correct = 0;
+      const resultsContainer = document.getElementById('results-container');
+      resultsContainer.innerHTML = '';
+
+      quizData.forEach((q, qi) => {
+        const picked = userAnswers[qi] || null;
+        const isCorrect = picked === q.correct_answer;
+        if (isCorrect) correct++;
+
+        const card = document.createElement('div');
+        card.className = 'quiz-question ' + (picked ? (isCorrect ? 'result-correct' : 'result-incorrect') : '');
+        let optsHtml = '';
+        ['A','B','C','D'].forEach(letter => {
+          const text = (q.options && q.options[letter]) || '';
+          let cls = 'quiz-option disabled';
+          if (letter === q.correct_answer) cls += ' correct';
+          if (letter === picked && !isCorrect) cls += ' incorrect';
+          if (letter === picked) cls += ' selected';
+          optsHtml += `<div class="${cls}"><span class="opt-letter">${letter}</span><span>${quizHtml(text)}</span></div>`;
+        });
+
+        card.innerHTML = `
+          <div class="quiz-q-title">Q${qi + 1}. ${quizHtml(q.question_stem)}</div>
+          <div class="quiz-options">${optsHtml}</div>
+          <div class="quiz-explanation">
+            <strong>${picked ? (isCorrect ? '✅ Correct' : `❌ Correct: ${q.correct_answer}`) : '⚪ Not answered'}</strong><br/>
+            ${quizHtml(q.detailed_explanation || '')}
+          </div>`;
+        resultsContainer.appendChild(card);
+      });
+
+      // Score
+      const total = quizData.length;
+      const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+      const status = isComplete ? 'Completed' : 'Incomplete';
+      document.getElementById('score-display').innerHTML = `
+        <div class="quiz-scoreboard">
+          <div class="score-label">
+            Score: <strong>${correct}/${total}</strong> · ${pct}% ·
+            <span style="color:${isComplete ? 'var(--c-success-fg)' : 'var(--c-warning-fg)'}">${status}</span>
+          </div>
+          <div class="score-stars">${'⭐'.repeat(Math.round(pct/20))}${'☆'.repeat(5 - Math.round(pct/20))}</div>
+        </div>`;
+
+      // Only record to dashboard if complete
+      if (isComplete) {
+        recordQuizResult({ subject: quizMeta.subject, total, correct });
+      }
+
+      // Save to history (localStorage)
+      saveToHistory({ ...quizMeta, correct, total, pct, status, questions: quizData, answers: userAnswers, ts: Date.now() });
+
+      // Update the "Save incorrect to Flashcards" button state
+      const flashBtn = document.getElementById('saveWrongToFlashBtn');
+      if (flashBtn) {
+        const wrongCount = total - correct;
+        if (wrongCount === 0) {
+          flashBtn.disabled = true;
+          flashBtn.title = 'Nothing to save — perfect score!';
+        } else if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
+          flashBtn.disabled = true;
+          flashBtn.title = 'Flashcards backend not yet deployed';
+        } else {
+          flashBtn.disabled = false;
+          flashBtn.title = `Convert ${wrongCount} wrong answer${wrongCount === 1 ? '' : 's'} into flashcards`;
+        }
+      }
+
+      showPhase('phase-results');
+      // Attach feedback widget to the score area once results render.
+      if (window.Feedback) {
+        const scoreEl = document.getElementById('score-display');
+        if (scoreEl) {
+          window.Feedback.attach(scoreEl, {
+            feature: 'quiz',
+            subject: quizMeta.subject,
+            context: (quizMeta.topic || '').slice(0, 80),
+          });
+        }
+      }
+      showToast(
+        isComplete ? `Completed: ${correct}/${total} (${pct}%)` : `Incomplete — ${correct}/${total}`,
+        isComplete && pct >= 60 ? 'success' : 'warning', 5000
+      );
+    }
+
+    /* ─── Quiz History (localStorage) ──────────────────────────────── */
+    function loadHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(QUIZ_HISTORY_KEY) || '[]');
+      } catch (e) { return []; }
+    }
+    function saveToHistory(entry) {
+      const hist = loadHistory();
+      entry.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      hist.unshift(entry);
+      // Keep last 50 entries
+      if (hist.length > 50) hist.length = 50;
+      try { localStorage.setItem(QUIZ_HISTORY_KEY, JSON.stringify(hist)); } catch (e) {}
+    }
+
+    document.getElementById('historyBtn').addEventListener('click', () => {
+      renderHistory();
+      showPhase('phase-history');
+    });
+    document.getElementById('historyBackBtn').addEventListener('click', () => showPhase('phase-setup'));
+
+    function renderHistory() {
+      const hist = loadHistory();
+      const host = document.getElementById('history-list');
+      if (!hist.length) {
+        host.innerHTML = '<p style="color:var(--c-muted);font-style:italic">No quiz history yet.</p>';
+        return;
+      }
+      // Render with data-* attributes only — no inline JS handlers — so a
+      // tampered localStorage entry can't smuggle code via h.id.
+      host.innerHTML = hist.map(h => `
+        <div class="quiz-history-item" data-quiz-id="${escapeHtml(h.id)}">
+          <div class="history-meta">
+            <strong>${escapeHtml(h.topic || 'Untitled')}</strong>
+            <span>${escapeHtml(h.subject)} · ${escapeHtml(h.difficulty)} · ${escapeHtml(new Date(h.ts).toLocaleDateString())}</span>
+          </div>
+          <div class="history-score">
+            <span class="${h.status === 'Completed' ? 'score-good' : 'score-warn'}">${h.correct}/${h.total} (${h.pct}%)</span>
+            <span class="history-status">${escapeHtml(h.status)}</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" data-act="retake">
+            ${iconHtml('refresh','btn-icon-rotate')}<span>Retake</span>
+          </button>
+          <button class="btn btn-ghost btn-sm" data-act="delete" title="Delete" style="color:var(--c-error-fg)">
+            ${iconHtml('trash','btn-icon-trash')}<span></span>
+          </button>
+        </div>
+      `).join('');
+
+      // Attach listeners by id from data attribute (NOT from interpolated JS).
+      host.querySelectorAll('[data-quiz-id]').forEach(item => {
+        const id = item.dataset.quizId;
+        item.querySelector('[data-act="retake"]')?.addEventListener('click', () => retakeQuiz(id));
+        item.querySelector('[data-act="delete"]')?.addEventListener('click', () => deleteQuiz(id));
+      });
+    }
+
+    function deleteQuiz(id) {
+      if (!confirm('Delete this quiz from history?')) return;
+      if (!confirm('Are you sure? This cannot be undone.')) return;
+      let hist = loadHistory();
+      hist = hist.filter(h => h.id !== id);
+      try { localStorage.setItem(QUIZ_HISTORY_KEY, JSON.stringify(hist)); } catch(e) {}
+      renderHistory();
+      showToast('Quiz deleted', 'success', 2000);
+    }
+
+    function retakeQuiz(id) {
+      const hist = loadHistory();
+      const entry = hist.find(h => h.id === id);
+      if (!entry || !entry.questions) {
+        showToast('Quiz data not found', 'error'); return;
+      }
+      quizData = entry.questions;
+      quizMeta = { subject: entry.subject, topic: entry.topic, difficulty: entry.difficulty, numQ: entry.total };
+      userAnswers = {};
+      renderQuiz();
+      showPhase('phase-quiz');
+      lockChatbox();
+      showToast('Retaking quiz — good luck!', 'success');
+    }
+
+    /* ─── Retry / New / Export ──────────────────────────────────────── */
+    document.getElementById('retryBtn').addEventListener('click', () => {
+      userAnswers = {};
+      renderQuiz();
+      showPhase('phase-quiz');
+      lockChatbox();
+      showToast('Quiz reset — try again!', 'success');
+    });
+    document.getElementById('newQuizBtn').addEventListener('click', () => {
+      quizData = [];
+      userAnswers = {};
+      document.getElementById('sourceNotes').value = '';
+      document.getElementById('file-info').textContent = '';
+      document.getElementById('file').value = '';
+      uploadedFile = { data: null, mime: null, name: null };
+      unlockChatbox();
+      showPhase('phase-setup');
+    });
+    document.getElementById('saveWrongToFlashBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('saveWrongToFlashBtn');
+      if (!window.Flashcards || !window.Flashcards.isBackendLive()) {
+        showToast('Flashcards backend not yet deployed', 'error');
+        return;
+      }
+      // Build the wrong-answer list from current quiz state
+      const wrong = quizData
+        .map((q, i) => ({ q, picked: userAnswers[i] }))
+        .filter(x => !x.picked || x.picked !== x.q.correct_answer)
+        .map(({ q, picked }) => ({
+          question: q.question_stem,
+          correct: (q.options && q.options[q.correct_answer]) || q.correct_answer,
+          picked: picked ? ((q.options && q.options[picked]) || picked) : null,
+          explanation: q.detailed_explanation || '',
+        }));
+      if (!wrong.length) {
+        showToast('Nothing to save — perfect score!', 'info');
+        return;
+      }
+      setButtonLoading(btn, true, 'Saving to Flashcards…');
+      try {
+        const id = await window.Flashcards.saveQuizMistakes({
+          subject: quizMeta.subject,
+          chapter: quizMeta.topic || quizMeta.subject,
+          topic: quizMeta.topic,
+          wrong_answers: wrong,
+        });
+        showToast(`Saved ${wrong.length} card${wrong.length === 1 ? '' : 's'} to Flashcards`, 'success');
+        // Soft prompt to study now
+        if (confirm(`Saved ${wrong.length} flashcard${wrong.length === 1 ? '' : 's'}. Study them now?`)) {
+          location.href = `flashcards.html?deck=${id}&autostudy=1`;
+        }
+      } catch (err) {
+        showToast('Save failed: ' + err.message, 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+  </script>
+  <script src="redesign.js"></script>
+  <script src="ui-icons.js"></script>
+</body>
+</html>

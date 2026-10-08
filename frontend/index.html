@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Virtual Science Lab Assistant</title>
   <meta name="description" content="AI-powered science learning companion for Biology, Chemistry, Physics, and General Science." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔬</text></svg>" />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
   <link rel="stylesheet" href="flashcards.css" />
+  <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="ui-icons.css" />
 </head>
-<body>
+<body class="dashboard-page">
 
   <nav class="navbar">
     <div class="nav-inner">
@@ -30,7 +32,7 @@
   <main class="page">
     <div class="page-header">
       <h1>Virtual Science Lab Assistant</h1>
-      <p>Pick a tool to start. Hover over any card to learn more.</p>
+      <p>Pick a tool to start. Each card explains what it does.</p>
     </div>
 
     <section class="progress-dashboard" id="progressDashboard"></section>
@@ -41,40 +43,40 @@
           <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         </div>
         <h3>Chapter Assistant</h3>
-        <p></p>
+        <p>Generate a structured overview of the main chapters in Biology, Chemistry, Physics, or General Science.</p>
       </a>
 
-      <a class="tile" href="experiment.html" data-desc="Get a complete experiment guide with safety briefing. Optionally upload a reference document.">
+      <a class="tile" href="experiment.html" data-desc="Get a complete experiment guide with a safety briefing. Optionally upload a reference document.">
         <div class="tile-icon">
           <svg viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg>
         </div>
         <h3>Experiment Guide</h3>
-        <p></p>
+        <p>Get a complete experiment guide with a safety briefing. Optionally upload a reference document.</p>
       </a>
 
-      <a class="tile" href="quiz.html" data-desc="AI-generated quizzes with outline refinement, strict JSON questions, and interactive grading.">
+      <a class="tile" href="quiz.html" data-desc="AI-generated quizzes: refine an outline, generate questions, and grade your answers interactively.">
         <div class="tile-icon">
           <svg viewBox="0 0 24 24"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
         </div>
         <h3>Quiz Generator</h3>
-        <p></p>
+        <p>AI-generated quizzes: refine an outline, generate questions, and grade your answers interactively.</p>
       </a>
 
-      <a class="tile" href="lab-tools.html" data-desc="Three tools in one: Safety Assistant, AI Image Generator, and What If scenario simulator.">
+      <a class="tile" href="lab-tools.html" data-desc="Three tools in one: Safety Assistant, AI Image Generator, and AI-guided What-If scenario explanations.">
         <div class="tile-icon">
           <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
         </div>
         <h3>Lab Tools</h3>
-        <p></p>
+        <p>Three tools in one: Safety Assistant, AI Image Generator, and AI-guided What-If scenario explanations.</p>
       </a>
 
-      <a class="tile" href="flashcards.html" id="flashTile" data-desc="AI-generated spaced repetition decks to lock science concepts into your long-term memory.">
+      <a class="tile" href="flashcards.html" id="flashTile" data-desc="AI-generated spaced-repetition decks to lock science concepts into your long-term memory.">
         <span class="tile-badge tile-badge-coming" id="flashBadge">Coming Soon</span>
         <div class="tile-icon">
           <svg viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-2-2H6.5L4 3.5A1 1 0 0 0 3 3a1 1 0 0 0-1 1v15a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2z"/><path d="M14 12h-4"/><path d="M12 10v4"/></svg>
         </div>
         <h3>Smart Flashcards</h3>
-        <p></p>
+        <p>AI-generated spaced-repetition decks to lock science concepts into your long-term memory.</p>
       </a>
     </div>
 
@@ -115,34 +117,50 @@
         if (badge) badge.remove();   // delete the badge node entirely when backend is live
       }
 
-      // Typewriter hover effect on tile descriptions
-      document.querySelectorAll('.tile').forEach(tile => {
-        const p = tile.querySelector('p');
-        const desc = tile.dataset.desc || '';
-        let typingTimer = null;
-        let charIdx = 0;
+      // Progressive enhancement: the full description is already in each <p> and
+      // stays visible if this script never runs. Only on desktop hover devices do
+      // we switch to the "type on hover / hide on leave" behaviour. On touch,
+      // keyboard, or reduced-motion the full text is shown without typing.
+      const hoverCapable = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // Only fine-pointer hover devices that have NOT asked for reduced motion get
+      // the hide-and-type behaviour. Touch, keyboard-only, or reduced-motion keep
+      // the full HTML description shown: no initial hide(), no dashboard-typing.
+      if (hoverCapable && !reduceMotion) {
+        document.body.classList.add('dashboard-typing');
+        document.querySelectorAll('.tile').forEach((tile) => {
+          const p = tile.querySelector('p');
+          if (!p) return;
+          const desc = p.textContent.trim();   // single source of truth: the <p> copy
+          let timer = null;
 
-        tile.addEventListener('mouseenter', () => {
-          clearInterval(typingTimer);
-          charIdx = 0;
-          p.textContent = '';
-          p.classList.add('typing');
-          typingTimer = setInterval(() => {
-            if (charIdx >= desc.length) {
-              clearInterval(typingTimer);
-              p.classList.remove('typing');
-              return;
-            }
-            p.textContent += desc[charIdx++];
-          }, 18);
+          const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+          const showFull = () => { stop(); p.textContent = desc; };
+          const hide = () => { stop(); p.textContent = ''; };
+          const typeOut = () => {
+            stop();
+            // If the card already has keyboard focus, keep the full text shown and
+            // never clear or re-type it when the mouse enters or leaves.
+            if (tile.matches(':focus-within')) { showFull(); return; }
+            if (reduceMotion) { showFull(); return; }
+            let i = 0;
+            p.textContent = '';
+            timer = setInterval(() => {
+              if (i >= desc.length) { stop(); return; }
+              p.textContent += desc[i++];
+            }, 18);
+          };
+
+          hide();   // start hidden once typing mode is active
+          tile.addEventListener('mouseenter', typeOut);
+          tile.addEventListener('mouseleave', () => { if (tile.matches(':focus-within')) return; hide(); });
+          tile.addEventListener('focusin', showFull);
+          tile.addEventListener('focusout', () => { if (tile.matches(':hover')) return; hide(); });
         });
-        tile.addEventListener('mouseleave', () => {
-          clearInterval(typingTimer);
-          p.classList.remove('typing');
-          p.textContent = '';
-        });
-      });
+      }
     });
   </script>
+  <script src="redesign.js"></script>
+  <script src="ui-icons.js"></script>
 </body>
 </html>

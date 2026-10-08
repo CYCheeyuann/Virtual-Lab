@@ -8,6 +8,7 @@
   const KEY = 'vsl.flashcards';
   const VERSION = 1;
   const QUOTA_BYTES = 3_000_000;
+  let sourceFile = { data: null, mime: null, name: null, text: '' };
 
   const Store = (function () {
     function emptyStore() { return { version: VERSION, decks: [] }; }
@@ -345,11 +346,15 @@
 
     if (typeof window.setButtonLoading === 'function') window.setButtonLoading(btn, true, 'Generating…');
     try {
+      const combinedSource = [source, sourceFile.text].filter(Boolean).join('\n\n');
       const cards = await generateCards({
-        mode: source ? 'from_text' : 'from_topic',
+        mode: (source || sourceFile.data) ? 'from_text' : 'from_topic',
         subject, chapter: bab, topic,
         num_cards: count,
-        source_text: source || '',
+        source_text: combinedSource,
+        file_data: sourceFile.data,
+        file_mime: sourceFile.mime,
+        file_name: sourceFile.name,
       });
       if (!cards.length) throw new Error('No cards generated');
       // Show preview step
@@ -438,6 +443,9 @@
       document.getElementById('newBab').value = '';
       document.getElementById('newTopic').value = '';
       document.getElementById('newSource').value = '';
+      document.getElementById('flashSourceFileInfo').textContent = '';
+      document.getElementById('flashSourceFile').value = '';
+      sourceFile = { data: null, mime: null, name: null, text: '' };
       renderLibrary();
       if (typeof window.showToast === 'function') {
         window.showToast('Deck confirmed & created', 'success');
@@ -654,6 +662,11 @@
     // common.js's bindSubjectSelect already populates the <select id="subject">
     // and applies the theme, so we don't need to manually pre-fill it here.
     document.getElementById('generateDeckBtn')?.addEventListener('click', onGenerateClick);
+    if (typeof window.setupDropzone === 'function') {
+      window.setupDropzone('flashSourceDz', 'flashSourceFile', 'flashSourceFileInfo', file => {
+        sourceFile = file;
+      });
+    }
     document.getElementById('newBab')?.addEventListener('input', (e) => {
       e.target.classList.remove('invalid');
     });

@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lab Tools</title>
   <meta name="description" content="All-in-one science toolkit: Safety Assistant, Image Generator, and What Happens If simulator." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧰</text></svg>" />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
   <link rel="stylesheet" href="feedback.css" />
+  <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="ui-icons.css" />
 </head>
 <body>
 
@@ -68,6 +70,20 @@
           <option>Home Experiment</option>
           <option>Field Work</option>
         </select>
+
+        <div class="reference-input-group">
+          <label for="safety-notes">Notes (optional)</label>
+          <textarea id="safety-notes" class="input" rows="4" maxlength="4000"
+            placeholder="Add safety requirements, teacher instructions, or other reference notes..."></textarea>
+          <div class="reference-or"><span>or attach a reference document</span></div>
+          <label>Reference Document (optional)</label>
+          <div class="dropzone" id="safety-dz" role="button" tabindex="0">
+            <input type="file" id="safety-file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+            <p>Drag &amp; drop a file here, or click to browse</p>
+            <small>PDF · DOCX · PPTX · TXT · Images · CSV · JSON · HTML</small>
+            <div class="file-info" id="safety-file-info"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Image Gen form -->
@@ -101,6 +117,20 @@
           <option selected>Detailed</option>
           <option>Advanced</option>
         </select>
+
+        <div class="reference-input-group">
+          <label for="image-notes">Notes (optional)</label>
+          <textarea id="image-notes" class="input" rows="4" maxlength="4000"
+            placeholder="Describe labels, composition, visual details, or reference instructions..."></textarea>
+          <div class="reference-or"><span>or attach a reference document</span></div>
+          <label>Reference Document (optional)</label>
+          <div class="dropzone" id="image-dz" role="button" tabindex="0">
+            <input type="file" id="image-file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+            <p>Drag &amp; drop a file here, or click to browse</p>
+            <small>PDF · DOCX · PPTX · TXT · Images · CSV · JSON · HTML</small>
+            <div class="file-info" id="image-file-info"></div>
+          </div>
+        </div>
       </div>
 
       <!-- What If form -->
@@ -127,6 +157,20 @@
           <option value="theoretical">🧪 Theoretical</option>
           <option value="scifi">🚀 Sci-Fi Fun</option>
         </select>
+
+        <div class="reference-input-group">
+          <label for="whatif-notes">Notes (optional)</label>
+          <textarea id="whatif-notes" class="input" rows="4" maxlength="4000"
+            placeholder="Add assumptions, constraints, evidence, or reference notes for the scenario..."></textarea>
+          <div class="reference-or"><span>or attach a reference document</span></div>
+          <label>Reference Document (optional)</label>
+          <div class="dropzone" id="whatif-dz" role="button" tabindex="0">
+            <input type="file" id="whatif-file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+            <p>Drag &amp; drop a file here, or click to browse</p>
+            <small>PDF · DOCX · PPTX · TXT · Images · CSV · JSON · HTML</small>
+            <div class="file-info" id="whatif-file-info"></div>
+          </div>
+        </div>
       </div>
 
       <div class="btn-row" style="margin-top:18px">
@@ -184,6 +228,29 @@
     };
 
     let currentTab = 'safety';
+    const referenceFiles = {
+      safety: { data: null, mime: null, name: null, text: '' },
+      image:  { data: null, mime: null, name: null, text: '' },
+      whatif: { data: null, mime: null, name: null, text: '' },
+    };
+
+    ['safety', 'image', 'whatif'].forEach(tab => {
+      setupDropzone(`${tab}-dz`, `${tab}-file`, `${tab}-file-info`, file => {
+        referenceFiles[tab] = file;
+      });
+    });
+
+    function addReference(payload, tab) {
+      const notes = document.getElementById(`${tab}-notes`).value.trim();
+      const file = referenceFiles[tab];
+      payload.notes = notes;
+      if (file.data) {
+        payload.file_data = file.data;
+        payload.file_mime = file.mime;
+        payload.file_name = file.name;
+      }
+      return payload;
+    }
 
     /* ─── Tab switching ─────────────────────────────────────────── */
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -351,7 +418,7 @@
        placeholder gracefully if image gen is unavailable or fails — the
        caller can still proceed to the text step. Returns when the image
        has actually been rendered to the DOM (or the failure handled). */
-    async function generateContextImage(concept, subjectVal, btn) {
+    async function generateContextImage(concept, subjectVal, btn, referencePayload = {}) {
       const imgUrl = window.STREAM_URLS && window.STREAM_URLS.image_generator;
       setImageState('skeleton');
       if (!imgUrl || imgUrl.startsWith('__URL_')) {
@@ -369,6 +436,10 @@
             concept,
             style:  'Scientific Diagram',
             detail: 'Detailed',
+            notes: referencePayload.notes || '',
+            file_data: referencePayload.file_data || null,
+            file_mime: referencePayload.file_mime || null,
+            file_name: referencePayload.file_name || null,
           }),
         });
         let json = {};
@@ -392,19 +463,23 @@
     document.getElementById('runBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBtn');
       if (currentTab === 'safety') {
-        const p = {
+        const p = addReference({
           subject:  document.getElementById('safety-subject').value,
           activity: document.getElementById('safety-activity').value.trim(),
           materials:document.getElementById('safety-materials').value.trim(),
           lab_level:document.getElementById('safety-level').value,
-        };
+        }, 'safety');
         if (!p.activity) { showToast('Enter an activity first', 'warning'); return; }
+        const safetyReferenceText = [p.notes, referenceFiles.safety.text].filter(Boolean).join('\n\n');
+        if (safetyReferenceText) {
+          p.materials = [p.materials, `Reference notes: ${safetyReferenceText}`].filter(Boolean).join('\n\n');
+        }
 
         // Step 1: image first — show contextual lab-safety setup
         const imgConcept = `Laboratory safety setup for ${p.activity}: PPE, fume hood, emergency equipment, organized bench`;
         const textPanel = document.getElementById('lab-out-text');
         textPanel.innerHTML = '<div class="placeholder">⏳ Generating safety scene image first…</div>';
-        await generateContextImage(imgConcept, p.subject, btn);
+        await generateContextImage(imgConcept, p.subject, btn, p);
 
         // Step 2: stream the safety report into the text panel
         const url = window.STREAM_URLS && window.STREAM_URLS.safety_assistant;
@@ -419,13 +494,15 @@
         }
       }
       else if (currentTab === 'image') {
-        const p = {
+        const p = addReference({
           subject: document.getElementById('image-subject').value,
           concept: document.getElementById('image-concept').value.trim(),
           style:   document.getElementById('image-style').value,
           detail:  document.getElementById('image-detail').value,
-        };
+        }, 'image');
         if (!p.concept) { showToast('Enter a concept first', 'warning'); return; }
+        const imageReferenceText = [p.notes, referenceFiles.image.text].filter(Boolean).join('\n\n');
+        if (imageReferenceText) p.concept += `\n\nReference instructions: ${imageReferenceText}`;
         // Image gen is JSON / non-streaming
         const text = document.getElementById('lab-out-text');
         text.innerHTML = skeletonHTML();
@@ -475,18 +552,20 @@
         }
       }
       else if (currentTab === 'whatif') {
-        const p = {
+        const p = addReference({
           subject:  document.getElementById('whatif-subject').value,
           scenario: document.getElementById('whatif-scenario').value.trim(),
           realism:  document.getElementById('whatif-realism').value,
-        };
+        }, 'whatif');
         if (!p.scenario) { showToast('Enter a scenario first', 'warning'); return; }
+        const whatIfReferenceText = [p.notes, referenceFiles.whatif.text].filter(Boolean).join('\n\n');
+        if (whatIfReferenceText) p.scenario += `\n\nReference notes: ${whatIfReferenceText}`;
 
         // Step 1: image first — visualize the scenario
         const imgConcept = `Conceptual scientific illustration of: ${p.scenario}`;
         const textPanel = document.getElementById('lab-out-text');
         textPanel.innerHTML = '<div class="placeholder">⏳ Visualizing scenario first…</div>';
-        await generateContextImage(imgConcept, p.subject, btn);
+        await generateContextImage(imgConcept, p.subject, btn, p);
 
         // Step 2: stream the timeline text
         const url = window.STREAM_URLS && window.STREAM_URLS.what_happens_if;
@@ -537,6 +616,10 @@
         document.getElementById('whatif-scenario').value = '';
         document.getElementById('whatif-realism').selectedIndex = 0;
       }
+      document.getElementById(`${currentTab}-notes`).value = '';
+      document.getElementById(`${currentTab}-file-info`).textContent = '';
+      document.getElementById(`${currentTab}-file`).value = '';
+      referenceFiles[currentTab] = { data: null, mime: null, name: null, text: '' };
       clearPanel('lab-out-text', 'Result text will appear here…');
       setImageState('placeholder');
     });
@@ -556,5 +639,7 @@
       window.GlobalChat && window.GlobalChat.injectContent(text, currentTab, labels[currentTab]);
     });
   </script>
+  <script src="redesign.js"></script>
+  <script src="ui-icons.js"></script>
 </body>
 </html>

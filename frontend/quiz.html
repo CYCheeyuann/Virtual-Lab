@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quiz Generator</title>
   <meta name="description" content="AI-powered quiz generator with outline refinement, strict JSON questions, and interactive grading." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📝</text></svg>" />
+  <link rel="icon" href="assets/icons/lab-mark.svg" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="global-chat.css" />
   <link rel="stylesheet" href="toolkit.css" />
   <link rel="stylesheet" href="feedback.css" />
+  <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="ui-icons.css" />
 </head>
 <body>
 
@@ -65,12 +67,19 @@
         <option value="20">20</option>
       </select>
 
-      <label>Reference Document (optional)</label>
-      <div class="dropzone" id="dz">
-        <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
-        <p>📄 Drag &amp; drop or click to upload</p>
-        <small>PDF · DOCX · TXT · Images · JSON</small>
-        <div class="file-info" id="file-info"></div>
+      <div class="reference-input-group">
+        <label for="sourceNotes">Notes (optional)</label>
+        <textarea id="sourceNotes" class="input" rows="4" maxlength="4000"
+          placeholder="Write the learning points, syllabus focus, or source notes for this quiz..."></textarea>
+
+        <div class="reference-or"><span>or attach a reference document</span></div>
+        <label>Reference Document (optional)</label>
+        <div class="dropzone" id="dz" role="button" tabindex="0">
+          <input type="file" id="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.pptx,.csv,.json,.html,.txt" hidden />
+          <p>Drag &amp; drop a file here, or click to browse</p>
+          <small>PDF · DOCX · PPTX · TXT · Images · CSV · JSON · HTML</small>
+          <div class="file-info" id="file-info"></div>
+        </div>
       </div>
 
       <div class="btn-row" style="margin-top:18px">
@@ -240,15 +249,19 @@
       }
 
       setButtonLoading(btn, true, 'Generating outline…');
+      const notes = document.getElementById('sourceNotes').value.trim();
+      const requestTopic = notes ? `${topic}\n\nReference notes:\n${notes}` : topic;
       const body = {
         action: 'outline',
         subject: document.getElementById('subject').value,
-        topic,
+        topic: requestTopic,
         difficulty: document.getElementById('difficulty').value,
+        notes,
       };
       if (uploadedFile.data) {
         body.file_data = uploadedFile.data;
         body.file_mime = uploadedFile.mime;
+        body.file_name = uploadedFile.name;
       }
 
       try {
@@ -319,6 +332,7 @@
         ...quizMeta,
         outline,
         num_questions: quizMeta.numQ,
+        notes: document.getElementById('sourceNotes').value.trim(),
       };
 
       try {
@@ -586,6 +600,10 @@
     document.getElementById('newQuizBtn').addEventListener('click', () => {
       quizData = [];
       userAnswers = {};
+      document.getElementById('sourceNotes').value = '';
+      document.getElementById('file-info').textContent = '';
+      document.getElementById('file').value = '';
+      uploadedFile = { data: null, mime: null, name: null };
       unlockChatbox();
       showPhase('phase-setup');
     });
@@ -629,5 +647,7 @@
       }
     });
   </script>
+  <script src="redesign.js"></script>
+  <script src="ui-icons.js"></script>
 </body>
 </html>

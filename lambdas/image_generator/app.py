@@ -41,7 +41,7 @@ app.url_map.strict_slashes = False
 # Claude (text) — global inference profile, invoked from Singapore.
 TEXT_REGION    = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
 TEXT_MODEL_ID  = os.environ.get("MODEL_ID",
-                                "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+                                "global.anthropic.claude-haiku-5-5")
 
 # Image model — Stability AI SD 3.5 Large in us-west-2.
 # Switched from Titan v2 / Nova Canvas (us-east-1) because account 298493766605

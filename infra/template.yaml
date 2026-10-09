@@ -80,6 +80,7 @@ Globals:
         API_KEY:        !Ref ApiKey
         AI_FUNCTION_NAME: !Ref AWS::StackName  # falls back if Lambda doesn't pass an explicit one
         ENVIRONMENT:    !Ref Environment
+        MODEL_ID:       global.anthropic.claude-haiku-5-5
 
 Resources:
   # ─── IAM Role ───────────────────────────────────────────────────────────────
@@ -105,15 +106,15 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              # Claude Haiku 4.5 — invoked through the GLOBAL inference profile
+              # Claude Haiku 5.5 — invoked through the GLOBAL inference profile
               # from any region (we call it from ap-southeast-1).
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
                 Resource:
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0"
-                  - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/global.anthropic.claude-haiku-5-5"
+                  - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-5-5"
               # Image generation — Stability AI SD 3.5 Large in us-west-2.
               # Nova Canvas kept in IAM as a future option (no cost until invoked).
               - Effect: Allow
@@ -336,7 +337,7 @@ Resources:
           ALLOWED_ORIGIN: !Ref AllowedOrigin
           # Claude (text) runs in Singapore via global inference profile.
           BEDROCK_REGION: ap-southeast-1
-          MODEL_ID: global.anthropic.claude-haiku-4-5-20251001-v1:0
+          MODEL_ID: global.anthropic.claude-haiku-5-5
           # Stability AI SD 3.5 Large in us-west-2.
           # Account 298493766605 has SD 3.5 Marketplace agreement signed; it
           # does NOT have Titan v2 enabled in us-east-1, hence the swap.

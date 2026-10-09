@@ -39,7 +39,7 @@ app.url_map.strict_slashes = False
 # ── Config ──────────────────────────────────────────────────────────────────
 TEXT_REGION   = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
 TEXT_MODEL_ID = os.environ.get("MODEL_ID",
-                               "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+                               "global.anthropic.claude-haiku-5-5")
 
 # Stability SD 3.5 Large is only available in us-west-2 at time of writing.
 # Hard-coded (NOT env-overridable) per the spec — keeps a misconfigured env

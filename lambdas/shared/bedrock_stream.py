@@ -27,7 +27,7 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger(__name__)
 
 REGION = os.environ.get("BEDROCK_REGION", "ap-southeast-1")
-MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-haiku-5-5")
 
 _client = None
 
@@ -122,6 +122,8 @@ def stream_bedrock(messages, system=None, max_tokens=4096, *, function_name=None
     }
     if system:
         body["system"] = system
+    if MODEL_ID.endswith("anthropic.claude-haiku-5-5"):
+        body["output_config"] = {"effort": "low"}
 
     logger.info(
         "Invoking Bedrock model=%s region=%s max_tokens=%s",
@@ -219,6 +221,10 @@ def invoke_bedrock_buffered(
     timer = CallTimer()
     timer.__enter__()
     try:
+        if model_id.endswith("anthropic.claude-haiku-5-5"):
+            request = json.loads(body)
+            request.setdefault("output_config", {}).setdefault("effort", "low")
+            body = json.dumps(request)
         resp = client.invoke_model(modelId=model_id, body=body)
         payload = json.loads(resp["body"].read())
     except ClientError as e:

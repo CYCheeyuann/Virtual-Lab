@@ -152,11 +152,12 @@
 
 .gc-msg {
   max-width: 88%;
+  min-width: 0;
   padding: 10px 13px;
   border-radius: 14px;
   font-size: 0.88rem;
   line-height: 1.5;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
   animation: gcMsgIn 0.22s ease-out;
 }
@@ -214,7 +215,9 @@
   background: var(--c-bg-glass);
 }
 .gc-input {
-  flex: 1;
+  flex: 1 1 auto;
+  /* min-width:0 so a long value can't push the Send button out of the row. */
+  min-width: 0;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--c-card-border);
@@ -240,6 +243,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* Never shrink away when the input holds a long value. */
+  flex: 0 0 auto;
+  white-space: nowrap;
   transition: transform 0.12s;
 }
 .gc-send-btn:hover { transform: translateY(-1px); }
@@ -251,11 +257,21 @@
     right: 8px;
     left: 8px;
     width: auto;
-    bottom: 96px;
-    height: 72vh;
+    /* dvh follows the visible viewport as the address bar / keyboard change
+       size, and the panel height is capped so the input row never ends up
+       under the software keyboard. safe-area keeps the FAB clear of the home
+       bar. */
+    /* Lift above the software keyboard when open (var set by the
+       visualViewport handler in global-chat.js); 0 when no keyboard. */
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px));
+    height: min(72dvh, 72vh);
+    max-height: calc(100dvh - 120px - var(--kb-inset, 0px));
   }
-  .gc-fab { right: 14px; bottom: 14px; width: 62px; height: 62px; font-size: 1.6rem; }
+  .gc-fab { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; font-size: 1.6rem; }
   .gc-bubble-hint { right: 82px; bottom: 28px; font-size: 0.75rem; }
+  /* 16px avoids iOS focus zoom; defined here (global-chat.css loads after
+     styles.css) so it wins for the chat input. */
+  .gc-input { font-size: 16px; }
 }
 
 /* Print: hide globally */

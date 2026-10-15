@@ -140,3 +140,82 @@ class TestSecurityProperties:
         client.post("/", json={"subject": "Biology", "concept": "Cell"})
         first_body = json.loads(mock_bedrock.invoke_model.call_args_list[0].kwargs["body"])
         assert "SECURITY RULE" in first_body["system"]
+
+
+class TestErrorLoggingPerStage:
+    """A single _bedrock_error() serves both pipeline stages. These tests make
+    the text stage and the image stage each raise AccessDeniedException and
+    assert the log line names the correct stage / model / region, and never
+    leaks the API key or image bytes."""
+
+    _DENY = {
+        "Error": {
+            "Code": "AccessDeniedException",
+            "Message": "User is not authorized to perform: bedrock:InvokeModel",
+        },
+        "ResponseMetadata": {"RequestId": "req-abc-123", "HTTPStatusCode": 403},
+    }
+
+    def test_text_stage_access_denied_logs_text_model_region(
+        self, mock_bedrock, app_for, caplog
+    ):
+        mod, client = app_for("image_generator")
+        # First invoke (Claude text expand) is denied.
+        mock_bedrock.invoke_model.side_effect = ClientError(self._DENY, "InvokeModel")
+        with caplog.at_level("ERROR"):
+            resp = client.post(
+                "/", json={"subject": "Biology", "concept": "Cell", "detail": "Simple"}
+            )
+        assert resp.status_code == 500
+        line = "\n".join(r.getMessage() for r in caplog.records)
+        assert "stage=text" in line
+        assert mod.TEXT_MODEL_ID in line
+        assert mod.TEXT_REGION in line
+        assert "req-abc-123" in line and "httpStatus=403" in line
+        # The text stage must NOT be mislabelled with the image model/region.
+        assert "stage=image" not in line
+        assert mod.IMAGE_MODEL_ID not in line
+
+    def test_image_stage_access_denied_logs_image_model_region(
+        self, mock_bedrock, app_for, caplog
+    ):
+        mod, client = app_for("image_generator")
+        claude = json.dumps({"explanation": "## X", "image_prompt": "a labelled cell"})
+        # First invoke (Claude) succeeds; second (Stability image) is denied.
+        mock_bedrock.invoke_model.side_effect = [
+            _claude_response_body(claude),
+            ClientError(self._DENY, "InvokeModel"),
+        ]
+        with caplog.at_level("ERROR"):
+            resp = client.post(
+                "/", json={"subject": "Biology", "concept": "Cell", "detail": "Simple"}
+            )
+        assert resp.status_code == 500
+        line = "\n".join(r.getMessage() for r in caplog.records)
+        assert "stage=image" in line
+        assert mod.IMAGE_MODEL_ID in line
+        assert mod.IMAGE_REGION in line
+        assert "req-abc-123" in line and "httpStatus=403" in line
+        # The image stage must NOT be mislabelled with the text model/region.
+        assert "stage=text" not in line
+
+    def test_error_log_does_not_leak_api_key_or_image_bytes(
+        self, mock_bedrock, app_for, caplog, monkeypatch
+    ):
+        monkeypatch.setenv("API_KEY", "super-secret-key-value")
+        mod, client = app_for("image_generator")
+        claude = json.dumps({"explanation": "## X", "image_prompt": "a labelled cell"})
+        mock_bedrock.invoke_model.side_effect = [
+            _claude_response_body(claude),
+            ClientError(self._DENY, "InvokeModel"),
+        ]
+        with caplog.at_level("INFO"):
+            client.post(
+                "/",
+                json={"subject": "Biology", "concept": "Cell"},
+                headers={"X-Api-Key": "super-secret-key-value"},
+            )
+        logged = "\n".join(r.getMessage() for r in caplog.records)
+        assert "super-secret-key-value" not in logged
+        assert "FAKEBASE64IMAGE" not in logged
+        assert "image_base64" not in logged

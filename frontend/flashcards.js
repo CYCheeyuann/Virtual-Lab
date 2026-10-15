@@ -1,6 +1,39 @@
 /* ─── Smart Flashcards — Storage + Leitner engine + UI controller ───── */
+
+/* Pure gesture classifier shared by the touch handler and the regression test.
+ * Returns one of: 'flip' | 'grade-hard' | 'grade-easy' | 'none'.
+ * Keeping this pure (no DOM) lets flashcards.test.js assert the single-tap /
+ * swipe / scroll outcomes without a browser. */
+function classifyFlashcardGesture(dx, dy, dt, moved) {
+  const absX = Math.abs(dx), absY = Math.abs(dy);
+  const horizontalish = absX > absY * 1.5;
+  const v = absX / Math.max(1, dt);
+  const big = absX > 60 && v > 0.3;
+  if (horizontalish && big) return dx < 0 ? 'grade-hard' : 'grade-easy';
+  if (absY > 12 && absY >= absX) return 'none';       // vertical scroll
+  if (absX < 10 && absY < 10 && !moved) return 'flip'; // tap
+  return 'none';
+}
+/* Shared click-suppression decision used by BOTH the stage click handler and
+ * the regression test, so the test exercises the real logic rather than a
+ * copy. Given the current suppress flag, returns whether this click should
+ * flip and what the flag becomes next. A touch tap arms suppression in
+ * pointerup, so the synthetic click that follows is swallowed exactly once. */
+function decideClickFlip(suppressNextClick) {
+  if (suppressNextClick) return { flip: false, suppressNextClick: false };
+  return { flip: true, suppressNextClick: false };
+}
+/* istanbul ignore next */
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { classifyFlashcardGesture, decideClickFlip };
+}
+
 (function () {
   'use strict';
+
+  // In a non-browser context (the Node regression test requires this file only
+  // for the pure classifier above) there is no DOM — skip the UI controller.
+  if (typeof window === 'undefined') return;
 
   // ══════════════════════════════════════════════════════════════════════
   // STORAGE
@@ -466,7 +499,8 @@
     queue: [],
     idx: 0,
     breakdown: { hard: 0, okay: 0, easy: 0 },
-    pointer: { down: false, x0: 0, y0: 0, t0: 0 },
+    pointer: { down: false, moved: false, x0: 0, y0: 0, t0: 0 },
+    suppressNextClick: false,
   };
 
   function startStudy(deckId) {
@@ -624,33 +658,53 @@
     else if (e.key === '3') { e.preventDefault(); grade('easy'); }
   }
 
-  // Pointer events — kept only for swipe-grade on touch devices.
-  // Note: on desktop, click flips via the dedicated click listener (left-click only).
+  // Pointer events — on touch they own BOTH tap-to-flip and swipe-to-grade.
+  // The synthesized click that follows a touch tap is suppressed (see
+  // suppressNextClick) so a single tap never flips twice. Desktop mouse flips
+  // through the click listener only.
   function onPointerDown(e) {
     if (!ui.overlayOpen) return;
     if (e.pointerType !== 'touch') return;   // desktop uses click handler instead
     ui.pointer.down = true;
+    ui.pointer.moved = false;
     ui.pointer.x0 = e.clientX; ui.pointer.y0 = e.clientY; ui.pointer.t0 = Date.now();
+  }
+  function onPointerMove(e) {
+    if (!ui.pointer.down || e.pointerType !== 'touch') return;
+    if (Math.abs(e.clientX - ui.pointer.x0) > 10 ||
+        Math.abs(e.clientY - ui.pointer.y0) > 10) {
+      ui.pointer.moved = true;
+    }
+  }
+  // A gesture that the browser turns into a scroll (or that leaves the card)
+  // fires pointercancel — treat it as "no tap, no grade", and still swallow the
+  // stray click so we don't flip after a scroll.
+  function onPointerCancel(e) {
+    if (e.pointerType !== 'touch') return;
+    ui.pointer.down = false;
+    ui.pointer.moved = false;
+    ui.suppressNextClick = true;
+    setTimeout(() => { ui.suppressNextClick = false; }, 400);
   }
   function onPointerUp(e) {
     if (!ui.pointer.down) return;
     ui.pointer.down = false;
     if (e.pointerType !== 'touch') return;
+    // Any touch interaction on the stage must swallow the browser's synthetic
+    // click so tap-flip (handled here) is not immediately undone by click.
+    ui.suppressNextClick = true;
+    setTimeout(() => { ui.suppressNextClick = false; }, 400);
+
     const dx = e.clientX - ui.pointer.x0;
     const dy = e.clientY - ui.pointer.y0;
     const dt = Math.max(1, Date.now() - ui.pointer.t0);
-    const horizontalish = Math.abs(dx) > Math.abs(dy) * 1.5;
-    const v = Math.abs(dx) / dt;       // px/ms
-    const big = Math.abs(dx) > 60 && v > 0.3;
-    // Tap (tiny movement) = flip on touch
-    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
-      flipCard();
-      return;
-    }
-    // Horizontal swipe = grade (touch shortcut, allowed regardless of flip state)
-    if (horizontalish && big) {
-      grade(dx < 0 ? 'hard' : 'easy');
-    }
+
+    // Single source of truth with the regression test. A swipe grades (and
+    // never also flips); a vertical scroll does nothing; a tiny tap flips once.
+    const outcome = classifyFlashcardGesture(dx, dy, dt, ui.pointer.moved);
+    if (outcome === 'grade-hard')      grade('hard');
+    else if (outcome === 'grade-easy') grade('easy');
+    else if (outcome === 'flip')       flipCard();
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -674,17 +728,23 @@
     // Wire study overlay events
     const stage = document.getElementById('fcStage');
     if (stage) {
-      // v2: left-click only — filter out middle/right clicks
+      // Click flips for MOUSE only. A touch tap is handled in onPointerUp and
+      // the following synthetic click is swallowed via suppressNextClick, so a
+      // single tap flips exactly once.
       stage.addEventListener('click', (e) => {
         if (e.button !== 0) return;          // left-click only
         if (e.detail > 1) return;            // ignore double-click second event
-        flipCard();
+        const d = decideClickFlip(ui.suppressNextClick);
+        ui.suppressNextClick = d.suppressNextClick;
+        if (d.flip) flipCard();
       });
       // Block the context menu (right-click) so it doesn't feel like an interaction
       stage.addEventListener('contextmenu', (e) => e.preventDefault());
-      // Touch swipe support — desktop uses click handler above
+      // Touch tap-flip + swipe-grade; desktop mouse uses the click handler above.
       stage.addEventListener('pointerdown', onPointerDown);
+      stage.addEventListener('pointermove', onPointerMove, { passive: true });
       stage.addEventListener('pointerup', onPointerUp);
+      stage.addEventListener('pointercancel', onPointerCancel);
     }
     document.getElementById('fcExitBtn')?.addEventListener('click', exitStudy);
     document.querySelectorAll('.fc-grade').forEach(b => {

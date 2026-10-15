@@ -338,11 +338,12 @@ Resources:
           # Claude (text) runs in Singapore via global inference profile.
           BEDROCK_REGION: ap-southeast-1
           MODEL_ID: global.anthropic.claude-haiku-5-5
-          # Stability AI SD 3.5 Large in us-west-2.
-          # Account 298493766605 has SD 3.5 Marketplace agreement signed; it
-          # does NOT have Titan v2 enabled in us-east-1, hence the swap.
-          # IAM grants both Titan/Nova ARNs (us-east-1) and SD 3.5 (us-west-2)
-          # so to flip back, change just the env vars below.
+          # Stability AI SD 3.5 Large in us-west-2 (swapped in from Titan v2 /
+          # Nova Canvas in us-east-1). IAM grants both the Titan/Nova ARNs
+          # (us-east-1) and SD 3.5 (us-west-2), so flipping back is just an env
+          # var change below. Model access / Marketplace status is per-account
+          # and must be verified in the deployment account's Bedrock console —
+          # it is not asserted here and no account id is recorded as proof.
           IMAGE_REGION: us-west-2
           IMAGE_MODEL_ID: stability.sd3-5-large-v1:0
       FunctionUrlConfig:
@@ -422,7 +423,11 @@ Resources:
       DistributionConfig:
         Enabled: true
         Comment: !Sub "${AWS::StackName} — frontend HTTPS"
-        DefaultRootObject: index.html
+        # Root URL (/) serves the Welcome landing page. /index.html still serves
+        # the Dashboard, /welcome.html still works directly, and Welcome's own
+        # buttons link to index.html. Only the root object changed — this is NOT
+        # a site-wide redirect to Welcome.
+        DefaultRootObject: welcome.html
         PriceClass: PriceClass_100
         HttpVersion: http2
         IPV6Enabled: true
@@ -441,8 +446,12 @@ Resources:
           Compress: true
           # AWS-managed CachingOptimized policy (TTL 86400, gzip+brotli).
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
-        # SPA-friendly: 403/404 from the bucket falls back to index.html
-        # so deep links work even though the static site has multiple pages.
+        # SPA-friendly: 403/404 from the bucket falls back to index.html (the
+        # app Dashboard) so unknown deep links land in the app, not the
+        # marketing page. Deliberately left as /index.html — changing it to
+        # welcome.html would funnel every mistyped path to Welcome, which is the
+        # site-wide redirect behaviour we were asked NOT to introduce. The root
+        # entry is controlled by DefaultRootObject above, independently of this.
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200

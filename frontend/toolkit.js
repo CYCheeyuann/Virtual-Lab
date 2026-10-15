@@ -211,6 +211,13 @@
     panelOpen ? close() : open();
   }
   function open(tab) {
+    // On phones the two bottom panels would overlap and hide each other's
+    // controls, so opening the toolkit closes the floating chat first. On wider
+    // screens they can coexist, so we leave the chat alone there.
+    if (window.matchMedia('(max-width: 600px)').matches &&
+        window.GlobalChat && window.GlobalChat.isOpen) {
+      try { window.GlobalChat.close(); } catch (_) {}
+    }
     panelOpen = true;
     document.getElementById('tk-panel').classList.add('open');
     document.getElementById('tk-backdrop').classList.add('show');
@@ -426,5 +433,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  window.Toolkit = { open, close, toggle };
+  window.Toolkit = { open, close, toggle, get isOpen() { return panelOpen; } };
 })();

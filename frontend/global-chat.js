@@ -289,6 +289,12 @@
     const panel = document.getElementById('gc-panel');
     const fab   = document.getElementById('gc-fab');
     if (!panel) return;
+    // On phones, close the toolkit bottom-sheet first so the two panels don't
+    // overlap and hide each other's controls. Wider screens can show both.
+    if (window.matchMedia('(max-width: 600px)').matches &&
+        window.Toolkit && window.Toolkit.isOpen) {
+      try { window.Toolkit.close(); } catch (_) {}
+    }
     panel.classList.add('open');
     if (fab) fab.classList.add('hidden');
     isOpen = true;
@@ -357,7 +363,73 @@
       const fab = document.getElementById('gc-fab');
       if (fab) fab.addEventListener('click', hide, { once: true });
     }, 1200);
+
+    setupKeyboardInset();
   }
+
+  /* ── Software-keyboard handling (shared by chat + toolkit panels) ──────
+   * iOS does NOT shrink the layout viewport (or 100dvh) when the on-screen
+   * keyboard opens, so a bottom-anchored panel can sit behind it. We measure
+   * the keyboard overlap from visualViewport and publish it as the CSS var
+   * --kb-inset on <html>; bottom-anchored mobile panels add it to their
+   * bottom offset. Restores to 0 when the keyboard closes. Listeners are
+   * registered once and the handler is a no-op where visualViewport is
+   * absent (older desktop browsers) so nothing regresses there. */
+  // Tracks whether the viewport listeners are currently attached, so re-arming
+  // (e.g. after a BFCache restore) never double-binds.
+  let kbInsetActive = false;
+
+  function setupKeyboardInset() {
+    const vv = window.visualViewport;
+    const root = document.documentElement;
+    if (!vv) { root.style.setProperty('--kb-inset', '0px'); return; }
+
+    let raf = 0;
+    let focusoutTimer = 0;
+
+    const apply = () => {
+      raf = 0;
+      // Overlap = how much of the layout viewport bottom is covered by the
+      // keyboard = innerHeight - (visualViewport height + its top offset).
+      const overlap = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+      // Ignore tiny values (address-bar jitter) so we don't fight the UI.
+      root.style.setProperty('--kb-inset', (overlap > 80 ? overlap : 0) + 'px');
+    };
+    const onChange = () => { if (!raf) raf = requestAnimationFrame(apply); };
+    // Reset when a field blurs (keyboard dismissed) — some browsers don't fire
+    // a reliable resize on close.
+    const onFocusOut = () => {
+      if (focusoutTimer) clearTimeout(focusoutTimer);
+      focusoutTimer = setTimeout(() => { focusoutTimer = 0; apply(); }, 100);
+    };
+
+    const attach = () => {
+      if (kbInsetActive) return;         // never double-bind
+      kbInsetActive = true;
+      vv.addEventListener('resize', onChange);
+      vv.addEventListener('scroll', onChange);
+      document.addEventListener('focusout', onFocusOut);
+      apply();                           // recompute position immediately
+    };
+    const detach = () => {
+      if (!kbInsetActive) return;
+      kbInsetActive = false;
+      vv.removeEventListener('resize', onChange);
+      vv.removeEventListener('scroll', onChange);
+      document.removeEventListener('focusout', onFocusOut);
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (focusoutTimer) { clearTimeout(focusoutTimer); focusoutTimer = 0; }
+    };
+
+    // Page lifecycle: tear down when the page is hidden/cached, and re-arm +
+    // recompute when it is shown again (including BFCache restores where init()
+    // does NOT run a second time). These two stay bound for the page's life.
+    window.addEventListener('pagehide', detach);
+    window.addEventListener('pageshow', () => { attach(); apply(); });
+
+    attach();                            // initial arm
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

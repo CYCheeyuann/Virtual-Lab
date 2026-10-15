@@ -152,9 +152,9 @@
      *  Quiz Generator — 4-phase workflow + history + chatbox lock
      * ════════════════════════════════════════════════════════════════════ */
 
-    /* ── Markdown-safe escape: escapeHtml then render **bold** ── */
+    /* Keep model-generated emphasis neutral in questions and answers. */
     function quizHtml(s) {
-      return escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      return escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '$1');
     }
 
     // ── Button icons ──
@@ -436,8 +436,6 @@
         ['A','B','C','D'].forEach(letter => {
           const text = (q.options && q.options[letter]) || '';
           let cls = 'quiz-option disabled';
-          if (letter === q.correct_answer) cls += ' correct';
-          if (letter === picked && !isCorrect) cls += ' incorrect';
           if (letter === picked) cls += ' selected';
           optsHtml += `<div class="${cls}"><span class="opt-letter">${letter}</span><span>${quizHtml(text)}</span></div>`;
         });
@@ -446,7 +444,7 @@
           <div class="quiz-q-title">Q${qi + 1}. ${quizHtml(q.question_stem)}</div>
           <div class="quiz-options">${optsHtml}</div>
           <div class="quiz-explanation">
-            <strong>${picked ? (isCorrect ? '✅ Correct' : `❌ Correct: ${q.correct_answer}`) : '⚪ Not answered'}</strong><br/>
+            <strong>${picked ? (isCorrect ? '✅ Correct' : `❌ Correct: ${q.correct_answer}`) : `⚪ Not answered · Correct: ${q.correct_answer}`}</strong><br/>
             ${quizHtml(q.detailed_explanation || '')}
           </div>`;
         resultsContainer.appendChild(card);

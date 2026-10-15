@@ -643,8 +643,11 @@ label { color: #b6c8c5; font-size: .68rem; letter-spacing: .12em; }
 
 @media (max-width: 1120px) {
   .nav-toggle { display: block; }
-  .nav-links { position: absolute; top: calc(100% + 1px); left: 16px; right: 16px; display: grid; gap: 3px; max-height: 0; padding: 0 8px; overflow: hidden; opacity: 0; pointer-events: none; border: 1px solid transparent; border-radius: 0 0 18px 18px; background: rgba(4,16,23,.97); transition: max-height .35s ease, opacity .25s ease, padding .35s ease; }
-  .nav-links.is-open { max-height: 560px; padding: 10px 8px 14px; opacity: 1; pointer-events: auto; border-color: var(--exp-line); }
+  .nav-links { position: absolute; top: calc(100% + 1px); left: 16px; right: 16px; display: grid; gap: 3px; max-height: 0; padding: 0 8px; overflow: hidden; opacity: 0; visibility: hidden; pointer-events: none; border: 1px solid transparent; border-radius: 0 0 18px 18px; background: rgba(4,16,23,.97); transition: max-height .35s ease, opacity .25s ease, padding .35s ease, visibility .35s; }
+  /* Open menu is capped to the space below the navbar and scrolls internally
+     so every link stays reachable in landscape / short viewports. visibility
+     toggles so closed-menu links are removed from the tab order. */
+  .nav-links.is-open { max-height: calc(100dvh - 90px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 10px 8px 14px; opacity: 1; visibility: visible; pointer-events: auto; border-color: var(--exp-line); }
   .nav-link { padding: 11px 14px; }
   .nav-link-cta { margin: 4px 0 0; text-align: center; }
   .journey-rail { display: none; }
@@ -688,7 +691,17 @@ label { color: #b6c8c5; font-size: .68rem; letter-spacing: .12em; }
   .scroll-cue { display: none; }
   .story-stats { grid-template-columns: 1fr; }
   .story-stats div + div { border-left: 0; border-top: 1px solid var(--exp-line); }
-  .journey-camera-motion { filter: saturate(.9) contrast(1.08) brightness(.68); }
+  /* Mobile: steady full-cover background. No per-stop zoom/pan transform even
+     if the camera script is disabled, so the address bar resizing can't cause
+     jumps, over-zoom, or black edges. Desktop keeps its cinematic transforms
+     (set inline by the script above this breakpoint). */
+  .journey-camera-motion {
+    transform: scale(1) !important;
+    transform-origin: 50% 50% !important;
+    transition: none !important;
+    filter: saturate(.9) contrast(1.06) brightness(.7);
+  }
+  .journey-camera { position: sticky; }
   .journey-camera-shade { background: linear-gradient(180deg, rgba(2,9,13,.34), rgba(2,9,13,.14) 35%, rgba(2,9,13,.62) 100%); }
   .camera-location { left: 16px; bottom: 18px; padding: 10px 12px; }
   .camera-coordinates { display: none; }
@@ -705,6 +718,19 @@ label { color: #b6c8c5; font-size: .68rem; letter-spacing: .12em; }
   .step-icon { margin: 26px 0 20px; }
   .summit-content h2 { font-size: 3rem; }
   .expedition-footer { padding-inline: 16px; }
+}
+
+/* Phone landscape (e.g. 844×390): wider than 600px but still a phone, so apply
+   the same stable full-cover background as portrait phones instead of the heavy
+   desktop zoom/pan. Matches isMobileView() in welcome-video.js. */
+@media (max-height: 600px) and (pointer: coarse) {
+  .journey-camera-motion {
+    transform: scale(1) !important;
+    transform-origin: 50% 50% !important;
+    transition: none !important;
+    filter: saturate(.9) contrast(1.06) brightness(.7);
+  }
+  .journey-camera { position: sticky; }
 }
 
 @media (prefers-reduced-motion: reduce) {

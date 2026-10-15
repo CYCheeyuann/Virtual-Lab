@@ -37,10 +37,14 @@
 /* ── Deck library grid ───────────────────────────────────────────────── */
 .deck-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* min(100%, 280px) lets a card shrink to the container on 320px phones
+     instead of forcing a fixed 280px track that overflows. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 18px;
   margin-top: 18px;
 }
+.deck-title { overflow-wrap: anywhere; }
+.deck-subtitle { overflow-wrap: anywhere; }
 .deck-card {
   background: var(--c-bg-glass);
   backdrop-filter: blur(12px);
@@ -176,6 +180,10 @@
   perspective: 1600px;
   width: 100%;
   height: min(420px, 60vh);
+  /* Allow native vertical scrolling of long card content; horizontal gestures
+     are handled by the swipe-grade logic. This stops the browser from eating
+     vertical pans while still letting us read the horizontal swipe. */
+  touch-action: pan-y;
 }
 .fc-stage:focus-visible {
   outline: 2px solid var(--c-accent);
@@ -207,10 +215,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* "safe center" keeps short content centred but, when content is taller than
+     the card, falls back to flex-start so the TOP stays reachable (plain
+     "center" clips the overflowing top in flex scroll containers). */
+  justify-content: safe center;
   text-align: center;
   gap: 14px;
+  /* Long prompts/answers scroll inside the face instead of spilling out. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
+.fc-prompt, .fc-answer { max-width: 100%; overflow-wrap: anywhere; }
 .fc-front .fc-prompt {
   font-size: 1.4rem;
   font-weight: 700;
@@ -349,11 +365,29 @@
 
 /* ── Mobile tweaks ───────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  .fc-stage { width: 92vw; height: 56vh; }
+  /* Smaller overlay padding so the session gets more of the viewport, and the
+     session caps at the real available width (viewport minus overlay padding).
+     The stage then follows the session width instead of a hard 92vw that
+     ignored the overlay's left/right padding. */
+  .fc-overlay { padding: 14px; }
+  .fc-session { width: 100%; max-width: calc(100vw - 28px); gap: 10px; }
+  .fc-stage { width: 100%; height: min(56vh, 420px); }
   .fc-front .fc-prompt { font-size: 1.15rem; }
   .fc-back .fc-answer  { font-size: 1.0rem; }
-  .fc-grade { min-width: 100px; padding: 10px 16px; font-size: 0.88rem; }
+  .fc-face { padding: 22px 20px; }
+  .fc-grade { min-width: 90px; padding: 10px 14px; font-size: 0.88rem; }
+  .fc-actions { gap: 8px; }
   .fc-shortcut { display: none; }
+}
+
+/* ── Short / landscape viewports: keep exit + grading reachable ───────── */
+@media (max-height: 520px) {
+  .fc-overlay { padding: 10px; align-items: stretch; }
+  .fc-session { margin: auto 0; gap: 8px; }
+  .fc-stage { height: min(48vh, 260px); }
+  .fc-face { padding: 16px 18px; }
+  .fc-front .fc-prompt { font-size: 1.05rem; }
+  .fc-grade { padding: 8px 14px; }
 }
 
 /* ── Preview list (collapsed accordion of cards) ─────────────────────── */

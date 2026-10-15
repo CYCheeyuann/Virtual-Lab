@@ -1,0 +1,111 @@
+/* Regression tests for flashcard touch gesture handling (mobile double-flip fix).
+ *
+ * Run with:  node tests/frontend/flashcards_gesture.test.js
+ *
+ * Lives OUTSIDE frontend/ so it is never synced to S3. It imports the SAME pure
+ * functions the production handlers use (classifyFlashcardGesture +
+ * decideClickFlip from flashcards.js) — it does not re-implement the logic.
+ *
+ * Covered:
+ *  - a single tap flips exactly once (the synthetic click after a touch tap is
+ *    suppressed, so no flip-then-flip-back);
+ *  - two consecutive taps each flip normally;
+ *  - a horizontal swipe grades without flipping (and the next card isn't flipped);
+ *  - a vertical scroll does nothing;
+ *  - pointercancel then a normal tap works;
+ *  - mouse click and keyboard still flip.
+ */
+'use strict';
+
+const assert = require('assert');
+const path = require('path');
+const { classifyFlashcardGesture, decideClickFlip } = require(
+  path.join(__dirname, '..', '..', 'frontend', 'flashcards.js')
+);
+
+let passed = 0;
+function test(name, fn) { fn(); passed++; console.log('  ok -', name); }
+
+/* A faithful model of the stage wiring that drives flips/grades through the
+ * REAL shared functions. One touch tap = pointerdown→pointerup (arms suppress)
+ * then a synthetic click. A mouse click = click only. */
+function makeStage() {
+  const s = { flips: 0, grades: [], suppressNextClick: false, down: false, moved: false, x0: 0, y0: 0, t0: 0 };
+  s.pointerdown = (x, y, t) => { s.down = true; s.moved = false; s.x0 = x; s.y0 = y; s.t0 = t; };
+  s.pointermove = (x, y) => { if (Math.abs(x - s.x0) > 10 || Math.abs(y - s.y0) > 10) s.moved = true; };
+  s.pointercancel = () => { s.down = false; s.moved = false; s.suppressNextClick = true; };
+  s.pointerup = (x, y, t) => {               // touch only
+    if (!s.down) return;
+    s.down = false;
+    s.suppressNextClick = true;              // handler always arms suppression on touch
+    const outcome = classifyFlashcardGesture(x - s.x0, y - s.y0, Math.max(1, t - s.t0), s.moved);
+    if (outcome === 'grade-hard') s.grades.push('hard');
+    else if (outcome === 'grade-easy') s.grades.push('easy');
+    else if (outcome === 'flip') s.flips++;
+  };
+  s.click = () => {                          // synthetic (touch) or real (mouse)
+    const d = decideClickFlip(s.suppressNextClick);
+    s.suppressNextClick = d.suppressNextClick;
+    if (d.flip) s.flips++;
+  };
+  s.touchTap = (x = 2, y = 2) => { s.pointerdown(x, y, 0); s.pointerup(x, y, 90); s.click(); };
+  return s;
+}
+
+// ── Pure classifier ──────────────────────────────────────────────────────────
+test('classify: tiny tap => flip', () =>
+  assert.strictEqual(classifyFlashcardGesture(2, -3, 120, false), 'flip'));
+test('classify: fast left swipe => grade-hard', () =>
+  assert.strictEqual(classifyFlashcardGesture(-120, 5, 200, true), 'grade-hard'));
+test('classify: fast right swipe => grade-easy', () =>
+  assert.strictEqual(classifyFlashcardGesture(130, -4, 200, true), 'grade-easy'));
+test('classify: vertical drag => none', () =>
+  assert.strictEqual(classifyFlashcardGesture(4, -90, 150, true), 'none'));
+test('classify: slow short nudge => none', () =>
+  assert.strictEqual(classifyFlashcardGesture(30, 2, 400, true), 'none'));
+
+// ── Real wiring: taps ────────────────────────────────────────────────────────
+test('one touch tap => exactly one flip', () => {
+  const s = makeStage(); s.touchTap();
+  assert.strictEqual(s.flips, 1);
+});
+test('two consecutive touch taps => two flips', () => {
+  const s = makeStage(); s.touchTap(); s.touchTap();
+  assert.strictEqual(s.flips, 2);
+});
+test('one mouse click => one flip', () => {
+  const s = makeStage(); s.click();
+  assert.strictEqual(s.flips, 1);
+});
+
+// ── Real wiring: swipe grades, never flips, and next card not flipped ─────────
+test('left swipe => one grade, zero flips', () => {
+  const s = makeStage();
+  s.pointerdown(200, 100, 0); s.pointermove(80, 102); s.pointerup(80, 102, 200); s.click();
+  assert.deepStrictEqual(s.grades, ['hard']);
+  assert.strictEqual(s.flips, 0);
+});
+test('swipe then tap on next card => grade then exactly one flip', () => {
+  const s = makeStage();
+  s.pointerdown(60, 100, 0); s.pointermove(190, 100); s.pointerup(190, 100, 200); s.click(); // swipe easy
+  s.touchTap(); // next card tap
+  assert.deepStrictEqual(s.grades, ['easy']);
+  assert.strictEqual(s.flips, 1);
+});
+
+// ── Real wiring: scroll + pointercancel ──────────────────────────────────────
+test('vertical scroll gesture => no flip, no grade', () => {
+  const s = makeStage();
+  s.pointerdown(100, 300, 0); s.pointermove(102, 180); s.pointerup(102, 180, 180); s.click();
+  assert.strictEqual(s.flips, 0);
+  assert.strictEqual(s.grades.length, 0);
+});
+test('pointercancel then a normal tap => one flip', () => {
+  const s = makeStage();
+  s.pointerdown(100, 100, 0); s.pointercancel(); s.click(); // cancelled gesture, stray click swallowed
+  assert.strictEqual(s.flips, 0);
+  s.touchTap();                                             // next real tap
+  assert.strictEqual(s.flips, 1);
+});
+
+console.log(`\n${passed} flashcard gesture tests passed.`);

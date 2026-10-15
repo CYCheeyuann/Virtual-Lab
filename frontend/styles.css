@@ -258,6 +258,21 @@ label {
 .input::placeholder { color: rgba(255, 255, 255, 0.30); }
 select.input { cursor: pointer; }
 
+/* iOS Safari auto-zooms when a focused field has font-size < 16px. Bump form
+   controls to 16px on small screens to stop the zoom-in jump. User pinch-zoom
+   is NOT disabled (the viewport meta has no maximum-scale/user-scalable=no). */
+@media (max-width: 600px) {
+  .input,
+  input.input,
+  select.input,
+  textarea.input { font-size: 16px; }
+  /* NOTE: toolkit (.tk-conv-input/.tk-conv-select/.tk-search) and global chat
+     (.gc-input) controls get their 16px rule inside toolkit.css / global-chat.css
+     respectively — those stylesheets load AFTER styles.css, so a rule here would
+     be overridden by their default font-size. Keep each control's mobile size
+     in its own (last-loaded) stylesheet. */
+}
+
 /* Native <option> elements ignore most CSS but accept background-color and
    color in modern Chrome / Firefox / Safari. Without these overrides the
    browser falls back to the OS-level light dropdown which is unreadable
@@ -587,10 +602,14 @@ select option:hover {
   color: var(--c-text);
   transition: background 0.2s, border-color 0.2s, transform 0.1s;
 }
-.quiz-option:hover:not(:disabled) {
-  background: var(--c-accent-soft);
-  border-color: var(--c-accent);
-  transform: translateX(2px);
+/* Hover highlight only on real hover devices — on touch, a tapped option used
+   to keep the accent-colored hover and look like it was pre-marked correct. */
+@media (hover: hover) and (pointer: fine) {
+  .quiz-option:hover:not(:disabled) {
+    background: var(--c-accent-soft);
+    border-color: var(--c-accent);
+    transform: translateX(2px);
+  }
 }
 .quiz-option:disabled { cursor: default; }
 .quiz-option .opt-letter {
@@ -800,6 +819,8 @@ select option:hover {
   background: var(--c-bg-glass);
   border: 1px solid var(--c-border);
   border-radius: 14px;
+  max-width: 100%;
+  overflow-x: hidden;
   padding: 18px;
   margin-bottom: 12px;
   min-height: 280px;
@@ -815,8 +836,17 @@ select option:hover {
   max-width: 86%;
   font-size: 0.93rem;
   line-height: 1.55;
-  word-wrap: break-word;
+  /* Normal words wrap naturally; long URLs / no-space strings break instead of
+     stretching the bubble past the panel. min-width:0 lets the flex child
+     shrink below its content width. */
+  overflow-wrap: anywhere;
+  word-break: normal;
+  min-width: 0;
 }
+/* Code/pre inside a reply may need its own horizontal scroll rather than
+   breaking the token — keep that local to the code block only. */
+.chat-bubble pre { max-width: 100%; overflow-x: auto; }
+.chat-bubble code { overflow-wrap: anywhere; }
 .chat-bubble.user {
   background: linear-gradient(135deg, var(--c-accent-2), var(--c-accent));
   color: #14101e;
@@ -831,7 +861,10 @@ select option:hover {
   border: 1px solid var(--c-border);
 }
 .chat-input-row { display: flex; gap: 8px; align-items: stretch; }
-.chat-input-row .input { flex: 1; }
+/* min-width:0 so a long value/placeholder can't push the Send button out of
+   the row; the button keeps its intrinsic size and never shrinks away. */
+.chat-input-row .input { flex: 1 1 auto; min-width: 0; }
+.chat-input-row .btn-send { flex: 0 0 auto; white-space: nowrap; }
 
 /* ─── Landing-page tile grid (FeatureCard pattern) ──────────────────── */
 .tile-grid {
@@ -1434,8 +1467,15 @@ select option:hover {
   padding: 30px 32px;
   width: 600px;
   max-width: calc(100vw - 40px);
-  max-height: 75vh;
-  overflow-y: auto;
+  /* dvh tracks the real viewport in landscape / with browser UI. The panel
+     itself no longer scrolls — it is a flex column that caps its height, and
+     the inner #modal-content scrolls — so the absolutely-positioned close
+     button always stays in view, even at the bottom of long content. */
+  max-height: min(75vh, 75dvh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
   box-shadow: 0 24px 64px rgba(0,0,0,0.5);
   transform: scale(0.9);
   transition: transform 0.3s ease;
@@ -1464,6 +1504,15 @@ select option:hover {
   color: #f87171;
   transform: rotate(90deg);
   background: rgba(248,113,113,0.12);
+}
+/* The panel is a non-scrolling flex column (see .chapter-modal); its content
+   wrapper is the scroll region, so the close button stays pinned and visible. */
+.chapter-modal > #modal-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 36px;   /* clear the top-right close button */
 }
 .chapter-modal h2 { font-size: 1.4rem; margin-bottom: 14px; }
 .chapter-modal h3 { font-size: 1rem; color: var(--c-accent); margin: 16px 0 8px; font-weight: 600; }
@@ -1745,11 +1794,22 @@ select option:hover {
   border-radius: 18px;
   padding: 28px 32px;
   width: min(720px, 100%);
-  max-height: 80vh;
-  overflow-y: auto;
+  max-height: min(80vh, 80dvh);
+  /* Non-scrolling flex column: the close button and title stay pinned while
+     only .node-detail-body scrolls, so Close is always reachable. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
   position: relative;
   box-shadow: 0 20px 60px var(--c-shadow-strong);
   animation: nodeDetailIn 0.22s ease-out;
+}
+.node-detail-panel > .node-detail-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 @keyframes nodeDetailIn {
   from { opacity: 0; transform: scale(0.96); }

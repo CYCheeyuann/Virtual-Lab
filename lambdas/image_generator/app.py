@@ -44,10 +44,12 @@ TEXT_MODEL_ID  = os.environ.get("MODEL_ID",
                                 "global.anthropic.claude-haiku-5-5")
 
 # Image model — Stability AI SD 3.5 Large in us-west-2.
-# Switched from Titan v2 / Nova Canvas (us-east-1) because account 298493766605
-# has SD 3.5 Marketplace agreement signed but not Titan/Nova in us-east-1.
-# Stability's request body shape is different from Titan's; the code below
-# branches on model ID prefix to support both.
+# Switched from Titan v2 / Nova Canvas (us-east-1): the deployment uses SD 3.5
+# in us-west-2 instead. Whether any given AWS account actually has model access
+# or a Marketplace subscription must be verified in that account's Bedrock
+# console — it is NOT asserted here, and no account id is hard-coded as proof.
+# Stability's request body shape differs from Titan's; the code below branches
+# on model ID prefix to support both.
 IMAGE_REGION   = os.environ.get("IMAGE_REGION",   "us-west-2")
 IMAGE_MODEL_ID = os.environ.get("IMAGE_MODEL_ID", "stability.sd3-5-large-v1:0")
 
@@ -122,7 +124,9 @@ def handler(path):
     try:
         explanation, image_prompt = _claude_step(subject, concept, style, detail)
     except ClientError as e:
-        return _bedrock_error(e)
+        return _bedrock_error(
+            e, stage="text", model_id=TEXT_MODEL_ID, region=TEXT_REGION,
+        )
     except Exception:                 # noqa: BLE001
         logger.exception("Claude step failed")
         return _json_response(
@@ -130,11 +134,14 @@ def handler(path):
             status=500,
         )
 
-    # Step 2 — Titan/Nova renders the expanded prompt into a 1024×1024 PNG.
+    # Step 2 — Stability renders the expanded prompt into a 1024×1024 image.
     try:
         image_b64 = _image_step(image_prompt)
     except ClientError as e:
-        return _bedrock_error(e, fallback_text=explanation, prompt_used=image_prompt)
+        return _bedrock_error(
+            e, stage="image", model_id=IMAGE_MODEL_ID, region=IMAGE_REGION,
+            fallback_text=explanation, prompt_used=image_prompt,
+        )
     except Exception:                 # noqa: BLE001
         logger.exception("Image step failed")
         return _json_response(
@@ -273,11 +280,31 @@ def _json_response(obj, status=200):
     return Response(json.dumps(obj), status=status, headers=headers)
 
 
-def _bedrock_error(err, fallback_text=None, prompt_used=None):
-    """Log the raw Bedrock error to CloudWatch, return a friendly payload."""
-    code = err.response.get("Error", {}).get("Code", "")
-    msg  = err.response.get("Error", {}).get("Message", str(err))
-    logger.exception("Bedrock ClientError code=%s message=%s", code, msg)
+def _bedrock_error(err, *, stage, model_id, region,
+                   fallback_text=None, prompt_used=None):
+    """Log the raw Bedrock error to CloudWatch, return a friendly payload.
+
+    This helper serves BOTH pipeline stages (the Claude text expansion and the
+    Stability image render), which use different models and regions. The caller
+    passes the actual ``stage`` ("text" or "image"), ``model_id`` and
+    ``region`` so the log line names the failing model/region correctly instead
+    of always blaming the image step.
+
+    Logs the AWS error code, original error message, request id, and HTTP
+    status. Does NOT log any API key, image bytes, or the full user input —
+    only the stage/model/region and the model's own error fields.
+    """
+    error    = err.response.get("Error", {})
+    meta     = err.response.get("ResponseMetadata", {})
+    code     = error.get("Code", "")
+    msg      = error.get("Message", str(err))
+    req_id   = meta.get("RequestId", "")
+    http     = meta.get("HTTPStatusCode", "")
+    logger.exception(
+        "Bedrock ClientError stage=%s model=%s region=%s "
+        "code=%s httpStatus=%s requestId=%s message=%s",
+        stage, model_id, region, code, http, req_id, msg,
+    )
     payload = {"error": friendly_error(code, msg)}
     if fallback_text is not None:
         payload["explanation"]  = fallback_text

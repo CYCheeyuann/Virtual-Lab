@@ -613,14 +613,15 @@ select option:hover {
   animation: shakeBox 0.4s ease;
 }
 .quiz-option.incorrect .opt-letter { color: var(--c-error-fg); }
-/* During answering: selected but not yet graded */
+/* During answering: selected but not yet graded. Neutral styling only — no
+   correct/incorrect color so nothing is revealed before submission. */
 .quiz-option.selected {
-  background: var(--c-accent-soft);
-  border-color: var(--c-accent);
-  color: var(--c-accent-2);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--c-text);
+  color: var(--c-text);
   font-weight: 600;
 }
-.quiz-option.selected .opt-letter { color: var(--c-accent); }
+.quiz-option.selected .opt-letter { color: var(--c-text); }
 .quiz-option.disabled {
   cursor: default;
   pointer-events: none;
@@ -657,14 +658,16 @@ select option:hover {
   line-height: 1.6;
 }
 
-/* Quiz keyword highlighting — bold terms glow in accent color */
+/* Bold terms in quiz text stay neutral: emphasis via weight only, no accent
+   color and no glow, so the quiz never auto-highlights stems, options, status
+   text, or explanations. (Math sub/sup/formulas are unaffected.) */
 .quiz-question strong,
 .quiz-explanation strong,
 .quiz-q-title strong,
 .quiz-option strong {
   font-weight: 700;
-  color: var(--c-accent-2);
-  text-shadow: 0 0 6px var(--c-accent-glow);
+  color: inherit;
+  text-shadow: none;
 }
 
 /* Quiz progress bar */

@@ -124,10 +124,18 @@
       botBubble.innerHTML = '<span class="spinner"></span>Thinking…';
       panel.appendChild(botBubble);
 
+      // Create the follow-scroll controller NOW (before awaiting the network),
+      // so a user who scrolls up while waiting for the first chunk is already
+      // recorded as "not following" and won't be yanked back down. Shared
+      // helper (common.js) — same implementation the test drives.
+      const followScroll = (typeof window.createFollowScroll === 'function')
+        ? window.createFollowScroll(panel) : null;
+
       const url = window.STREAM_URLS.science_tutor;
       if (!url || url.startsWith('__URL_')) {
         botBubble.innerHTML = '<span class="error-msg">⚠️ Streaming URL not configured.</span>';
         showToast('Streaming URL not configured', 'error');
+        if (followScroll) followScroll.destroy();
         setButtonLoading(sendBtn, false);
         return;
       }
@@ -153,14 +161,18 @@
         const reader = resp.body.getReader();
         const dec = new TextDecoder('utf-8');
         let full = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          full += dec.decode(value, { stream: true });
-          botBubble.innerHTML = renderInline(full) + '<span class="streaming-cursor"></span>';
-          panel.scrollTop = panel.scrollHeight;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            full += dec.decode(value, { stream: true });
+            botBubble.innerHTML = renderInline(full) + '<span class="streaming-cursor"></span>';
+            if (followScroll) followScroll.onContentGrow();   // pin only if user is following
+          }
+        } finally {
+          botBubble.innerHTML = renderInline(full);
+          if (followScroll) { followScroll.settle(); followScroll.destroy(); }
         }
-        botBubble.innerHTML = renderInline(full);
         history.push({ role: 'user', content: message });
         history.push({ role: 'assistant', content: full });
         recordActivity(subject);
@@ -176,6 +188,7 @@
         botBubble.innerHTML = `<span class="error-msg">⚠️ ${err.message}</span>`;
         showToast(`Failed: ${err.message}`, 'error');
       } finally {
+        if (followScroll) followScroll.destroy();   // idempotent: remove scroll listener
         setButtonLoading(sendBtn, false);
       }
     }

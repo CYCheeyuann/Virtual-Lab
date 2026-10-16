@@ -1,6 +1,225 @@
 /* ─── Shared helpers for all pages ───────────────────────────────────── */
 
 /* ============================================================
+ *  SCROLL LOCK (reference-counted)
+ *  Multiple overlays (flashcard study, chapter/experiment detail,
+ *  future modals) may be layered. A plain `body.style.overflow=''`
+ *  on one overlay's close would prematurely unlock the background
+ *  while another overlay is still open. ScrollLock counts active
+ *  holders and only restores scrolling when the last one releases,
+ *  preserving and restoring the scroll position.
+ * ============================================================ */
+window.ScrollLock = (function () {
+  const holders = new Set();   // ownership tokens — idempotent per holder
+  let seq = 0;
+  let savedY = 0;
+  let savedInlineOverflow = '';
+  // lock([token]) returns a token. Calling lock again with the SAME token does
+  // nothing (idempotent) — a holder can only count once, so one overlay's
+  // repeated/animated close can't over-decrement another's lock.
+  function lock(token) {
+    if (token == null) token = 'lock-' + (++seq);
+    if (holders.has(token)) return token;   // idempotent
+    if (holders.size === 0) {
+      savedY = window.scrollY || document.documentElement.scrollTop || 0;
+      savedInlineOverflow = document.body.style.overflow;   // preserve prior inline value
+      document.body.style.overflow = 'hidden';
+    }
+    holders.add(token);
+    return token;
+  }
+  // release(token) frees only that holder; restoring styles + scroll position
+  // only when the LAST holder releases. Safe to call twice for the same token.
+  function release(token) {
+    if (token == null || !holders.has(token)) return;
+    holders.delete(token);
+    if (holders.size === 0) {
+      document.body.style.overflow = savedInlineOverflow;   // restore prior value, not blank
+      // Restore the scroll position in case hiding overflow shifted it.
+      try { window.scrollTo(0, savedY); } catch (_) {}
+    }
+  }
+  function reset() {
+    holders.clear();
+    document.body.style.overflow = savedInlineOverflow;
+  }
+  return {
+    lock, release, reset,
+    // Back-compat: unlock() without a token releases one anonymous holder.
+    unlock(token) { if (token != null) return release(token); const first = holders.values().next().value; if (first !== undefined) release(first); },
+    get count() { return holders.size; },
+  };
+})();
+
+/* ============================================================
+ *  FOLLOW-SCROLL (chat / stream auto-scroll)
+ *  Keeps a scroll container pinned to the bottom WHILE the user is at the
+ *  bottom, but stops yanking them down the moment they scroll up to read.
+ *  Driven by real scroll events (a selfScroll flag ignores our own writes),
+ *  and the follow state is initialised from the ACTUAL position at creation
+ *  time — so a user who scrolls up before the first streamed chunk arrives is
+ *  already recorded as "not following". Shared by tutor.html (and testable in
+ *  isolation) so runtime and tests use one implementation.
+ *  Usage: const fs = createFollowScroll(panel); ... fs.onContentGrow();
+ *         ... fs.destroy();
+ * ============================================================ */
+function createFollowScroll(panel, opts) {
+  const threshold = (opts && opts.threshold) || 60;
+  const raf = (typeof requestAnimationFrame === 'function')
+    ? requestAnimationFrame : (fn) => setTimeout(fn, 0);
+  const nearBottom = () =>
+    panel.scrollHeight - panel.scrollTop - panel.clientHeight < threshold;
+  let follow = nearBottom();     // initialise from the current real position
+  let selfScroll = false;
+  const onUserScroll = () => {
+    if (selfScroll) return;      // ignore our own programmatic scrollTop writes
+    follow = nearBottom();       // the user's position decides follow state
+  };
+  panel.addEventListener('scroll', onUserScroll, { passive: true });
+  const stickToBottom = () => {
+    selfScroll = true;
+    panel.scrollTop = panel.scrollHeight;
+    raf(() => { selfScroll = false; });
+  };
+  return {
+    // Call after content grows (new chunk): pin only if the user is following.
+    onContentGrow() { if (follow) stickToBottom(); },
+    // Call at stream end to settle at the bottom if still following.
+    settle() { if (follow) panel.scrollTop = panel.scrollHeight; },
+    isFollowing() { return follow; },
+    destroy() { panel.removeEventListener('scroll', onUserScroll); },
+  };
+}
+if (typeof window !== 'undefined') window.createFollowScroll = createFollowScroll;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Object.assign(module.exports || {}, { createFollowScroll });
+}
+
+/* ============================================================
+ *  MODAL FOCUS (small focus trap + restore)
+ *  trapFocus(panel, trigger) moves focus into the modal, keeps Tab/Shift+Tab
+ *  cycling inside it (so keyboard focus can't reach the background), and
+ *  returns a release() that restores focus to the trigger element (or a sane
+ *  fallback if it's gone / detached). No framework. Shared by chapter.html and
+ *  experiment.html.
+ * ============================================================ */
+function trapFocus(panel, trigger, fallbackResolver) {
+  if (!panel) return function () {};
+  const SEL = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const focusables = () => Array.prototype.filter.call(
+    panel.querySelectorAll(SEL),
+    (el) => el.offsetParent !== null || el === document.activeElement
+  );
+  // Move focus in: first focusable, else the panel itself.
+  const first = focusables()[0];
+  if (first) { try { first.focus({ preventScroll: true }); } catch (_) { first.focus(); } }
+  else if (panel.focus) { try { panel.setAttribute('tabindex', '-1'); panel.focus({ preventScroll: true }); } catch (_) {} }
+
+  const onKeydown = (e) => {
+    if (e.key !== 'Tab') return;
+    const items = focusables();
+    if (!items.length) { e.preventDefault(); return; }
+    const firstEl = items[0], lastEl = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === firstEl || !panel.contains(active))) {
+      e.preventDefault(); lastEl.focus();
+    } else if (!e.shiftKey && active === lastEl) {
+      e.preventDefault(); firstEl.focus();
+    } else if (!panel.contains(active)) {
+      // Focus escaped to the background somehow — pull it back in.
+      e.preventDefault(); firstEl.focus();
+    }
+  };
+  // Also guard against PROGRAMMATIC focus steals (e.g. a stale deferred
+  // focus() from the chat panel firing after the modal opened). If focus lands
+  // outside the panel while the modal is open, pull it back to the first item.
+  let guarding = true;
+  const onFocusIn = (e) => {
+    if (!guarding) return;
+    if (panel.contains(e.target)) return;
+    const items = focusables();
+    if (items.length) { try { items[0].focus({ preventScroll: true }); } catch (_) { items[0].focus(); } }
+  };
+  document.addEventListener('keydown', onKeydown, true);
+  document.addEventListener('focusin', onFocusIn, true);
+
+  let released = false;
+  return function release() {
+    if (released) return;              // idempotent — don't double-restore/unbind
+    released = true;
+    guarding = false;                  // stop pulling focus back BEFORE we restore
+    document.removeEventListener('keydown', onKeydown, true);
+    document.removeEventListener('focusin', onFocusIn, true);
+    // Restore to the trigger if it's still in the document; else a caller-
+    // provided fallback (e.g. the re-rendered card at the same index); else a
+    // generic sane target.
+    const alive = trigger && document.contains(trigger) && typeof trigger.focus === 'function';
+    let target = alive ? trigger : null;
+    if (!target && typeof fallbackResolver === 'function') {
+      try { const el = fallbackResolver(); if (el && document.contains(el)) target = el; } catch (_) {}
+    }
+    if (!target) target = document.querySelector('.navbar a, .nav-link, main h1, body') || null;
+    if (target && typeof target.focus === 'function') {
+      try { target.focus({ preventScroll: true }); } catch (_) { try { target.focus(); } catch (_) {} }
+    }
+  };
+}
+if (typeof window !== 'undefined') window.trapFocus = trapFocus;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Object.assign(module.exports || {}, { trapFocus });
+}
+
+/* ============================================================
+ *  OVERLAY LOCK CONTROLLER
+ *  The open/close bookkeeping shared by animated detail modals (chapter,
+ *  experiment): a single `open` flag, one owned ScrollLock token (so a
+ *  double/animated close can't over-decrement another overlay's lock), and a
+ *  hide timer that a reopen cancels. Pages and tests call this SAME helper so
+ *  the lifecycle can't drift between them. DOM-free: callers supply onShow/
+ *  onHide hooks.
+ *    const c = createOverlayLock({ onShow, onHide, hideMs });
+ *    c.open();            // idempotent while open; cancels a pending hide
+ *    c.close();           // idempotent; releases its own lock; schedules onHide
+ * ============================================================ */
+function createOverlayLock(opts) {
+  opts = opts || {};
+  const onShow = opts.onShow || function () {};
+  const onHide = opts.onHide || function () {};
+  const hideMs = opts.hideMs != null ? opts.hideMs : 300;
+  const setT = opts.setTimeout || (typeof setTimeout === 'function' ? setTimeout : null);
+  const clrT = opts.clearTimeout || (typeof clearTimeout === 'function' ? clearTimeout : null);
+  const SL = opts.scrollLock || (typeof window !== 'undefined' ? window.ScrollLock : null);
+
+  let open = false;
+  let token = null;
+  let hideTimer = 0;
+
+  return {
+    open() {
+      if (hideTimer && clrT) { clrT(hideTimer); hideTimer = 0; }   // cancel stale hide
+      if (open) return;                                            // idempotent
+      open = true;
+      if (SL) token = SL.lock(token || undefined);
+      onShow();
+    },
+    close() {
+      if (!open) return;                                           // idempotent
+      open = false;
+      if (SL) { SL.release(token); token = null; }
+      if (clrT && hideTimer) clrT(hideTimer);
+      if (setT) {
+        hideTimer = setT(() => { hideTimer = 0; if (!open) onHide(); }, hideMs);
+      } else if (!open) { onHide(); }
+    },
+    isOpen() { return open; },
+  };
+}
+if (typeof window !== 'undefined') window.createOverlayLock = createOverlayLock;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Object.assign(module.exports || {}, { createOverlayLock });
+}
+
+/* ============================================================
  *  SVG ICON LIBRARY
  *  Inline SVGs returned as strings, used everywhere instead
  *  of plain emoji/text on buttons.

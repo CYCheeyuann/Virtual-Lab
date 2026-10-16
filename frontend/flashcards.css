@@ -149,6 +149,13 @@
   gap: 14px;
   width: min(640px, 92vw);
   max-width: 100%;
+  /* Whole-session scroll fallback: if the stage + hint + grade buttons exceed
+     the overlay height (long hint, landscape, large text), the session scrolls
+     so the exit button (top) and grade buttons (bottom) stay reachable. The
+     stage uses flex:0 0 auto below so it is never squished by this. */
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   outline: none;
 }
 
@@ -180,6 +187,9 @@
   perspective: 1600px;
   width: 100%;
   height: min(420px, 60vh);
+  /* Keep the stage from being compressed when the session becomes a scroll
+     container (B2) — it holds its height and the session scrolls instead. */
+  flex: 0 0 auto;
   /* Allow native vertical scrolling of long card content; horizontal gestures
      are handled by the swipe-grade logic. This stops the browser from eating
      vertical pans while still letting us read the horizontal swipe. */
@@ -378,6 +388,10 @@
   .fc-grade { min-width: 90px; padding: 10px 14px; font-size: 0.88rem; }
   .fc-actions { gap: 8px; }
   .fc-shortcut { display: none; }
+  /* NOTE: the preview answer indent is reduced for phones in a media block
+     placed AFTER the base .preview-card-body rule (search "preview answer
+     indent"), because this earlier block would be overridden by the base
+     `padding` shorthand that appears later in the source. */
 }
 
 /* ── Short / landscape viewports: keep exit + grading reachable ───────── */
@@ -427,6 +441,10 @@
   border: 1px solid var(--c-border);
   border-radius: 12px;
   overflow: hidden;
+  /* flex-shrink:0 so a tall expanded card is NOT compressed by the flex column
+     (its overflow:hidden would then clip the content). The list itself scrolls
+     via overflow-y:auto, so cards keep their natural height. */
+  flex: 0 0 auto;
   transition: border-color 0.2s;
 }
 .preview-card[open] {
@@ -454,6 +472,8 @@
 }
 .preview-q-text {
   flex: 1;
+  min-width: 0;                 /* allow shrink so long questions wrap */
+  overflow-wrap: anywhere;      /* break long URLs / no-space strings */
   color: var(--c-text-strong);
   line-height: 1.45;
 }
@@ -480,6 +500,14 @@
 .preview-back  { color: var(--c-text); font-size: 0.88rem; line-height: 1.55; }
 .preview-back strong { color: var(--c-accent-2); }
 .preview-hint  { color: var(--c-muted); font-size: 0.82rem; font-style: italic; }
+
+/* preview answer indent — phones: this comes AFTER the base .preview-card-body
+   `padding` shorthand above, so it actually wins (a media block earlier in the
+   file would be re-expanded by that shorthand). Full shorthand keeps all four
+   sides explicit so nothing later silently resets the left padding. */
+@media (max-width: 600px) {
+  .preview-card-body { padding: 4px 14px 14px 22px; }
+}
 
 /* ── Reduced motion: drop the 3D flip in favor of an opacity swap ────── */
 @media (prefers-reduced-motion: reduce) {

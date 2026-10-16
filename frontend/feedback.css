@@ -12,7 +12,12 @@
   font-size: 0.85rem;
   color: var(--c-muted, #a3a3a3);
   user-select: none;
+  /* After a vote, a status label ("Thanks!" / offline) is appended. Allow the
+     row to wrap and cap its width so it never overflows a narrow card. */
+  flex-wrap: wrap;
+  max-width: 100%;
 }
+.fb-widget .fb-status { overflow-wrap: anywhere; }
 
 .fb-widget .fb-label {
   margin-right: 4px;

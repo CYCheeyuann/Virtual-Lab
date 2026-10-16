@@ -19,7 +19,7 @@
 
 const assert = require('assert');
 const path = require('path');
-const { classifyFlashcardGesture, decideClickFlip } = require(
+const { classifyFlashcardGesture, decideClickFlip, reducePointerGesture, createGestureState } = require(
   path.join(__dirname, '..', '..', 'frontend', 'flashcards.js')
 );
 
@@ -106,6 +106,122 @@ test('pointercancel then a normal tap => one flip', () => {
   assert.strictEqual(s.flips, 0);
   s.touchTap();                                             // next real tap
   assert.strictEqual(s.flips, 1);
+});
+
+// ── Multi-touch state machine (real reducePointerGesture used by runtime) ────
+// Uses the SAME createGestureState()/reducePointerGesture() the production
+// pointer handlers call (flashcards.js dispatchGesture), so these drive the
+// real state machine, not a copy.
+function run(events) {
+  let st = createGestureState();
+  const actions = [];
+  for (const ev of events) {
+    const r = reducePointerGesture(st, ev);
+    st = r.state;
+    if (r.action) actions.push(r.action);
+  }
+  return { st, actions };
+}
+
+test('multi: single-finger tap => one flip', () => {
+  const { actions } = run([
+    { type: 'down', pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'up',   pointerId: 1, x: 102, y: 101, t: 90 },
+  ]);
+  assert.deepStrictEqual(actions, ['flip']);
+});
+
+test('multi: second finger covers start, first lifts => NO grade (cancelled)', () => {
+  // finger1 down at x=100; finger2 down at x=200 (covers start); finger1 up at
+  // x=100 → naive dx would be -100 (grade-hard), but multi-touch cancels it.
+  const { actions } = run([
+    { type: 'down', pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'down', pointerId: 2, x: 200, y: 100, t: 20 },
+    { type: 'up',   pointerId: 1, x: 100, y: 100, t: 220 },
+  ]);
+  assert.deepStrictEqual(actions, []);
+});
+
+test('multi: second finger lifts first (different order) => NO action', () => {
+  const { actions } = run([
+    { type: 'down', pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'down', pointerId: 2, x: 200, y: 100, t: 20 },
+    { type: 'up',   pointerId: 2, x: 240, y: 100, t: 120 },  // 2nd finger up first — ignored
+    { type: 'up',   pointerId: 1, x: 100, y: 100, t: 200 },  // tracked finger up — cancelled
+  ]);
+  assert.deepStrictEqual(actions, []);
+});
+
+test('multi: tracked-finger pointercancel then fresh tap => one flip', () => {
+  const { actions } = run([
+    { type: 'down',   pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'cancel', pointerId: 1, x: 100, y: 100, t: 50 },
+    { type: 'down',   pointerId: 2, x: 50,  y: 50,  t: 300 },
+    { type: 'up',     pointerId: 2, x: 52,  y: 51,  t: 380 },
+  ]);
+  assert.deepStrictEqual(actions, ['flip']);
+});
+
+test('multi: clean left swipe (single finger) => grade-hard', () => {
+  const { actions } = run([
+    { type: 'down', pointerId: 1, x: 200, y: 100, t: 0 },
+    { type: 'move', pointerId: 1, x: 90,  y: 102, t: 100 },
+    { type: 'up',   pointerId: 1, x: 80,  y: 102, t: 200 },
+  ]);
+  assert.deepStrictEqual(actions, ['grade-hard']);
+});
+
+test('multi: secondary pointer up during single gesture is ignored, then tracked tap flips', () => {
+  const { actions } = run([
+    { type: 'down', pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'up',   pointerId: 9, x: 300, y: 300, t: 40 },   // stray/unknown pointer up — ignored
+    { type: 'up',   pointerId: 1, x: 101, y: 101, t: 90 },   // tracked finger tap
+  ]);
+  assert.deepStrictEqual(actions, ['flip']);
+});
+
+// ── The review's exact "poison must persist until ALL fingers lift" sequence ──
+test('multi: f1 down, f2 down, f1 up, f2 STILL held, f3 down+swipe => NO grade', () => {
+  // Previously the single-id tracker cleared on f1 up and let f3 start a fresh
+  // single-finger gesture (false grade) while f2 was still down. The active-set
+  // + poison flag must suppress all custom gestures until every finger lifts.
+  const r = run([
+    { type: 'down', pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'down', pointerId: 2, x: 200, y: 100, t: 10 },   // poison
+    { type: 'up',   pointerId: 1, x: 100, y: 100, t: 20 },   // f1 up, f2 still held
+    { type: 'down', pointerId: 3, x: 300, y: 100, t: 30 },   // f3 lands (f2 held)
+    { type: 'move', pointerId: 3, x: 180, y: 100, t: 110 },
+    { type: 'up',   pointerId: 3, x: 170, y: 100, t: 120 },  // would be grade-hard if not poisoned
+  ]);
+  assert.deepStrictEqual(r.actions, []);
+  assert.strictEqual(r.st.poisoned, true, 'still poisoned while finger 2 held');
+  assert.deepStrictEqual(r.st.active, [2], 'finger 2 still tracked as active');
+});
+
+test('multi: after the poisoned sequence, lifting the last finger then a clean tap flips', () => {
+  const r = run([
+    { type: 'down', pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'down', pointerId: 2, x: 200, y: 100, t: 10 },
+    { type: 'up',   pointerId: 1, x: 100, y: 100, t: 20 },
+    { type: 'up',   pointerId: 2, x: 200, y: 100, t: 30 },   // ALL fingers up → poison clears
+    { type: 'down', pointerId: 5, x: 50,  y: 50,  t: 400 },  // fresh single-finger tap
+    { type: 'up',   pointerId: 5, x: 51,  y: 51,  t: 470 },
+  ]);
+  assert.deepStrictEqual(r.actions, ['flip']);
+  assert.strictEqual(r.st.poisoned, false);
+  assert.deepStrictEqual(r.st.active, []);
+});
+
+test('multi: pointercancel on one of two fingers, other still held => no action, stays poisoned', () => {
+  const r = run([
+    { type: 'down',   pointerId: 1, x: 100, y: 100, t: 0 },
+    { type: 'down',   pointerId: 2, x: 200, y: 100, t: 10 },
+    { type: 'cancel', pointerId: 1, x: 100, y: 100, t: 20 },
+    { type: 'up',     pointerId: 2, x: 60,  y: 100, t: 120 },  // tracked? no — poisoned
+  ]);
+  assert.deepStrictEqual(r.actions, []);
+  assert.deepStrictEqual(r.st.active, []);
+  assert.strictEqual(r.st.poisoned, false);  // all up now
 });
 
 console.log(`\n${passed} flashcard gesture tests passed.`);

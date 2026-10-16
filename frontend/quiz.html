@@ -181,23 +181,38 @@
     /* ─── Lab Assistant lockout during quiz ─────────────────────────── */
     function lockChatbox() {
       quizActive = true;
+      // Unified lock flag — blocks every GlobalChat.open path (public wrapper
+      // AND internal toggle()).
+      document.documentElement.dataset.gcLocked = '1';
+      // Close any already-open chat panel first — disabling the FAB alone does
+      // not dismiss a panel the user opened on the outline step. 'lock' reason
+      // so close() does not focus the now-disabled FAB.
+      if (window.GlobalChat && window.GlobalChat.isOpen) {
+        try { window.GlobalChat.close('lock'); } catch (_) {}
+      }
       const fab = document.getElementById('gc-fab');
       if (fab) {
         fab.dataset.origTitle = fab.title;
         fab.title = '🔒 Chat locked during quiz';
         fab.style.opacity = '0.45';
         fab.style.pointerEvents = 'none';
+        // Block keyboard activation too, not just pointer events.
+        fab.setAttribute('aria-disabled', 'true');
+        fab.dataset.quizLocked = '1';
       }
       // Navigation guard: warn user before leaving mid-quiz
       window.addEventListener('beforeunload', navGuard);
     }
     function unlockChatbox() {
       quizActive = false;
+      delete document.documentElement.dataset.gcLocked;
       const fab = document.getElementById('gc-fab');
       if (fab) {
         fab.title = fab.dataset.origTitle || 'Open AI Lab Assistant';
         fab.style.opacity = '';
         fab.style.pointerEvents = '';
+        fab.removeAttribute('aria-disabled');
+        delete fab.dataset.quizLocked;
       }
       window.removeEventListener('beforeunload', navGuard);
     }
@@ -397,7 +412,7 @@
       const total = quizData.length;
       const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
       document.getElementById('quiz-progress').innerHTML =
-        `<div class="progress-fill" style="width:${pct}%"></div>
+        `<div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
          <span class="progress-label">${answered}/${total} answered</span>`;
     }
 

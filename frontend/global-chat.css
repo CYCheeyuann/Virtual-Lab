@@ -42,7 +42,13 @@
   border-radius: 12px 12px 2px 12px;
   box-shadow: 0 6px 20px var(--c-accent-glow);
   z-index: 9000;
-  white-space: nowrap;
+  /* Wrap long greetings instead of forcing one line off-screen. The width cap
+     subtracts the right offset (100px) plus a left safe margin (~16px) so the
+     bubble can never cross the left viewport edge. */
+  max-width: calc(100vw - 100px - 16px);
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
   opacity: 0;
   transform: translateX(30px) scale(0.85);
   transition: opacity 0.35s ease, transform 0.35s ease;
@@ -251,27 +257,38 @@
 .gc-send-btn:hover { transform: translateY(-1px); }
 .gc-send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-/* Mobile */
-@media (max-width: 600px) {
+/* Mobile — narrow portrait OR short/landscape phones (coarse pointer). The
+   second condition catches 844×390-type landscape phones that are wider than
+   600px but would otherwise fall back to the desktop panel (bottom:180px,
+   height:540px) and not fit. Keep this in sync with the JS mutual-exclusivity
+   check and welcome-video.js isMobileView(). */
+@media (max-width: 600px), (max-height: 600px) and (pointer: coarse) {
   .gc-panel {
     right: 8px;
     left: 8px;
     width: auto;
     /* dvh follows the visible viewport as the address bar / keyboard change
-       size, and the panel height is capped so the input row never ends up
-       under the software keyboard. safe-area keeps the FAB clear of the home
-       bar. */
-    /* Lift above the software keyboard when open (var set by the
-       visualViewport handler in global-chat.js); 0 when no keyboard. */
+       size; --kb-inset lifts the panel above the software keyboard (0 when no
+       keyboard); safe-area keeps the FAB clear of the home bar. */
     bottom: calc(96px + env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px));
     height: min(72dvh, 72vh);
     max-height: calc(100dvh - 120px - var(--kb-inset, 0px));
   }
   .gc-fab { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 62px; height: 62px; font-size: 1.6rem; }
-  .gc-bubble-hint { right: 82px; bottom: 28px; font-size: 0.75rem; }
+  .gc-bubble-hint { right: 82px; bottom: 28px; font-size: 0.75rem; max-width: calc(100vw - 82px - 14px); }
   /* 16px avoids iOS focus zoom; defined here (global-chat.css loads after
      styles.css) so it wins for the chat input. */
   .gc-input { font-size: 16px; }
+}
+
+/* Short / landscape phones: cap the panel to the visible height and keep the
+   header + messages + input row all reachable; message area scrolls. */
+@media (max-height: 600px) and (pointer: coarse) {
+  .gc-panel {
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px));
+    height: auto;
+    max-height: calc(100dvh - 94px - var(--kb-inset, 0px));
+  }
 }
 
 /* Print: hide globally */

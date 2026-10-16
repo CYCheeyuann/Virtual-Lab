@@ -23,9 +23,74 @@ function decideClickFlip(suppressNextClick) {
   if (suppressNextClick) return { flip: false, suppressNextClick: false };
   return { flip: true, suppressNextClick: false };
 }
+/* Pure pointer-gesture reducer shared by the touch handlers and the regression
+ * test, so the test exercises the REAL multi-touch state machine (not a copy).
+ * `st` is {id, down, moved, cancelled, x0, y0, t0}; `ev` is
+ * {type:'down'|'move'|'up'|'cancel', pointerId, x, y, t}. Returns
+ * {state, action} where action is null | 'flip' | 'grade-hard' | 'grade-easy'.
+ * A second finger during an active gesture cancels it; only the tracked
+ * finger's up resolves a flip/grade. */
+function createGestureState() {
+  return {
+    active: [],       // ids of all pointers currently down on the stage
+    primary: null,    // the finger whose up resolves a flip/grade
+    down: false,
+    moved: false,
+    poisoned: false,  // true once >1 pointer coexisted; blocks custom gestures
+    x0: 0, y0: 0, t0: 0,
+  };
+}
+function reducePointerGesture(st, ev) {
+  const s = Object.assign({}, st, { active: (st.active || []).slice() });
+  if (ev.type === 'down') {
+    if (!s.active.includes(ev.pointerId)) s.active.push(ev.pointerId);
+    if (s.active.length > 1) {
+      // Multi-touch: poison the whole interaction. No custom flip/grade may
+      // fire again until EVERY pointer has lifted — this blocks the "finger
+      // re-lands while another is still held" false-swipe sequence.
+      s.poisoned = true;
+      s.down = false;
+      s.primary = null;
+      return { state: s, action: null };
+    }
+    if (s.poisoned) return { state: s, action: null };   // still mid multi-touch
+    s.primary = ev.pointerId; s.down = true; s.moved = false;
+    s.x0 = ev.x; s.y0 = ev.y; s.t0 = ev.t;
+    return { state: s, action: null };
+  }
+  if (ev.type === 'move') {
+    if (!s.down || ev.pointerId !== s.primary) return { state: s, action: null };
+    if (Math.abs(ev.x - s.x0) > 10 || Math.abs(ev.y - s.y0) > 10) s.moved = true;
+    return { state: s, action: null };
+  }
+  if (ev.type === 'cancel') {
+    s.active = s.active.filter(id => id !== ev.pointerId);
+    if (ev.pointerId === s.primary) { s.down = false; s.primary = null; }
+    if (s.active.length === 0) s.poisoned = false;   // all up → reset poison
+    return { state: s, action: null };
+  }
+  if (ev.type === 'up') {
+    const wasPrimary = ev.pointerId === s.primary;
+    const wasDown = s.down;
+    const poisoned = s.poisoned;
+    s.active = s.active.filter(id => id !== ev.pointerId);
+    if (wasPrimary) { s.down = false; s.primary = null; }
+    const allUp = s.active.length === 0;
+    if (allUp) s.poisoned = false;                   // reset only when truly all up
+    // Resolve a flip/grade ONLY for the tracked primary finger, only if the
+    // interaction was never poisoned by a second finger.
+    if (!wasPrimary || !wasDown || poisoned) return { state: s, action: null };
+    const outcome = classifyFlashcardGesture(ev.x - s.x0, ev.y - s.y0, Math.max(1, ev.t - s.t0), s.moved);
+    const action = outcome === 'flip' ? 'flip'
+                 : outcome === 'grade-hard' ? 'grade-hard'
+                 : outcome === 'grade-easy' ? 'grade-easy' : null;
+    return { state: s, action };
+  }
+  return { state: s, action: null };
+}
 /* istanbul ignore next */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { classifyFlashcardGesture, decideClickFlip };
+  module.exports = { classifyFlashcardGesture, decideClickFlip, reducePointerGesture, createGestureState };
 }
 
 (function () {
@@ -499,7 +564,8 @@ if (typeof module !== 'undefined' && module.exports) {
     queue: [],
     idx: 0,
     breakdown: { hard: 0, okay: 0, easy: 0 },
-    pointer: { down: false, moved: false, x0: 0, y0: 0, t0: 0 },
+    gesture: createGestureState(),
+    gestureSuppressTimer: 0,
     suppressNextClick: false,
   };
 
@@ -523,9 +589,13 @@ if (typeof module !== 'undefined' && module.exports) {
     ui.idx = 0;
     ui.breakdown = { hard: 0, okay: 0, easy: 0 };
     ui.flipped = false;
+    // Fresh gesture state each study session; clear any stale suppress timer.
+    ui.gesture = createGestureState();
+    if (ui.gestureSuppressTimer) { clearTimeout(ui.gestureSuppressTimer); ui.gestureSuppressTimer = 0; }
+    ui.suppressNextClick = false;
     document.getElementById('fcOverlay').classList.add('open');
     ui.overlayOpen = true;
-    document.body.style.overflow = 'hidden';
+    if (window.ScrollLock) ui.scrollLockToken = window.ScrollLock.lock(); else document.body.style.overflow = 'hidden';
     showCurrentCard();
     // Focus the stage so Enter works without an extra click
     setTimeout(() => document.getElementById('fcStage')?.focus(), 50);
@@ -628,9 +698,15 @@ if (typeof module !== 'undefined' && module.exports) {
 
   function exitStudy() {
     document.getElementById('fcOverlay').classList.remove('open');
-    document.body.style.overflow = '';
+    if (window.ScrollLock) { window.ScrollLock.release(ui.scrollLockToken); ui.scrollLockToken = null; }
+    else document.body.style.overflow = '';
     ui.overlayOpen = false;
     ui.flipped = false;
+    // Clear gesture state + any pending suppress timer so a half-finished
+    // multi-touch can't carry over into the next study session.
+    ui.gesture = createGestureState();
+    if (ui.gestureSuppressTimer) { clearTimeout(ui.gestureSuppressTimer); ui.gestureSuppressTimer = 0; }
+    ui.suppressNextClick = false;
     renderLibrary();
   }
 
@@ -659,52 +735,47 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   // Pointer events — on touch they own BOTH tap-to-flip and swipe-to-grade.
-  // The synthesized click that follows a touch tap is suppressed (see
-  // suppressNextClick) so a single tap never flips twice. Desktop mouse flips
-  // through the click listener only.
+  // ALL gesture state lives in reducePointerGesture (the same pure reducer the
+  // regression test drives), so runtime and tests share one implementation.
+  // The synthetic click after a touch tap is suppressed so a single tap never
+  // flips twice. Desktop mouse flips via the click listener instead.
+  function armClickSuppression() {
+    ui.suppressNextClick = true;
+    if (ui.gestureSuppressTimer) clearTimeout(ui.gestureSuppressTimer);
+    ui.gestureSuppressTimer = setTimeout(() => { ui.suppressNextClick = false; }, 400);
+  }
+  function dispatchGesture(type, e) {
+    const r = reducePointerGesture(ui.gesture, {
+      type, pointerId: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(),
+    });
+    ui.gesture = r.state;
+    if (r.action === 'grade-hard')      grade('hard');
+    else if (r.action === 'grade-easy') grade('easy');
+    else if (r.action === 'flip')       flipCard();
+  }
   function onPointerDown(e) {
     if (!ui.overlayOpen) return;
     if (e.pointerType !== 'touch') return;   // desktop uses click handler instead
-    ui.pointer.down = true;
-    ui.pointer.moved = false;
-    ui.pointer.x0 = e.clientX; ui.pointer.y0 = e.clientY; ui.pointer.t0 = Date.now();
+    dispatchGesture('down', e);
   }
   function onPointerMove(e) {
-    if (!ui.pointer.down || e.pointerType !== 'touch') return;
-    if (Math.abs(e.clientX - ui.pointer.x0) > 10 ||
-        Math.abs(e.clientY - ui.pointer.y0) > 10) {
-      ui.pointer.moved = true;
-    }
+    if (e.pointerType !== 'touch') return;
+    dispatchGesture('move', e);
   }
-  // A gesture that the browser turns into a scroll (or that leaves the card)
+  // A gesture the browser turns into a scroll/zoom (or that leaves the card)
   // fires pointercancel — treat it as "no tap, no grade", and still swallow the
   // stray click so we don't flip after a scroll.
   function onPointerCancel(e) {
     if (e.pointerType !== 'touch') return;
-    ui.pointer.down = false;
-    ui.pointer.moved = false;
-    ui.suppressNextClick = true;
-    setTimeout(() => { ui.suppressNextClick = false; }, 400);
+    dispatchGesture('cancel', e);
+    armClickSuppression();
   }
   function onPointerUp(e) {
-    if (!ui.pointer.down) return;
-    ui.pointer.down = false;
     if (e.pointerType !== 'touch') return;
-    // Any touch interaction on the stage must swallow the browser's synthetic
-    // click so tap-flip (handled here) is not immediately undone by click.
-    ui.suppressNextClick = true;
-    setTimeout(() => { ui.suppressNextClick = false; }, 400);
-
-    const dx = e.clientX - ui.pointer.x0;
-    const dy = e.clientY - ui.pointer.y0;
-    const dt = Math.max(1, Date.now() - ui.pointer.t0);
-
-    // Single source of truth with the regression test. A swipe grades (and
-    // never also flips); a vertical scroll does nothing; a tiny tap flips once.
-    const outcome = classifyFlashcardGesture(dx, dy, dt, ui.pointer.moved);
-    if (outcome === 'grade-hard')      grade('hard');
-    else if (outcome === 'grade-easy') grade('easy');
-    else if (outcome === 'flip')       flipCard();
+    // Any touch interaction on the stage swallows the browser's synthetic click
+    // so a tap-flip handled here is not immediately undone by the click event.
+    armClickSuppression();
+    dispatchGesture('up', e);
   }
 
   // ══════════════════════════════════════════════════════════════════════

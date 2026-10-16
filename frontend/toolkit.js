@@ -178,6 +178,7 @@
     panel.id = 'tk-panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'Quick Toolkit');
+    panel.setAttribute('inert', '');   // closed by default — isolate from tab/pointer
     panel.innerHTML = `
       <div class="tk-header">
         <div class="tk-title">🧮 Quick Toolkit</div>
@@ -213,13 +214,17 @@
   function open(tab) {
     // On phones the two bottom panels would overlap and hide each other's
     // controls, so opening the toolkit closes the floating chat first. On wider
-    // screens they can coexist, so we leave the chat alone there.
-    if (window.matchMedia('(max-width: 600px)').matches &&
+    // screens they can coexist. Breakpoint matches global-chat.js / CSS:
+    // narrow portrait OR short/landscape coarse-pointer phones.
+    if (window.matchMedia('(max-width: 600px), (max-height: 600px) and (pointer: coarse)').matches &&
         window.GlobalChat && window.GlobalChat.isOpen) {
-      try { window.GlobalChat.close(); } catch (_) {}
+      // 'takeover': the toolkit is taking over; chat must NOT grab focus back.
+      try { window.GlobalChat.close('takeover'); } catch (_) {}
     }
     panelOpen = true;
-    document.getElementById('tk-panel').classList.add('open');
+    const panel = document.getElementById('tk-panel');
+    panel.classList.add('open');
+    panel.removeAttribute('inert');
     document.getElementById('tk-backdrop').classList.add('show');
     document.getElementById('tk-fab').classList.add('panel-open');
     document.getElementById('tk-fab').innerHTML = '<span class="tk-fab-icon">✕</span>';
@@ -227,10 +232,20 @@
   }
   function close() {
     panelOpen = false;
-    document.getElementById('tk-panel').classList.remove('open');
+    const panel = document.getElementById('tk-panel');
+    // Move focus out before isolating, so focus doesn't get stuck on an inert
+    // control, then restore to the toolkit FAB for keyboard users.
+    const fab = document.getElementById('tk-fab');
+    const active = document.activeElement;
+    if (active && panel.contains(active) && typeof active.blur === 'function') active.blur();
+    panel.classList.remove('open');
+    panel.setAttribute('inert', '');
     document.getElementById('tk-backdrop').classList.remove('show');
-    document.getElementById('tk-fab').classList.remove('panel-open');
-    document.getElementById('tk-fab').innerHTML = '<span class="tk-fab-icon">🧮</span>';
+    fab.classList.remove('panel-open');
+    fab.innerHTML = '<span class="tk-fab-icon">🧮</span>';
+    if (fab && document.visibilityState === 'visible') {
+      try { fab.focus({ preventScroll: true }); } catch (_) {}
+    }
   }
 
   function switchTab(tab) {

@@ -618,6 +618,14 @@ select option:hover {
   width: 22px;
   flex: 0 0 22px;
 }
+/* The option text is the flex child after .opt-letter. min-width:0 lets it
+   shrink and overflow-wrap breaks long URLs / no-space formulas instead of
+   stretching the option past the card. Normal spaced sentences wrap naturally. */
+.quiz-option > span:not(.opt-letter) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.quiz-q-title, .quiz-explanation { overflow-wrap: anywhere; }
 .quiz-option.correct {
   background: var(--c-success-bg);
   border-color: var(--c-success-fg);
@@ -690,12 +698,18 @@ select option:hover {
 }
 
 /* Quiz progress bar */
+/* Wrapper no longer clips: it stacks the clipped track above a normal-flow
+   label so the "N/M answered" text is never hidden by the 8px track's
+   overflow:hidden (previously the label was absolutely positioned at top:12px
+   inside an 8px overflow:hidden box and got clipped at every viewport). */
 .quiz-progress-bar {
+  margin-bottom: 18px;
+}
+.quiz-progress-bar .progress-track {
   position: relative;
   height: 8px;
   background: var(--c-input-bg);
   border-radius: 6px;
-  margin-bottom: 18px;
   overflow: hidden;
 }
 .quiz-progress-bar .progress-fill {
@@ -705,9 +719,9 @@ select option:hover {
   transition: width 0.3s ease;
 }
 .quiz-progress-bar .progress-label {
-  position: absolute;
-  right: 0;
-  top: 12px;
+  display: block;
+  margin-top: 6px;
+  text-align: right;
   font-size: 0.75rem;
   color: var(--c-muted);
 }
@@ -726,9 +740,11 @@ select option:hover {
 }
 .quiz-history-item .history-meta {
   flex: 1;
+  min-width: 0;                /* allow long topic names to wrap, not overflow */
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-wrap: anywhere;
 }
 .quiz-history-item .history-meta span { font-size: 0.78rem; color: var(--c-muted); }
 .quiz-history-item .history-score { text-align: right; }
@@ -1065,8 +1081,8 @@ select option:hover {
   animation: toastSlideIn 0.28s ease-out;
 }
 .toast.toast-out { animation: toastSlideOut 0.28s ease-in forwards; }
-.toast .toast-icon { font-size: 1.05rem; }
-.toast .toast-msg { flex: 1; line-height: 1.45; }
+.toast .toast-icon { font-size: 1.05rem; flex: 0 0 auto; }
+.toast .toast-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
 .toast .toast-close {
   background: transparent;
   border: none;
@@ -1443,14 +1459,17 @@ select option:hover {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Detail modal */
+/* Detail modal. z-index 11500 matches the experiment detail overlay and sits
+   above the body-level chat (9001) and toolkit (10000) panels. This only works
+   because the backdrop is reparented to <body> at init (chapter.html) — inside
+   .page (z-index:1) it would be trapped in that stacking context. */
 .chapter-modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  z-index: 5000;
+  z-index: 11500;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1843,6 +1862,13 @@ select option:hover {
   color: var(--c-accent-2);
   margin-bottom: 16px;
   padding-right: 40px;
+}
+/* The title text is a flex child next to the icon; without min-width:0 a long
+   title can't shrink/wrap and overflows under the close button. */
+.node-detail-panel h2 #nodeDetailTitleText,
+.node-detail-panel h2 .node-detail-title-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .node-detail-body {
   font-size: 0.94rem;

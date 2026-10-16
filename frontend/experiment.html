@@ -408,18 +408,34 @@
     }
 
     /* ─── Detail panel (modal) ─── */
+    let nodeScrollToken = null;   // owned ScrollLock token for the detail modal
+    let nodeFocusRelease = null;  // focus-trap release for the detail modal
     function openDetail(sectionKey) {
       if (!sessionCache || !sessionCache.sections) return;
       const body = sessionCache.sections[sectionKey] || '';
       document.getElementById('nodeDetailIcon').textContent = SECTION_ICONS[sectionKey] || '';
       document.getElementById('nodeDetailTitleText').textContent = SECTION_TITLES[sectionKey] || sectionKey;
       document.getElementById('nodeDetailBody').innerHTML = renderSectionMarkdown(body);
-      document.getElementById('nodeDetailBackdrop').hidden = false;
+      const bd = document.getElementById('nodeDetailBackdrop');
+      const triggerBox = document.querySelector(`.node-box[data-section="${sectionKey}"]`);
+      const wasHidden = bd.hidden;
+      if (wasHidden && window.ScrollLock) nodeScrollToken = window.ScrollLock.lock(nodeScrollToken || undefined);
+      bd.hidden = false;
       // Mark the box as viewed
-      document.querySelector(`.node-box[data-section="${sectionKey}"]`)?.classList.add('viewed');
+      triggerBox?.classList.add('viewed');
+      // Trap focus inside the panel and remember the trigger box for restore.
+      if (wasHidden && window.trapFocus && !nodeFocusRelease) {
+        const panel = bd.querySelector('.node-detail-panel') || bd;
+        nodeFocusRelease = window.trapFocus(panel, triggerBox || null);
+      }
     }
     function closeDetail() {
-      document.getElementById('nodeDetailBackdrop').hidden = true;
+      const bd = document.getElementById('nodeDetailBackdrop');
+      if (!bd.hidden) {
+        if (nodeFocusRelease) { try { nodeFocusRelease(); } catch (_) {} nodeFocusRelease = null; }
+        if (window.ScrollLock) { window.ScrollLock.release(nodeScrollToken); nodeScrollToken = null; }
+      }
+      bd.hidden = true;
     }
     document.querySelectorAll('.node-box').forEach(box => {
       box.addEventListener('click', () => openDetail(box.dataset.section));

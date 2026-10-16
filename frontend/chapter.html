@@ -35,6 +35,7 @@
       <p>Select a subject and level to see all chapters, or type a specific topic to filter. Click any card to expand.</p>
     </div>
 
+    <section class="card">
       <label for="subject">Subject</label>
       <select id="subject" class="input">
         <option value="Biology">Biology</option>
@@ -103,6 +104,19 @@
     document.getElementById('runBtn').innerHTML   = `${iconHtml('bolt')}<span>Generate</span>`;
     document.getElementById('resetBtn').innerHTML = `${iconHtml('refresh','btn-icon-rotate')}<span>Reset</span>`;
     document.getElementById('copilotSend').innerHTML = `${iconHtml('plane','btn-icon-plane')}<span>Ask</span>`;
+
+    // The detail modal lives inside <main class="page">, whose
+    // `position:relative; z-index:1` creates a stacking context — so the modal
+    // could never paint above the body-level chat/toolkit panels no matter how
+    // high its own z-index was. Reparent it to <body> so its z-index (11500,
+    // matching the experiment detail overlay) actually wins. Event listeners
+    // bind by id below, so moving the node keeps them intact.
+    (function reparentModal() {
+      const backdrop = document.getElementById('modal-backdrop');
+      if (backdrop && backdrop.parentElement !== document.body) {
+        document.body.appendChild(backdrop);
+      }
+    })();
 
     let chaptersData = [];
     let chapterContext = '';
@@ -208,20 +222,56 @@
         card.className = 'chapter-card' + (detailCache[ch.title] ? ' cached' : '');
         card.style.animationDelay = `${i * 0.08}s`;
         card.dataset.index = i;
+        // Keyboard-accessible: focusable + button semantics so focus() works and
+        // Enter/Space open the detail (matching the click).
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `Open chapter: ${ch.title || 'Untitled'}`);
         card.innerHTML = `
           <div class="chapter-card-num">Ch. ${escapeHtml(ch.chapterNumber || String(i+1))}</div>
           <div class="chapter-card-title">${escapeHtml(ch.title || 'Untitled')}</div>
           <div class="chapter-card-desc">${escapeHtml(ch.shortDescription || '')}</div>`;
         card.addEventListener('click', () => openDetail(ch, card));
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();          // stop Space page-scroll / double fire
+            openDetail(ch, card);
+          }
+        });
         grid.appendChild(card);
       });
     }
 
     // ── Detail modal with caching ──
+    // Lifecycle (open flag, scroll-lock token, hide timer) is handled by the
+    // shared createOverlayLock() helper in common.js — the SAME helper the
+    // lifecycle test drives, so page and test can't diverge. Focus trapping is
+    // layered on top here.
+    let modalFocusRelease = null;
+    const modalCtl = (window.createOverlayLock)
+      ? window.createOverlayLock({
+          hideMs: 300,
+          onHide: () => { document.getElementById('modal-backdrop').style.display = 'none'; },
+        })
+      : null;
     async function openDetail(ch, cardEl) {
       const backdrop = document.getElementById('modal-backdrop');
       const content = document.getElementById('modal-content');
+      const wasOpen = modalCtl ? modalCtl.isOpen() : false;
       backdrop.style.display = 'flex';
+      if (modalCtl) modalCtl.open();     // idempotent; cancels a pending hide; locks once
+      // Trap keyboard focus only on a real open transition.
+      if (!wasOpen && window.trapFocus) {
+        const idx = cardEl ? cardEl.dataset.index : null;
+        const fallback = () => (idx != null
+          ? document.querySelector(`.chapter-card[data-index="${idx}"]`)
+          : null) || document.getElementById('chapter-grid');
+        requestAnimationFrame(() => {
+          if (modalCtl && modalCtl.isOpen() && !modalFocusRelease) {
+            modalFocusRelease = window.trapFocus(document.getElementById('chapter-modal'), cardEl || null, fallback);
+          }
+        });
+      }
       requestAnimationFrame(() => backdrop.classList.add('show'));
 
       const cacheKey = ch.title || '';
@@ -330,9 +380,15 @@
       if (e.target === e.currentTarget) closeDetail();
     });
     function closeDetail() {
+      if (modalCtl && !modalCtl.isOpen()) return;   // idempotent
       const backdrop = document.getElementById('modal-backdrop');
       backdrop.classList.remove('show');
-      setTimeout(() => { backdrop.style.display = 'none'; }, 300);
+      // Release the focus trap + restore focus to the trigger card (or fallback).
+      if (modalFocusRelease) { try { modalFocusRelease(); } catch (_) {} modalFocusRelease = null; }
+      // Controller releases its own lock token (idempotent) and schedules the
+      // display:none hide, which a reopen cancels.
+      if (modalCtl) modalCtl.close();
+      else backdrop.style.display = 'none';
     }
 
     // ── Co-pilot ──

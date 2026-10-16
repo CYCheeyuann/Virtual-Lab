@@ -234,14 +234,17 @@
 .tk-conv-formula { font-size: 0.75rem; color: var(--c-muted); margin-top: 6px; }
 
 /* Mobile */
-@media (max-width: 600px) {
+/* Narrow portrait OR short/landscape coarse-pointer phones (matches
+   global-chat.css + the JS mutual-exclusivity check). */
+@media (max-width: 600px), (max-height: 600px) and (pointer: coarse) {
   .tk-fab { right: 14px; bottom: 90px; width: 48px; height: 48px; font-size: 1.3rem; }
   .tk-fab::after { display: none; }
   .tk-panel {
     left: 0; right: 0; top: auto; width: 100%; max-width: 100%;
     /* Rise above the software keyboard (var set by the visualViewport handler
        in global-chat.js, shared across panels); 0 when no keyboard. dvh tracks
-       browser-UI changes; safe-area clears the home indicator. */
+       browser-UI changes; safe-area clears the home indicator. On short
+       landscape, cap to the visible height so the panel content stays usable. */
     bottom: var(--kb-inset, 0px);
     max-height: min(50dvh, 50vh);
     padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
@@ -258,6 +261,10 @@
   /* 16px avoids iOS focus zoom. Defined here (toolkit.css loads after
      styles.css) so it is the winning rule for these controls. */
   .tk-conv-input, .tk-conv-select, .tk-search { font-size: 16px; }
+}
+/* Short landscape: the bottom sheet uses most of the viewport height. */
+@media (max-height: 600px) and (pointer: coarse) {
+  .tk-panel { max-height: min(82dvh, 82vh); }
 }
 
 /* Print */

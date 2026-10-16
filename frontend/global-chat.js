@@ -55,6 +55,17 @@
 
   let isOpen = false;
   let hasUnread = false;
+  let gcFocusTimer = 0;   // pending auto-focus timer, cancellable on close
+  let gcFocusRaf = 0;     // pending deferred FAB-focus rAF, cancellable on close
+
+  // Phone viewport = narrow portrait OR short/landscape coarse-pointer device.
+  // Matches the CSS breakpoint and toolkit.js so panel sizing and the
+  // chat/toolkit mutual-exclusivity stay consistent.
+  function isPhoneViewport() {
+    return window.matchMedia(
+      '(max-width: 600px), (max-height: 600px) and (pointer: coarse)'
+    ).matches;
+  }
   // Tracks the currently streaming reply so the user can abort it via the
   // 🗑️ clear button (or simply by sending another message).
   let activeAbort = null;
@@ -87,6 +98,9 @@
     panel.className = 'gc-panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'AI Lab Assistant');
+    // Closed by default — isolate from keyboard/pointer until opened so hidden
+    // controls aren't tabbable. open() removes this.
+    panel.setAttribute('inert', '');
     panel.innerHTML = `
       <div class="gc-header">
         <div class="gc-title">🤖 Lab Assistant</div>
@@ -103,7 +117,7 @@
     document.body.appendChild(panel);
 
     document.getElementById('gc-clear').addEventListener('click', clearHistory);
-    document.getElementById('gc-close').addEventListener('click', close);
+    document.getElementById('gc-close').addEventListener('click', () => close('user'));
     document.getElementById('gc-input-row').addEventListener('submit', (e) => {
       e.preventDefault();
       const input = document.getElementById('gc-input');
@@ -286,34 +300,87 @@
 
   /* ── Open / close / clear ─────────────────────────────────── */
   function open() {
+    // Unified lock: a host page (e.g. Quiz during answering) can set
+    // document.documentElement.dataset.gcLocked = '1' to block ALL open paths,
+    // including the internal toggle()→open() route that bypasses the public
+    // window.GlobalChat.open wrapper.
+    if (document.documentElement.dataset.gcLocked === '1') {
+      if (typeof window.showToast === 'function') {
+        window.showToast('🔒 Lab Assistant is locked during the quiz. Submit your quiz first.', 'warning');
+      }
+      return;
+    }
     const panel = document.getElementById('gc-panel');
     const fab   = document.getElementById('gc-fab');
     if (!panel) return;
-    // On phones, close the toolkit bottom-sheet first so the two panels don't
-    // overlap and hide each other's controls. Wider screens can show both.
-    if (window.matchMedia('(max-width: 600px)').matches &&
-        window.Toolkit && window.Toolkit.isOpen) {
+    // On phones (narrow OR short/landscape coarse-pointer), close the toolkit
+    // bottom-sheet first so the two panels don't overlap and hide each other's
+    // controls. Wider screens can show both. Must match the CSS breakpoint and
+    // toolkit.js.
+    if (isPhoneViewport() && window.Toolkit && window.Toolkit.isOpen) {
       try { window.Toolkit.close(); } catch (_) {}
     }
     panel.classList.add('open');
+    panel.removeAttribute('inert');
     if (fab) fab.classList.add('hidden');
     isOpen = true;
     hasUnread = false;
     if (fab) fab.classList.remove('has-unread');
-    setTimeout(() => {
+    // Track the delayed focus so close() can cancel it — otherwise a quick
+    // open→close leaves a pending focus that drags the caret (and keyboard)
+    // back into a now-hidden input.
+    if (gcFocusTimer) clearTimeout(gcFocusTimer);
+    gcFocusTimer = setTimeout(() => {
+      gcFocusTimer = 0;
+      if (!isOpen) return;                 // closed in the meantime — do nothing
       const inp = document.getElementById('gc-input');
       if (inp) inp.focus();
     }, 50);
   }
-  function close() {
+  // close(reason): the reason decides whether focus returns to the chat FAB.
+  //   'user'      (default) — user dismissed it → restore focus to the FAB.
+  //   'takeover'  — another overlay (toolkit) is opening; it manages focus, so
+  //                 DON'T steal focus back to the chat FAB.
+  //   'lock'      — Quiz locked the chat; the FAB is disabled, don't focus it.
+  //   'lifecycle' — page hide / BFCache etc.; don't move focus.
+  function close(reason) {
+    reason = reason || 'user';
     const panel = document.getElementById('gc-panel');
     const fab   = document.getElementById('gc-fab');
     if (!panel) return;
+    // Cancel any pending auto-focus / deferred focus so a hidden input or a
+    // stale focus task can't run after a quick close→reopen.
+    if (gcFocusTimer) { clearTimeout(gcFocusTimer); gcFocusTimer = 0; }
+    if (gcFocusRaf) { cancelAnimationFrame(gcFocusRaf); gcFocusRaf = 0; }
+    // Move focus out of the panel before hiding it, then isolate the hidden
+    // panel from keyboard/pointer with inert so its controls aren't tabbable.
+    const active = document.activeElement;
+    if (active && panel.contains(active) && typeof active.blur === 'function') {
+      active.blur();
+    }
     panel.classList.remove('open');
+    panel.setAttribute('inert', '');
     if (fab) fab.classList.remove('hidden');
     isOpen = false;
+    // Only a user-initiated close returns focus to the FAB. Takeover/lock/
+    // lifecycle closes must not grab focus (the taking-over overlay owns it,
+    // or the FAB is disabled/irrelevant).
+    if (reason === 'user' && fab &&
+        !fab.classList.contains('hidden') &&
+        document.documentElement.dataset.gcLocked !== '1' &&
+        document.visibilityState === 'visible') {
+      gcFocusRaf = requestAnimationFrame(() => {
+        gcFocusRaf = 0;
+        // Re-check at execution time: don't focus if we were re-opened, locked,
+        // or the toolkit opened in the meantime.
+        if (isOpen) return;
+        if (document.documentElement.dataset.gcLocked === '1') return;
+        if (window.Toolkit && window.Toolkit.isOpen) return;
+        try { fab.focus({ preventScroll: true }); } catch (_) {}
+      });
+    }
   }
-  function toggle() { isOpen ? close() : open(); }
+  function toggle() { isOpen ? close('user') : open(); }
 
   function clearHistory() {
     // Stop any in-flight streaming reply so it can't keep appending after
@@ -387,13 +454,37 @@
     let raf = 0;
     let focusoutTimer = 0;
 
+    const isEditableFocused = () => {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+    };
     const apply = () => {
       raf = 0;
-      // Overlap = how much of the layout viewport bottom is covered by the
-      // keyboard = innerHeight - (visualViewport height + its top offset).
-      const overlap = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
-      // Ignore tiny values (address-bar jitter) so we don't fight the UI.
-      root.style.setProperty('--kb-inset', (overlap > 80 ? overlap : 0) + 'px');
+      // METHOD (heuristic — see caveats):
+      //   layout viewport bottom covered = innerHeight - (vv.height + vv.offsetTop)
+      // When the page is pinch-zoomed, vv.height is ALSO divided by vv.scale,
+      // so that raw difference conflates zoom with the keyboard. We can only
+      // approximate the keyboard portion. Approach:
+      //   - Convert the visual-viewport height back to layout-CSS px by
+      //     multiplying by scale, so zoom alone contributes ~0 overlap.
+      //   - Treat the remainder as keyboard only when it is substantial (>80px)
+      //     and a keyboard is plausible (either not zoomed, or an editable is
+      //     focused — covering "zoom first, then type").
+      // CAVEATS / SUPPORT: visualViewport is unavailable on very old browsers
+      // (then --kb-inset stays 0 and panels fall back to dvh). The zoom/keyboard
+      // split is approximate; exact behaviour on iOS Safari / Android Chrome
+      // with the on-screen keyboard is NOT verified without a real device.
+      const scale = vv.scale || 1;
+      const layoutVisibleH = vv.height * scale;            // undo zoom shrink
+      const overlap = Math.max(0, window.innerHeight - (layoutVisibleH + vv.offsetTop * scale));
+      const zoomed = scale > 1.05;
+      const keyboardLikely = !zoomed || isEditableFocused();
+      // Clamp to <=60% of viewport so a bad reading can't shove the panel off.
+      const capped = Math.min(overlap, window.innerHeight * 0.6);
+      const inset = (keyboardLikely && capped > 80) ? Math.round(capped) : 0;
+      root.style.setProperty('--kb-inset', inset + 'px');
     };
     const onChange = () => { if (!raf) raf = requestAnimationFrame(apply); };
     // Reset when a field blurs (keyboard dismissed) — some browsers don't fire

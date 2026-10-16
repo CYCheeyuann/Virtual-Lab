@@ -404,6 +404,16 @@
   .fc-grade { padding: 8px 14px; }
 }
 
+/* ── Short / landscape viewports: keep exit + grading reachable ───────── */
+@media (max-height: 520px) {
+  .fc-overlay { padding: 10px; align-items: stretch; }
+  .fc-session { margin: auto 0; gap: 8px; }
+  .fc-stage { height: min(48vh, 260px); }
+  .fc-face { padding: 16px 18px; }
+  .fc-front .fc-prompt { font-size: 1.05rem; }
+  .fc-grade { padding: 8px 14px; }
+}
+
 /* ── Preview list (collapsed accordion of cards) ─────────────────────── */
 .preview-list {
   display: flex;

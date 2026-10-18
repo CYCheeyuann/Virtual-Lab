@@ -6,7 +6,7 @@ An AI-powered learning companion for Biology, Chemistry, and Physics — sliced 
 
 - **AWS Lambda** (Python 3.12, Flask, Lambda Web Adapter, response streaming)
 - **Amazon Bedrock**
-  - Text: Claude Haiku 4.5 via the **global** inference profile
+  - Text: Claude Haiku 5.5 via the **global** inference profile
     (`global.anthropic.claude-haiku-4-5-20251001-v1:0`), called from
     `ap-southeast-1`.
   - Image: **Stability AI Stable Diffusion 3.5 Large**

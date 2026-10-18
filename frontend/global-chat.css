@@ -256,6 +256,13 @@
 }
 .gc-send-btn:hover { transform: translateY(-1px); }
 .gc-send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+/* ui-icons.js swaps the ➤ glyph for a stroke-only SVG (stroke=currentColor).
+   The base .vsl-icon color is the mint --c-accent, which sits on this button's
+   mint→primary gradient and renders near-invisible. Force white so the
+   paper-plane reads clearly on the gradient (matches the button's own
+   color:#fff). This is a contrast fix only — it does NOT touch the disabled
+   opacity, which still communicates the empty-input state. */
+.gc-send-btn .vsl-icon { color: #fff; }
 
 /* Mobile — narrow portrait OR short/landscape phones (coarse pointer). The
    second condition catches 844×390-type landscape phones that are wider than

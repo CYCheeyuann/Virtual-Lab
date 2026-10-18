@@ -459,7 +459,7 @@
           <div class="quiz-q-title">Q${qi + 1}. ${quizHtml(q.question_stem)}</div>
           <div class="quiz-options">${optsHtml}</div>
           <div class="quiz-explanation">
-            <strong>${picked ? (isCorrect ? '✅ Correct' : `❌ Correct: ${q.correct_answer}`) : `⚪ Not answered · Correct: ${q.correct_answer}`}</strong><br/>
+            <strong>${picked ? (isCorrect ? '✅ Correct' : `❌ Correct: ${quizHtml(q.correct_answer)}`) : `⚪ Not answered · Correct: ${quizHtml(q.correct_answer)}`}</strong><br/>
             ${quizHtml(q.detailed_explanation || '')}
           </div>`;
         resultsContainer.appendChild(card);

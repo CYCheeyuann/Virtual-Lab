@@ -159,3 +159,71 @@ class TestGenerate:
         _, client = app_for("science_quiz")
         resp = client.post("/", json={"action": "explode", "subject": "Physics"})
         assert resp.status_code == 400
+
+
+class TestQuestionValidation:
+    """A malformed correct_answer must not flow through to the results page,
+    where it is rendered. The backend returns an understandable error instead
+    of silently guessing (and never echoes raw model text)."""
+
+    def test_correct_answer_not_in_options_rejected(self, mock_bedrock, app_for):
+        _, client = app_for("science_quiz")
+        bad = [{
+            "question_stem": "What is X?",
+            "options": {"A": "Alpha", "B": "Beta", "C": "Gamma", "D": "Delta"},
+            "correct_answer": "E",   # not a valid option key
+            "detailed_explanation": "...",
+        }]
+        mock_bedrock.set_text_response(json.dumps(bad))
+        resp = client.post("/", json={
+            "action": "generate", "subject": "Physics", "topic": "X",
+            "difficulty": "SPM", "outline": "x", "num_questions": 5,
+        })
+        body = resp.get_json()
+        assert "questions" not in body, "invalid question must not reach the client"
+        assert "error" in body
+        assert "raw" not in body  # re-injection guard preserved
+
+    def test_missing_option_for_answer_rejected(self, mock_bedrock, app_for):
+        _, client = app_for("science_quiz")
+        bad = [{
+            "question_stem": "Q?",
+            "options": {"A": "Alpha", "B": "Beta", "C": "Gamma", "D": ""},  # D empty
+            "correct_answer": "D",   # points at an empty option
+            "detailed_explanation": "...",
+        }]
+        mock_bedrock.set_text_response(json.dumps(bad))
+        resp = client.post("/", json={
+            "action": "generate", "subject": "Physics", "topic": "X",
+            "difficulty": "SPM", "outline": "x", "num_questions": 5,
+        })
+        body = resp.get_json()
+        assert "questions" not in body
+        assert "error" in body
+
+    def test_non_string_option_rejected(self, mock_bedrock, app_for):
+        _, client = app_for("science_quiz")
+        bad = [{
+            "question_stem": "Q?",
+            "options": {"A": "Alpha", "B": 7, "C": "Gamma", "D": "Delta"},  # B not a str
+            "correct_answer": "A",
+            "detailed_explanation": "...",
+        }]
+        mock_bedrock.set_text_response(json.dumps(bad))
+        resp = client.post("/", json={
+            "action": "generate", "subject": "Physics", "topic": "X",
+            "difficulty": "SPM", "outline": "x", "num_questions": 5,
+        })
+        body = resp.get_json()
+        assert "questions" not in body
+        assert "error" in body
+
+    def test_valid_questions_still_pass_through(self, mock_bedrock, app_for):
+        _, client = app_for("science_quiz")
+        mock_bedrock.set_text_response(json.dumps(_questions(4)))
+        resp = client.post("/", json={
+            "action": "generate", "subject": "Physics", "topic": "X",
+            "difficulty": "SPM", "outline": "x", "num_questions": 4,
+        })
+        body = resp.get_json()
+        assert "questions" in body and len(body["questions"]) == 4

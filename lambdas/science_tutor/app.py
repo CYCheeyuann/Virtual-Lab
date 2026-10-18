@@ -15,11 +15,13 @@ from flask import Flask, Response, request, stream_with_context
 from prompt_safety import INJECTION_GUARD, tag
 from prompts import load_prompt
 from validators import (
+    require_object_body,
     sanitize_subject,
     sanitize_topic,
     trim_history,
     validate_api_key,
     validate_file,
+    validate_message,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +36,14 @@ _PROMPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts
 _TUTOR_TEMPLATE = load_prompt(_PROMPTS_DIR, "system")
 
 
+def _json_error(message, status=400):
+    """Consistent JSON error response that KEEPS the CORS headers the normal
+    error paths (401, 413) attach — a validation failure must not drop CORS."""
+    h = cors_headers()
+    h["Content-Type"] = "application/json"
+    return Response(json.dumps({"error": message}), status=status, headers=h)
+
+
 @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "OPTIONS"])
 @app.route("/<path:path>", methods=["GET", "POST", "OPTIONS"])
 def handler(path):
@@ -46,9 +56,42 @@ def handler(path):
         return Response(json.dumps({"error": "Unauthorized"}), status=401,
                         content_type="application/json", headers=cors_headers())
 
-    body = request.get_json(force=True, silent=True) or {}
-    subject   = sanitize_subject(body.get("subject", ""))
-    message   = sanitize_topic(body.get("message", ""), max_len=2000)
+    # Parse the body. A truly EMPTY body is allowed and defaults to {} (so a
+    # bare POST still works). But a NON-empty body that is malformed JSON, or a
+    # literal `null`, or any non-object JSON (array/string/number/bool), is a
+    # client error — reject it as a consistent 4xx instead of silently coercing
+    # it to {} and proceeding to a (billable) model call.
+    raw = request.get_data(cache=True) or b""
+    if raw.strip() == b"":
+        body = {}
+    else:
+        body = request.get_json(force=True, silent=True)
+        if body is None:
+            # Non-empty body that did not parse as JSON, or parsed to JSON null.
+            return _json_error("Request body must be valid JSON.", status=400)
+
+    # Request body must be a JSON OBJECT. An array/string/number/bool used to
+    # reach body.get(...) and raise AttributeError → 500; return a consistent
+    # 4xx (with CORS headers) instead.
+    body_err = require_object_body(body)
+    if body_err:
+        return _json_error(body_err, status=400)
+
+    # Subject handling at the request boundary:
+    #   - absent  → keep the existing default (sanitize_subject → "Biology").
+    #   - present but NOT a string (e.g. [] or {}) → reject as a 400 before any
+    #     model call. (sanitize_subject tolerates non-strings so it never 500s,
+    #     but an explicit wrong TYPE is a client error we refuse rather than
+    #     silently default — the requirement is reject-with-400, not coerce.)
+    #   - present and a string → sanitize as before (unknown strings default).
+    raw_subject = body.get("subject")
+    if raw_subject is not None and not isinstance(raw_subject, str):
+        return _json_error("subject must be a string.", status=400)
+    subject = sanitize_subject(raw_subject if raw_subject is not None else "")
+    # message must be a string (a number used to crash sanitize_topic → 500).
+    message, msg_err = validate_message(body.get("message", ""), max_len=2000)
+    if msg_err:
+        return _json_error(msg_err, status=400)
     # Cap history at 10 turns (was 20) to bound per-request input cost.
     # Legitimate conversations rarely need more, and the frontend ringbuffer
     # already keeps its own copy if more context is needed.
@@ -82,7 +125,10 @@ def handler(path):
         # Defence-in-depth: only accept the two roles Bedrock expects, and
         # only string content. Anything else from the client is dropped, so a
         # tampered frontend can't seed fake assistant turns with arbitrary
-        # role values.
+        # role values. A non-dict history item (e.g. a bare string/number in
+        # the array) is skipped rather than crashing on .get().
+        if not isinstance(msg, dict):
+            continue
         role = msg.get("role")
         content = msg.get("content", "")
         if role not in ("user", "assistant") or not isinstance(content, str) or not content:

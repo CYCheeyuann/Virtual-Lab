@@ -67,8 +67,16 @@
     ).matches;
   }
   // Tracks the currently streaming reply so the user can abort it via the
-  // 🗑️ clear button (or simply by sending another message).
+  // 🗑️ clear button. While a reply is in flight, further sends are REFUSED
+  // (not queued, not fire-a-second-request) so one awaited reply = one backend
+  // call — the frontend half of avoiding duplicate (billable) generations.
   let activeAbort = null;
+  let replyInFlight = false;
+  // Monotonic generation token. clearHistory() bumps it so a late response
+  // from a request that started before the clear can detect it is stale and
+  // refuse to write to the (now reused) message list. This does NOT rely on
+  // array indices, which get reused when state.messages is replaced.
+  let chatGen = 0;
 
   /* ── DOM build ────────────────────────────────────────────── */
   // Reuse the global escapeHtml from common.js when available, else fall back
@@ -123,8 +131,10 @@
       const input = document.getElementById('gc-input');
       const v = input.value.trim();
       if (!v) return;
-      sendUser(v);
-      input.value = '';
+      // sendUser returns false when a reply is still in flight. In that case
+      // we must NOT clear the box — the user's text is preserved so a send
+      // refused during the wait is never silently lost.
+      if (sendUser(v) !== false) input.value = '';
     });
 
     render();
@@ -189,7 +199,18 @@
     return out;
   }
 
-  async function streamReply(userText) {
+  // streamReply(userText, opts):
+  //   opts.popLastUserTurn — drop the trailing history turn because it is the
+  //     live user text we are about to send as `message` (the sendUser path:
+  //     the text is already pushed into state.messages). Defaults to true for
+  //     backwards compatibility.
+  //   When FALSE (the injectContent path) the trailing turn is the injected
+  //     page-context body — it must STAY in history so the shared content
+  //     actually reaches the model; the `message` we send is only the ack
+  //     prompt, which is NOT in history.
+  async function streamReply(userText, opts) {
+    opts = opts || {};
+    const popLastUserTurn = opts.popLastUserTurn !== false;
     const url = window.STREAM_URLS && window.STREAM_URLS.science_tutor;
     if (!url || url.startsWith('__URL_')) {
       pushMessage({
@@ -200,16 +221,22 @@
       return;
     }
 
-    // If a previous reply is still streaming, abort it first.
-    if (activeAbort) { try { activeAbort.abort(); } catch (_) {} }
     activeAbort = new AbortController();
     const localAbort = activeAbort;
+    // Snapshot the generation this request belongs to. If clearHistory() bumps
+    // chatGen while we're awaiting, isCurrent() turns false and we refuse to
+    // touch the fresh message list (no index reuse, no stale error write-back).
+    const myGen = chatGen;
+    const isCurrent = () => myGen === chatGen && localAbort === activeAbort;
+    replyInFlight = true;
 
     // History snapshot BEFORE we add the placeholder assistant bubble.
     const apiHistory = buildApiHistory();
-    // The just-pushed user message is already in apiHistory; the backend
-    // expects `message` separately and `history` to hold prior turns only.
-    apiHistory.pop();
+    // On the sendUser path the just-pushed user message is already the last
+    // entry of apiHistory; the backend expects `message` separately and
+    // `history` to hold prior turns only, so drop it. On the injectContent
+    // path we must NOT pop — the trailing turn is the shared body context.
+    if (popLastUserTurn) apiHistory.pop();
 
     const subject = (typeof window.getSavedSubject === 'function')
       ? window.getSavedSubject()
@@ -249,13 +276,15 @@
         const { done, value } = await reader.read();
         if (done) break;
         full += decoder.decode(value, { stream: true });
-        // Bail quietly if the user cleared the chat mid-stream — the bubble
-        // is already gone and we don't want to revive it.
-        if (localAbort.signal.aborted || !state.messages[idx]) return;
+        // Bail quietly if the user cleared the chat (or started a newer send)
+        // mid-stream — the bubble belongs to a wiped/stale list.
+        if (!isCurrent() || !state.messages[idx]) return;
         state.messages[idx].content = full;
         render();
       }
-      if (!state.messages[idx]) return;
+      // Stale guard: a response that resolves AFTER a clear must not write to
+      // the reused list. Check the generation, not just the index.
+      if (!isCurrent() || !state.messages[idx]) return;
       state.messages[idx].content = full || '(no response)';
       state.messages[idx].source  = 'manual';
       saveHistory(state);
@@ -265,37 +294,86 @@
         // User clicked clear; nothing to surface.
         return;
       }
-      if (state.messages[idx]) {
+      // A plain network error on an OLD request (cleared, or superseded) must
+      // NOT overwrite the current message — guard the error path by generation
+      // too, not only by the (reusable) array index.
+      if (isCurrent() && state.messages[idx]) {
         state.messages[idx].content = '⚠️ ' + (err.message || 'request failed');
         state.messages[idx].source  = 'system';
         saveHistory(state);
         render();
       }
     } finally {
-      if (activeAbort === localAbort) activeAbort = null;
+      // Only the CURRENT request releases shared state: a stale/aborted
+      // request's finally must not clear the in-flight flag of a newer send.
+      if (isCurrent()) {
+        replyInFlight = false;
+        activeAbort = null;
+      }
     }
   }
 
   function sendUser(text) {
+    // In-flight guard shared by every send entry point (form submit, Enter,
+    // and any future caller): while a reply is awaited, a repeat send is
+    // REFUSED — it must not fire a second (billable) request. Returning false
+    // lets the caller keep the user's text in the input box.
+    if (replyInFlight) {
+      if (typeof window.showToast === 'function') {
+        window.showToast('⏳ Wait for the current reply to finish.', 'warning');
+      }
+      return false;
+    }
     pushMessage({ role: 'user', content: text, source: 'manual' });
-    streamReply(text);
+    // The live user turn is now the last entry in history → pop it before
+    // sending (backend wants it in `message`, not `history`).
+    streamReply(text, { popLastUserTurn: true });
+    return true;
   }
 
   function injectContent(content, sourcePage, sourceLabel) {
     if (!content) return;
     const label = sourceLabel || SOURCE_LABEL[sourcePage] || '📋 From page';
+    const body = typeof content === 'string' ? content : String(content);
+    // Dedupe: injecting the SAME body from the SAME page twice in a row must
+    // not stack two identical context turns (e.g. a double-click on "Send to
+    // AI"). Skip the push if the most recent page-inject already carries it.
+    let lastInject = null;
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      if (state.messages[i].source === 'page-inject') { lastInject = state.messages[i]; break; }
+    }
+    const duplicate = lastInject &&
+      lastInject.content === body && lastInject.sourcePage === sourcePage;
+
+    // Always surface the panel so the user sees their shared content, even
+    // when we end up not firing a request below.
+    open();
+
+    // A repeat share of the SAME body from the SAME page must not fire a
+    // second (billable) generation — not just skip the history push. Skip the
+    // whole request when the body duplicates the most recent inject.
+    if (duplicate) return;
+
+    // Likewise, if a reply is already streaming, do not stack a second
+    // request. Keep the body in history (so it still reaches the model on the
+    // next turn) but don't dispatch an ack request on top of the live one.
     pushMessage({
       role: 'user',
-      content: typeof content === 'string' ? content : String(content),
+      content: body,
       source: 'page-inject',
       sourcePage,
       sourceLabel: label,
     });
+    if (replyInFlight) return;
+
     // Ask the tutor to acknowledge + summarise so the user immediately sees
-    // the assistant has the context. We pipe a synthetic user message so the
-    // backend treats prior turns + the injected blob as conversation context.
-    streamReply(`I just shared content from "${label}". Briefly acknowledge what you received and offer to help.`);
-    open();
+    // the assistant has the context. The ack prompt is sent as `message`; the
+    // injected body stays in `history` (popLastUserTurn=false) so the model
+    // actually receives the shared content on the very first share.
+    streamReply(
+      `I just shared content from "${label}". Briefly acknowledge what you received and offer to help.`,
+      { popLastUserTurn: false }
+    );
   }
 
   /* ── Open / close / clear ─────────────────────────────────── */
@@ -384,9 +462,14 @@
 
   function clearHistory() {
     // Stop any in-flight streaming reply so it can't keep appending after
-    // we've reset the message list.
+    // we've reset the message list. Bumping chatGen invalidates that request's
+    // generation so even a NON-abort path (a plain network error resolving
+    // later) sees isCurrent()===false and refuses to write to the fresh list.
+    // Reset replyInFlight so the user can send immediately after clearing.
+    chatGen++;
     if (activeAbort) { try { activeAbort.abort(); } catch (_) {} }
     activeAbort = null;
+    replyInFlight = false;
     state = { messages: [] };
     saveHistory(state);
     state.messages.push({

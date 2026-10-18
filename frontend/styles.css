@@ -727,31 +727,69 @@ select option:hover {
 }
 
 /* Quiz history items */
-.quiz-history-item {
-  display: flex;
+/* Quiz history card. Scoped to #phase-history so these rules can never leak to
+   other pages. Grid (not a single flex row) so the title block is never
+   squeezed into a sliver by the score + buttons — the old flex-wrap made even
+   ordinary words wrap character-by-character on phones. Desktop: meta on the
+   left takes the free space, score + actions sit on the right. */
+#phase-history .quiz-history-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas: "meta score actions";
   align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
+  column-gap: 14px;
+  row-gap: 10px;
   padding: 14px 16px;
   background: var(--c-bg-glass-2);
   border: 1px solid var(--c-border);
   border-radius: 12px;
   margin-bottom: 10px;
 }
-.quiz-history-item .history-meta {
-  flex: 1;
+#phase-history .quiz-history-item .history-meta {
+  grid-area: meta;
   min-width: 0;                /* allow long topic names to wrap, not overflow */
   display: flex;
   flex-direction: column;
   gap: 2px;
-  overflow-wrap: anywhere;
+  overflow-wrap: anywhere;     /* only unbreakable runs hard-break; words wrap normally */
 }
-.quiz-history-item .history-meta span { font-size: 0.78rem; color: var(--c-muted); }
-.quiz-history-item .history-score { text-align: right; }
-.quiz-history-item .score-good { color: var(--c-success-fg); font-weight: 700; }
-.quiz-history-item .score-warn { color: var(--c-warning-fg); font-weight: 700; }
-.quiz-history-item .history-status { display: block; font-size: 0.72rem; color: var(--c-muted); text-transform: uppercase; }
+#phase-history .quiz-history-item .history-meta span { font-size: 0.78rem; color: var(--c-muted); }
+#phase-history .quiz-history-item .history-score { grid-area: score; text-align: right; }
+#phase-history .quiz-history-item .score-good { color: var(--c-success-fg); font-weight: 700; }
+#phase-history .quiz-history-item .score-warn { color: var(--c-warning-fg); font-weight: 700; }
+#phase-history .quiz-history-item .history-status { display: block; font-size: 0.72rem; color: var(--c-muted); text-transform: uppercase; }
+#phase-history .quiz-history-item .history-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#phase-history .quiz-history-item .history-delete-label { display: none; }   /* desktop: icon-only delete */
 .btn-sm { padding: 8px 14px; font-size: 0.82rem; }
+
+/* Phones: stop the four blocks fighting for one row. Stack them —
+   title + meta, then score, then the action buttons — each on its own
+   full-width line so the title reads normally and nothing is clipped.
+   Scoped to #phase-history. */
+@media (max-width: 600px) {
+  #phase-history .quiz-history-item {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "meta"
+      "score"
+      "actions";
+    align-items: stretch;
+  }
+  #phase-history .quiz-history-item .history-score { text-align: left; }
+  #phase-history .quiz-history-item .history-actions { width: 100%; }
+  /* Full, comfortable touch targets (>=44x44) and a visible Delete label. */
+  #phase-history .quiz-history-item .history-actions .btn-sm {
+    flex: 1;
+    min-height: 44px;
+    justify-content: center;
+  }
+  #phase-history .quiz-history-item .history-delete-label { display: inline; }
+}
 
 .particle {
   position: fixed;

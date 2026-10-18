@@ -560,12 +560,14 @@
             <span class="${h.status === 'Completed' ? 'score-good' : 'score-warn'}">${h.correct}/${h.total} (${h.pct}%)</span>
             <span class="history-status">${escapeHtml(h.status)}</span>
           </div>
-          <button class="btn btn-ghost btn-sm" data-act="retake">
-            ${iconHtml('refresh','btn-icon-rotate')}<span>Retake</span>
-          </button>
-          <button class="btn btn-ghost btn-sm" data-act="delete" title="Delete" style="color:var(--c-error-fg)">
-            ${iconHtml('trash','btn-icon-trash')}<span></span>
-          </button>
+          <div class="history-actions">
+            <button class="btn btn-ghost btn-sm" data-act="retake">
+              ${iconHtml('refresh','btn-icon-rotate')}<span>Retake</span>
+            </button>
+            <button class="btn btn-ghost btn-sm history-delete" data-act="delete" aria-label="Delete this quiz" title="Delete" style="color:var(--c-error-fg)">
+              ${iconHtml('trash','btn-icon-trash')}<span class="history-delete-label">Delete</span>
+            </button>
+          </div>
         </div>
       `).join('');
 

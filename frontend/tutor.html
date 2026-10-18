@@ -91,6 +91,18 @@
     let pendingFile = { data: null, mime: null, name: null };
     setupDropzone('dz', 'file', 'file-info', f => pendingFile = f);
 
+    // ── Send/async state guard ─────────────────────────────────────────
+    // One in-flight request at a time: click, Enter and any other entry point
+    // all go through send(), which bails while a request is active so a 2nd
+    // Enter can't start a concurrent request. `tutorGen` is a monotonic
+    // generation counter — clearing the conversation (resetBtn) aborts the
+    // live fetch AND bumps the generation, so a late-resolving old request
+    // checks its captured generation before writing history/DOM/button state
+    // and silently drops out if it is stale.
+    let tutorInFlight = false;
+    let tutorAbort = null;
+    let tutorGen = 0;
+
     function renderInline(text) {
       return escapeHtml(text)
         .replace(/^### (.+)$/gm, '<strong>$1</strong>')
@@ -107,7 +119,14 @@
       const sendBtn = document.getElementById('sendBtn');
       const message = input.value.trim();
       if (!message) return;
+      // In-flight guard: covers click, Enter and any future entry point. A
+      // repeat click/Enter while awaiting the current reply does nothing.
+      if (tutorInFlight) return;
 
+      tutorInFlight = true;
+      const myGen = tutorGen;
+      const ctrl = new AbortController();
+      tutorAbort = ctrl;
       setButtonLoading(sendBtn, true, 'Sending…');
       const subject = document.getElementById('subject').value;
       const panel   = document.getElementById('chat-panel');
@@ -137,6 +156,8 @@
         showToast('Streaming URL not configured', 'error');
         if (followScroll) followScroll.destroy();
         setButtonLoading(sendBtn, false);
+        tutorInFlight = false;
+        if (tutorAbort === ctrl) tutorAbort = null;
         return;
       }
 
@@ -149,11 +170,15 @@
         document.getElementById('file-info').textContent = '';
       }
 
+      // True while THIS request is still the current generation (not cleared).
+      const isCurrent = () => myGen === tutorGen;
+
       try {
         const resp = await fetch(url, {
           method: 'POST',
           headers: apiHeaders(),
           body: JSON.stringify(body),
+          signal: ctrl.signal,
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
@@ -166,13 +191,19 @@
             const { done, value } = await reader.read();
             if (done) break;
             full += dec.decode(value, { stream: true });
+            // Conversation was cleared mid-stream — stop touching the DOM; the
+            // bubble belongs to a wiped panel.
+            if (!isCurrent()) return;
             botBubble.innerHTML = renderInline(full) + '<span class="streaming-cursor"></span>';
             if (followScroll) followScroll.onContentGrow();   // pin only if user is following
           }
         } finally {
-          botBubble.innerHTML = renderInline(full);
+          if (isCurrent()) botBubble.innerHTML = renderInline(full);
           if (followScroll) { followScroll.settle(); followScroll.destroy(); }
         }
+        // Stale guard: if the session was cleared while this request was in
+        // flight, do NOT write its turns back into the fresh history.
+        if (!isCurrent()) return;
         history.push({ role: 'user', content: message });
         history.push({ role: 'assistant', content: full });
         recordActivity(subject);
@@ -185,22 +216,45 @@
           });
         }
       } catch (err) {
-        botBubble.innerHTML = `<span class="error-msg">⚠️ ${err.message}</span>`;
-        showToast(`Failed: ${err.message}`, 'error');
+        // An abort from clearing the conversation is expected — stay silent and
+        // leave the fresh panel untouched.
+        if (err && err.name === 'AbortError') return;
+        if (isCurrent()) {
+          botBubble.innerHTML = `<span class="error-msg">⚠️ ${escapeHtml(err.message)}</span>`;
+          showToast(`Failed: ${err.message}`, 'error');
+        }
       } finally {
         if (followScroll) followScroll.destroy();   // idempotent: remove scroll listener
-        setButtonLoading(sendBtn, false);
+        // Only the CURRENT request restores shared state: an aborted/stale
+        // request must not re-enable the button for (or clear the in-flight
+        // flag of) a newer send.
+        if (isCurrent()) {
+          setButtonLoading(sendBtn, false);
+          tutorInFlight = false;
+          if (tutorAbort === ctrl) tutorAbort = null;
+        }
       }
     }
 
     document.getElementById('sendBtn').addEventListener('click', send);
     document.getElementById('chatInput').addEventListener('keydown', e => {
+      // Don't send mid-IME composition (Chinese/Japanese/Korean input): the
+      // Enter that commits a candidate must stay with the IME. keyCode 229 is
+      // the legacy signal some browsers still fire during composition.
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+        e.preventDefault();   // Shift+Enter still falls through → newline
         send();
       }
     });
     document.getElementById('resetBtn').addEventListener('click', () => {
+      // Cancel any in-flight request and bump the generation so its late
+      // response (if it still resolves) is treated as stale and writes nothing
+      // back into the fresh conversation.
+      tutorGen++;
+      if (tutorAbort) { try { tutorAbort.abort(); } catch (_) {} tutorAbort = null; }
+      tutorInFlight = false;
+      setButtonLoading(document.getElementById('sendBtn'), false);
       history = [];
       pendingFile = { data: null, mime: null, name: null };
       document.getElementById('file-info').textContent = '';

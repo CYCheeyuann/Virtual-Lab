@@ -644,6 +644,12 @@ if (typeof module !== 'undefined' && module.exports) {
 
     summary.hidden = true;
     stage.style.display = '';
+    // Re-show the grading buttons. A previous session's end screen set
+    // actions.hidden = true; starting a new round (same deck again OR a
+    // different deck) runs through here, so without this reset the Hard/Okay/
+    // Easy row would stay hidden on round 2. (v2 rule: grading is always
+    // visible, no flip gate — see the comment below.)
+    actions.hidden = false;
     const card = ui.queue[ui.idx];
     document.getElementById('fcPrompt').innerHTML = richText(card.front);
     document.getElementById('fcAnswer').innerHTML = richText(card.back);
@@ -839,6 +845,15 @@ if (typeof module !== 'undefined' && module.exports) {
         if (id) setTimeout(() => startStudy(id), 250);
       }
     } catch (_) {}
+  }
+
+  // Node-only test seam: expose the study controller so the round-2 grading
+  // regression test can drive the SAME startStudy/grade/exitStudy the page
+  // uses (instead of copying the state logic). Guarded by `module` so it is a
+  // no-op in the browser, where `module` is undefined and this is skipped.
+  /* istanbul ignore next */
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports.__studyControls = { startStudy, grade, exitStudy, showCurrentCard };
   }
 
   if (document.readyState === 'loading') {

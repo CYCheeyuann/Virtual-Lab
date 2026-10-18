@@ -34,6 +34,11 @@ def validate_api_key(request):
 
 
 def sanitize_subject(value):
+    # A non-string value (e.g. [] or {}) is unhashable, so ``value in
+    # VALID_SUBJECTS`` would raise ``TypeError: unhashable type`` → 500.
+    # Treat any non-string as "not a valid subject" and fall back safely.
+    if not isinstance(value, str):
+        return "Biology"
     return value if value in VALID_SUBJECTS else "Biology"
 
 
@@ -80,7 +85,42 @@ def validate_file(file_data, file_mime):
 
 
 def trim_history(history, max_turns=MAX_HISTORY_TURNS):
-    """Keep only the last N conversation turns."""
-    if not history:
+    """Keep only the last N conversation turns.
+
+    Defensive: a non-list (string, number, dict, None) yields an empty
+    history rather than raising, so a tampered/mistyped client body cannot
+    crash the handler. Item-shape filtering (role/content types) is handled
+    by the caller when it builds the Bedrock messages.
+    """
+    if not isinstance(history, list):
         return []
     return history[-max_turns:]
+
+
+def require_object_body(body):
+    """Validate that a parsed JSON request body is an object (dict).
+
+    A JSON array, string, number, boolean or null is NOT a valid request body
+    for these services (which read named fields), and letting one through
+    causes an AttributeError (→ 500) on the first ``body.get(...)``. Returns an
+    error string when the body is not a dict, else None.
+    """
+    if not isinstance(body, dict):
+        return "Request body must be a JSON object."
+    return None
+
+
+def validate_message(value, max_len=MAX_TOPIC_LENGTH):
+    """Validate a free-text message field, returning (text, error).
+
+    - A missing/empty value is allowed (callers may default it).
+    - A non-string value (e.g. a number or array) is REJECTED with an error so
+      it surfaces as a 4xx instead of crashing ``sanitize_topic`` with a
+      TypeError (→ 500).
+    - A valid string is trimmed to ``max_len`` via ``sanitize_topic``.
+    """
+    if value is None or value == "":
+        return "", None
+    if not isinstance(value, str):
+        return None, "message must be a string."
+    return sanitize_topic(value, max_len=max_len), None

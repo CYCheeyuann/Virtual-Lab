@@ -248,6 +248,11 @@
     // lifecycle test drives, so page and test can't diverge. Focus trapping is
     // layered on top here.
     let modalFocusRelease = null;
+    // Monotonic request id so only the LATEST non-cached detail fetch may
+    // mutate the modal. Opening chapter A then B (or closing the modal) bumps
+    // this; a slow/failed earlier response whose id no longer matches is
+    // ignored, so it can't overwrite the current chapter's content or error.
+    let detailReqSeq = 0;
     const modalCtl = (window.createOverlayLock)
       ? window.createOverlayLock({
           hideMs: 300,
@@ -276,6 +281,10 @@
 
       const cacheKey = ch.title || '';
 
+      // A new open supersedes any in-flight fetch — only this request may
+      // write the modal from here on.
+      const myReq = ++detailReqSeq;
+
       // If cached, show immediately — no loading, no fetch
       if (detailCache[cacheKey]) {
         renderDetailContent(content, detailCache[cacheKey], ch);
@@ -301,15 +310,24 @@
         if (json.error && !json.data) throw new Error(json.error);
         const d = json.data;
 
-        // Cache it
+        // Cache it (caching is safe regardless of ordering — it's keyed by
+        // title — so we still populate the cache even for a superseded open).
         detailCache[cacheKey] = d;
         savePageState();
+
+        // Stale/out-of-order guard: a newer open (or a close) bumped the seq,
+        // so this response must NOT touch the current modal content.
+        if (myReq !== detailReqSeq) return;
+
         // Mark card as cached visually
         if (cardEl) cardEl.classList.add('cached');
 
         renderDetailContent(content, d, ch);
         chapterContext = JSON.stringify(d);
       } catch (err) {
+        // Same guard on the error path: a failed earlier request must not
+        // overwrite the chapter the user is currently looking at.
+        if (myReq !== detailReqSeq) return;
         content.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(err.message)}</div>`;
       }
     }
@@ -381,6 +399,9 @@
     });
     function closeDetail() {
       if (modalCtl && !modalCtl.isOpen()) return;   // idempotent
+      // Invalidate any in-flight detail fetch so a response arriving after the
+      // modal closes can't repaint/overwrite the (now hidden) content.
+      detailReqSeq++;
       const backdrop = document.getElementById('modal-backdrop');
       backdrop.classList.remove('show');
       // Release the focus trap + restore focus to the trigger card (or fallback).

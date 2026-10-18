@@ -46,6 +46,39 @@ def _sanitize_diff(v):
     return v if v in VALID_DIFFICULTIES else "SPM"
 
 
+_MCQ_KEYS = ("A", "B", "C", "D")
+
+
+def _valid_question(q):
+    """Validate one model-generated MCQ against the question contract.
+
+    Guards the results page: a malformed ``correct_answer`` (not A–D, or one
+    that does not map to a real option) must NOT flow through to the frontend.
+    Returns True only when the question matches the schema the UI expects.
+    """
+    if not isinstance(q, dict):
+        return False
+    stem = q.get("question_stem")
+    explanation = q.get("detailed_explanation")
+    options = q.get("options")
+    answer = q.get("correct_answer")
+    if not isinstance(stem, str) or not stem.strip():
+        return False
+    if not isinstance(explanation, str):
+        return False
+    if not isinstance(options, dict):
+        return False
+    for key in _MCQ_KEYS:
+        if not isinstance(options.get(key), str) or not options[key].strip():
+            return False
+    # correct_answer must be one of A–D AND point at a real, non-empty option.
+    if answer not in _MCQ_KEYS:
+        return False
+    if not isinstance(options.get(answer), str) or not options[answer].strip():
+        return False
+    return True
+
+
 def _parse_num_questions(raw, default=10, lo=3, hi=20):
     """Parse and clamp num_questions; raise ValueError on non-integer input."""
     if raw is None or raw == "":
@@ -219,6 +252,20 @@ Generate the JSON array now, using the values inside the tags as the quiz parame
         h["Content-Type"] = "application/json"
         return Response(json.dumps({
             "error": "Quiz format could not be parsed. Try again.",
+        }), status=200, headers=h)
+
+    # Validate each question against the MCQ contract. A malformed question
+    # (e.g. correct_answer="E", or an answer key with no matching option) must
+    # not reach the results page, where the answer is rendered. Return an
+    # understandable error instead of silently guessing. Do NOT echo raw model
+    # text (keeps the re-injection guard intact).
+    if not questions or not all(_valid_question(q) for q in questions):
+        logger.warning("Quiz contained an invalid question; n=%s",
+                       len(questions) if isinstance(questions, list) else "n/a")
+        h = cors_headers()
+        h["Content-Type"] = "application/json"
+        return Response(json.dumps({
+            "error": "Quiz contained an invalid question. Try again.",
         }), status=200, headers=h)
 
     h = cors_headers()
